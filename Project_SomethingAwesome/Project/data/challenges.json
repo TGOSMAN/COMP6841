@@ -7,6 +7,7 @@
     "points": 100,
     "scenario": "A smart tolling corridor receives ETA and toll telemetry from passing vehicles. The operator assumed the air interface was private because it was not published.",
     "objective": "Inspect the waterfall and explain the first contested-spectrum principle: anyone in range can observe transmissions.",
+    "signal_scheme": "C01 OOK/ASK passive recon: a fixed low-duty roadside beacon plus a weak neighbouring burst, designed to teach visibility before exploitation.",
     "concepts": ["passive collection", "waterfall interpretation", "threat modelling"],
     "steps": [
       "Open the waterfall and identify the repeating burst pattern.",
@@ -16,9 +17,10 @@
     ],
     "artifacts": [
       {
-        "label": "Waterfall JSON",
-        "href": "/captures/tolling-waterfall.json",
-        "type": "application/json"
+        "label": "C01 OOK passive recon capture",
+        "href": "/captures/01-passive-recon-ook.json",
+        "type": "application/json",
+        "role": "signal"
       }
     ],
     "hints": [
@@ -36,6 +38,7 @@
     "points": 180,
     "scenario": "The tolling unit emits short telemetry bursts near the toll gantry. The capture contains a simple teaching modulation rather than a real tolling standard.",
     "objective": "Use the artifact metadata and waterfall to identify the channel, burst timing, modulation family, and vehicle identifier.",
+    "signal_scheme": "C02 2-FSK hop-set discovery: a fixed pilot and a five-channel hopping telemetry burst used to recover VH-7A29.",
     "concepts": ["ASK/OOK", "channel identification", "device identifiers", "SigMF metadata"],
     "steps": [
       "Download the SigMF metadata and inspect the centre frequency and sample rate.",
@@ -44,6 +47,12 @@
       "Recover the training vehicle ID used by later backend tasks."
     ],
     "artifacts": [
+      {
+        "label": "C02 2-FSK hop capture",
+        "href": "/captures/02-fsk-hop-scheme.json",
+        "type": "application/json",
+        "role": "signal"
+      },
       {
         "label": "SigMF metadata",
         "href": "/captures/tolling-beacon.sigmf-meta",
@@ -75,6 +84,7 @@
     "points": 220,
     "scenario": "A decoded RF frame appears to carry enough backend parameters to request a toll quote.",
     "objective": "Read the simplified telemetry payload and identify why the checksum is not a real authentication mechanism.",
+    "signal_scheme": "C03 BPSK framed request: visible preamble, payload body, and checksum trailer blocks that map onto decoded toll fields.",
     "concepts": ["protocol reversing", "weak checksums", "replay risk", "telemetry trust"],
     "steps": [
       "Open the decoded packet notes.",
@@ -83,6 +93,12 @@
       "Submit the checksum weakness flag."
     ],
     "artifacts": [
+      {
+        "label": "C03 BPSK frame decode capture",
+        "href": "/captures/03-frame-decode-bpsk.json",
+        "type": "application/json",
+        "role": "signal"
+      },
       {
         "label": "Decoded packet notes",
         "href": "/captures/decoded-packets.json",
@@ -104,6 +120,7 @@
     "points": 280,
     "scenario": "The web toll API accepts vehicle IDs recovered from the RF capture. One training endpoint builds SQL unsafely so you can study injection and the correct defence.",
     "objective": "Use the local API console to trigger an SQL error, enumerate schema details, and find the toll schedule table.",
+    "signal_scheme": "C04 CSS/LoRa-like uplink bridge: the recovered RF identifier becomes the backend query parameter, where SQLi begins.",
     "concepts": ["SQL injection", "schema discovery", "unsafe string concatenation", "parameterized queries"],
     "steps": [
       "Query the vulnerable events endpoint with vehicle_id=VH-7A29.",
@@ -112,6 +129,12 @@
       "Find the schedules table and submit the recon flag."
     ],
     "artifacts": [
+      {
+        "label": "C04 backend ID uplink capture",
+        "href": "/captures/04-backend-id-uplink.json",
+        "type": "application/json",
+        "role": "signal"
+      },
       {
         "label": "Vulnerable endpoint",
         "href": "/api/toll/events?vehicle_id=VH-7A29",
@@ -138,6 +161,7 @@
     "points": 320,
     "scenario": "The toll quote service trusts a schedule code from telemetry. Your goal is to get a zero-dollar trip without being an operator.",
     "objective": "Combine recovered RF parameters with backend behaviour to request a schedule that prices the trip at zero.",
+    "signal_scheme": "C05 GFSK replay logic trace: an original STANDARD burst and a delayed drifting replay echo carrying MAINT_FREE.",
     "concepts": ["business logic abuse", "authorization failure", "trusted telemetry", "server-side validation"],
     "steps": [
       "Use the recovered vehicle, booth, and route fields.",
@@ -146,6 +170,12 @@
       "Submit the flag returned by the quote service."
     ],
     "artifacts": [
+      {
+        "label": "C05 replay free-trip capture",
+        "href": "/captures/05-replay-free-trip.json",
+        "type": "application/json",
+        "role": "signal"
+      },
       {
         "label": "Quote endpoint template",
         "href": "/api/toll/quote?vehicle_id=VH-7A29&booth_id=EAST-17&route_code=BIRCH&schedule_code=STANDARD",
@@ -167,6 +197,7 @@
     "points": 360,
     "scenario": "A recovered roadside maintenance utility decodes SFCTF telemetry frames. The source-backed artifact mirrors the local binary challenge path for systems where a compiler is not available.",
     "objective": "Reverse the frame format, identify the weak checksum boundary, and recover the decoder flag.",
+    "signal_scheme": "C06 Manchester-coded maintenance frame: timing transitions and a checksum trailer drive the decoder reverse-engineering task.",
     "concepts": ["reverse engineering", "packet formats", "field offsets", "checksum analysis"],
     "steps": [
       "Open the telemetry frame artifact and identify the delimiter and magic/version field.",
@@ -175,6 +206,12 @@
       "Recover the flag emitted by the decoder when the checksum validates."
     ],
     "artifacts": [
+      {
+        "label": "C06 decoder clock recovery capture",
+        "href": "/captures/06-decoder-clock-recovery.json",
+        "type": "application/json",
+        "role": "signal"
+      },
       {
         "label": "Telemetry frame",
         "href": "/artifacts/telemetry-frame.txt",
@@ -206,6 +243,7 @@
     "points": 420,
     "scenario": "A synthetic roadside parser copies telemetry fields into fixed-size buffers. The unsafe version represents the class of memory-safety mistakes that serious RF/cyber systems must eliminate.",
     "objective": "Compare the vulnerable and safe parser sources, explain the memory-safety flaw, and trigger or reason about the controlled local success condition.",
+    "signal_scheme": "C07 AFSK long-field burst: a malformed VHF-style callsign field becomes parser input and reaches the stack-copy bug.",
     "concepts": ["binary exploitation", "buffer overflow", "unsafe parsing", "compiler hardening", "fuzzing"],
     "steps": [
       "Read the vulnerable parser source and identify the unsafe copy operation.",
@@ -214,6 +252,12 @@
       "Submit the flag associated with the controlled parser success condition."
     ],
     "artifacts": [
+      {
+        "label": "C07 parser overflow burst",
+        "href": "/captures/07-parser-overflow-burst.json",
+        "type": "application/json",
+        "role": "signal"
+      },
       {
         "label": "Vulnerable parser source",
         "href": "/tools/rsu_parser/rsu_parser_vuln.c",
@@ -250,6 +294,7 @@
     "points": 440,
     "scenario": "The signal is no longer just a visible burst. The player must infer framing behaviour from hop timing, preamble, sync word, whitening, and field boundaries.",
     "objective": "Reverse the RF-side framing notes enough to recover the preamble, sync word, hop set, whitening seed, and frame field order.",
+    "signal_scheme": "C08 DSSS-over-FHSS waveform RE: a widened spread payload rides a hop schedule with explicit sync and whitening artefacts.",
     "concepts": ["RF reverse engineering", "preamble recovery", "sync words", "whitening", "FHSS hop sets", "field boundary analysis"],
     "steps": [
       "Open the annotated contested waterfall and identify the hop-set timing.",
@@ -260,9 +305,10 @@
     ],
     "artifacts": [
       {
-        "label": "Annotated contested waterfall",
-        "href": "/captures/tolling-waterfall.json",
-        "type": "application/json"
+        "label": "C08 DSSS/FHSS waveform capture",
+        "href": "/captures/08-waveform-dsss-hop.json",
+        "type": "application/json",
+        "role": "signal"
       },
       {
         "label": "Waveform RE notes",
@@ -290,6 +336,7 @@
     "points": 560,
     "scenario": "A synthetic roadside-unit firmware bundle contains debug strings, a command table, and a training key derivation path. The goal is reverse engineering, not real device exploitation.",
     "objective": "Reverse the firmware manifest and source-backed image notes to find the hidden diagnostic command and explain why hard-coded secrets are unacceptable.",
+    "signal_scheme": "C09 maintenance diagnostic sideband: a narrowband FSK service channel leaks command names that line up with firmware strings.",
     "concepts": ["firmware reverse engineering", "strings", "command tables", "key material", "secure boot", "attestation"],
     "steps": [
       "Open the firmware manifest and identify architecture, memory map, and enabled hardening notes.",
@@ -299,6 +346,12 @@
       "Submit the firmware RE flag."
     ],
     "artifacts": [
+      {
+        "label": "C09 maintenance sideband capture",
+        "href": "/captures/09-maintenance-sideband.json",
+        "type": "application/json",
+        "role": "signal"
+      },
       {
         "label": "Firmware manifest",
         "href": "/tools/firmware_re/firmware_manifest.json",
@@ -330,6 +383,7 @@
     "points": 580,
     "scenario": "A second synthetic parser accepts binary-ish telemetry frames with nested TLVs. It has a length-field mismatch that models a common protocol parser bug class.",
     "objective": "Compare vulnerable and safe TLV parser sources, identify the integer/length mismatch, and use the malicious sample to reach the controlled flag path.",
+    "signal_scheme": "C10 4-FSK malformed TLV burst: header cadence and an oversized value block feed the length-field parser bug.",
     "concepts": ["binary exploitation", "TLV parsing", "integer mismatch", "heap/stack safety", "fuzzing harnesses", "state-machine validation"],
     "steps": [
       "Read the vulnerable TLV parser and identify where declared length and available buffer length diverge.",
@@ -339,6 +393,12 @@
       "Submit the length-field exploit flag."
     ],
     "artifacts": [
+      {
+        "label": "C10 malformed TLV burst",
+        "href": "/captures/10-tlv-malformed-burst.json",
+        "type": "application/json",
+        "role": "signal"
+      },
       {
         "label": "Vulnerable TLV parser",
         "href": "/tools/tlv_parser/tlv_parser_vuln.c",
@@ -364,21 +424,28 @@
   },
   {
     "id": "operator-console-xss",
-    "title": "Operator Console XSS",
+    "title": "RF-to-Operator XSS Sink",
     "track": "cyber",
     "difficulty": "Medium-Hard",
     "points": 260,
-    "scenario": "Decoded RF events are displayed in an operator console. Attack Mode renders operator comments as HTML, turning decoded telemetry into a browser sink.",
-    "objective": "Inject a harmless local training payload into an operator comment, then switch to Secure Mode and confirm the same content is rendered as text.",
+    "scenario": "Decoded RF note fields are displayed in an operator console. Attack Mode renders one decoded note as HTML, turning RF-origin text into a browser execution sink.",
+    "objective": "Receive an AFSK-style operator-note burst, post the decoded note, and see why RF-derived strings must be output-encoded before browser rendering.",
+    "signal_scheme": "C11 AFSK operator-note telemetry: a decoded note field crosses from RF analysis into an operator web console, demonstrating the sink.",
     "concepts": ["XSS", "output encoding", "safe DOM APIs", "RF-to-web trust boundary"],
     "steps": [
       "Open the operator console in Attack Mode.",
       "Use Receive RF burst to decode the current radio intercept into operational fields.",
-      "Post the decoded event with a harmless HTML payload in operator_comment.",
-      "Observe that the unsafe renderer treats the comment as markup.",
-      "Switch to Secure Mode and observe that comments are escaped/rendered as text."
+      "Post the decoded event with its RF-origin operator_note field.",
+      "Observe that the unsafe renderer treats the decoded note as markup.",
+      "Switch to Secure Mode and observe that the same RF-origin note is escaped/rendered as text."
     ],
     "artifacts": [
+      {
+        "label": "C11 operator-note AFSK capture",
+        "href": "/captures/11-operator-afsk-xss.json",
+        "type": "application/json",
+        "role": "signal"
+      },
       {
         "label": "Operator events",
         "href": "/operator/events",
@@ -386,9 +453,9 @@
       }
     ],
     "hints": [
-      "The sink is not the radio packet itself; it is the operator console rendering decoded text unsafely.",
-      "A harmless payload can set visible text in the local page rather than exfiltrating anything.",
-      "Secure Mode demonstrates output encoding and safe DOM rendering."
+      "The sink is not the RF demodulator; it is the browser console rendering a decoded RF string unsafely.",
+      "A harmless local payload proves the trust-boundary failure without exfiltration.",
+      "Secure Mode demonstrates output encoding and safe DOM rendering for the exact same decoded note."
     ],
     "flag": "CTF{CONSOLE_XSS_CHAIN}"
   },
@@ -400,6 +467,7 @@
     "points": 520,
     "scenario": "The range now contains a fixed roadside beacon, hopping telemetry, a drifting replay echo, a sweep interferer, and a protocol-aware noise-band jammer.",
     "objective": "Use the annotated waterfall with frequency/time zoom to classify the interference type and identify which signal is operationally suspicious rather than merely loud.",
+    "signal_scheme": "C12 propagation/jamming scene: FHSS telemetry, replay drift, sweep interference, and protocol-aware noise-band jamming coexist.",
     "concepts": ["radio propagation", "Doppler/CFO", "FHSS", "sweep jamming", "replay detection", "interference classification"],
     "steps": [
       "Open the annotated waterfall artifact and zoom the frequency axis around the hop set.",
@@ -410,9 +478,10 @@
     ],
     "artifacts": [
       {
-        "label": "Annotated contested waterfall",
-        "href": "/captures/tolling-waterfall.json",
-        "type": "application/json"
+        "label": "C12 propagation and jamming capture",
+        "href": "/captures/12-jamming-propagation.json",
+        "type": "application/json",
+        "role": "signal"
       },
       {
         "label": "Radio intercept",
@@ -435,6 +504,7 @@
     "points": 620,
     "scenario": "A serious contested-spectrum system cannot rely on a single control. RF resilience, hardware trust, protocol security, backend policy, and detection all have to agree.",
     "objective": "Design a layered assurance plan for the tolling range that would survive valid-looking telemetry, hostile RF conditions, compromised tooling, and backend abuse.",
+    "signal_scheme": "C13 SOTA fusion scenario: adaptive control hops, attested-device heartbeat, suspicious valid packets, and null-steering markers.",
     "concepts": ["hardware root of trust", "secure boot", "attestation", "cryptographic agility", "memory-safe parsers", "fuzzing", "RF/cyber fusion"],
     "steps": [
       "Start from Secure Mode and list what it already fixes: HMAC, freshness, replay cache, safe SQL, and server-side authorization.",
@@ -445,6 +515,12 @@
       "Submit the layered assurance flag."
     ],
     "artifacts": [
+      {
+        "label": "C13 SOTA fusion capture",
+        "href": "/captures/13-sota-fusion-scenario.json",
+        "type": "application/json",
+        "role": "signal"
+      },
       {
         "label": "Developer SOTA roadmap",
         "href": "/docs/developer-extension-plan.md",
@@ -471,6 +547,7 @@
     "points": 200,
     "scenario": "After finding passive collection, replay, weak integrity, SQLi, and logic abuse, propose the defensive design for the tolling range.",
     "objective": "Select mitigations that address both the RF and backend failures.",
+    "signal_scheme": "C14 clean-vs-contested defence trace: clean FHSS telemetry transitions into spot jamming, sweep jamming, and replay pressure.",
     "concepts": ["freshness", "message authentication", "frequency agility", "backend validation", "anomaly detection"],
     "steps": [
       "Compare clean telemetry with replayed/jammed observations.",
@@ -480,9 +557,10 @@
     ],
     "artifacts": [
       {
-        "label": "Jammed waterfall JSON",
-        "href": "/captures/tolling-waterfall.json",
-        "type": "application/json"
+        "label": "C14 clean vs jammed defence capture",
+        "href": "/captures/14-defence-clean-vs-jam.json",
+        "type": "application/json",
+        "role": "signal"
       }
     ],
     "hints": [

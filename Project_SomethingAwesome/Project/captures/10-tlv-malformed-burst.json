@@ -1,0 +1,22 @@
+{
+  "scheme_id": "C10-TLV-LENGTH-CHAOS",
+  "center_hz": 902300000,
+  "span_hz": 650000,
+  "bins": 112,
+  "frames": 150,
+  "seed": 1001,
+  "description": "Challenge 10 TLV parser capture: a burst with repeated length markers and an oversized nested operator note.",
+  "protocol_notes": {
+    "modulation": "4-FSK TLV telemetry training burst",
+    "binary_bug": "declared length exceeds available payload bytes",
+    "fuzzing_goal": "generate malformed nested TLVs"
+  },
+  "annotations": [
+    {"label": "TLV header train", "offset_hz": -140000, "color": "#59d7e8", "row": 0},
+    {"label": "oversized value", "offset_hz": 130000, "color": "#ff6b6b", "row": 1}
+  ],
+  "sources": [
+    {"label": "TLV header train", "kind": "burst", "offset_hz": -140000, "bandwidth_hz": 20000, "period_frames": 21, "duration_frames": 5, "power": 0.76},
+    {"label": "Oversized value block", "kind": "burst", "offset_hz": 130000, "bandwidth_hz": 42000, "period_frames": 63, "duration_frames": 24, "phase_frames": 12, "power": 0.9}
+  ]
+}

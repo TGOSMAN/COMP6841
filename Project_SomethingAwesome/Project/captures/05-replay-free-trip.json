@@ -1,0 +1,22 @@
+{
+  "scheme_id": "C05-REPLAY-LOGIC-FLAW",
+  "center_hz": 2437000000,
+  "span_hz": 1000000,
+  "bins": 128,
+  "frames": 160,
+  "seed": 505,
+  "description": "Challenge 5 free-trip capture: two near-identical telemetry bursts where a delayed replay echo carries a privileged schedule value.",
+  "protocol_notes": {
+    "modulation": "GFSK training burst",
+    "replay_indicator": "delayed echo with carrier offset drift",
+    "logic_flaw": "schedule_code is trusted by the vulnerable quote endpoint"
+  },
+  "annotations": [
+    {"label": "original STANDARD", "offset_hz": -180000, "color": "#73f2a6", "row": 0},
+    {"label": "replay MAINT_FREE", "offset_hz": 260000, "color": "#ffc766", "row": 1}
+  ],
+  "sources": [
+    {"label": "Original toll burst", "kind": "burst", "offset_hz": -180000, "bandwidth_hz": 22000, "period_frames": 46, "duration_frames": 9, "power": 0.86},
+    {"label": "Delayed replay echo", "kind": "burst", "offset_hz": 260000, "bandwidth_hz": 22000, "period_frames": 46, "duration_frames": 9, "phase_frames": 21, "drift_hz_per_frame": 85, "power": 0.68}
+  ]
+}

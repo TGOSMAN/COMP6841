@@ -1,0 +1,25 @@
+{
+  "scheme_id": "C13-SOTA-FUSION-RANGE",
+  "center_hz": 3500000000,
+  "span_hz": 3000000,
+  "bins": 160,
+  "frames": 210,
+  "seed": 1301,
+  "description": "Challenge 13 SOTA assurance capture: simultaneous adaptive hops, attested-device heartbeat, suspicious valid packet, and beam/null steering training markers.",
+  "protocol_notes": {
+    "modulation": "adaptive OFDM-like training carriers plus FHSS control channel",
+    "assurance_goal": "fuse RF features, device attestation, parser safety, backend policy, and anomaly logs",
+    "warning": "valid cryptography can still be behaviourally suspicious"
+  },
+  "annotations": [
+    {"label": "attested heartbeat", "offset_hz": -950000, "color": "#73f2a6", "row": 0},
+    {"label": "adaptive control hops", "offset_hz": 0, "color": "#59d7e8", "row": 1},
+    {"label": "suspicious valid packet", "offset_hz": 820000, "color": "#ffc766", "row": 2}
+  ],
+  "sources": [
+    {"label": "Attestation heartbeat", "kind": "burst", "offset_hz": -950000, "bandwidth_hz": 22000, "period_frames": 25, "duration_frames": 5, "power": 0.76},
+    {"label": "Adaptive control hops", "kind": "burst", "hop_offsets_hz": [-420000, -210000, 0, 210000, 420000], "bandwidth_hz": 70000, "period_frames": 20, "duration_frames": 8, "power": 0.78},
+    {"label": "Suspicious valid packet", "kind": "burst", "offset_hz": 820000, "bandwidth_hz": 50000, "period_frames": 70, "duration_frames": 16, "phase_frames": 34, "drift_hz_per_frame": -65, "power": 0.82},
+    {"label": "Null-steering training sweep", "kind": "sweep", "sweep_start_hz": -1200000, "sweep_stop_hz": 1200000, "sweep_period_frames": 130, "bandwidth_hz": 12000, "power": 0.44}
+  ]
+}

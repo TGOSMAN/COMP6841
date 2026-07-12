@@ -488,6 +488,25 @@ button {
   color: var(--green);
 }
 
+.signal-scheme {
+  margin: 18px 0;
+  border-left: 3px solid var(--cyan);
+  background: rgba(89, 215, 232, 0.07);
+  padding: 12px 14px;
+}
+
+.signal-scheme strong {
+  display: block;
+  color: var(--cyan);
+  margin-bottom: 6px;
+}
+
+.signal-scheme p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .artifact-list button {
   cursor: pointer;
 }

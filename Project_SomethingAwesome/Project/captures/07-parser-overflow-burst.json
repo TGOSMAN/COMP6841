@@ -1,0 +1,20 @@
+{
+  "scheme_id": "C07-LONG-CALLSIGN-PARSER",
+  "center_hz": 172000000,
+  "span_hz": 300000,
+  "bins": 88,
+  "frames": 120,
+  "seed": 707,
+  "description": "Challenge 7 parser panic capture: a malformed long callsign field arrives in a VHF-style training telemetry burst.",
+  "protocol_notes": {
+    "modulation": "AFSK-style packet burst",
+    "malformed_field": "callsign/vehicle field exceeds parser destination buffer",
+    "binary_bug": "unsafe copy into fixed stack buffer"
+  },
+  "annotations": [
+    {"label": "oversized callsign segment", "offset_hz": 40000, "color": "#ff6b6b", "row": 0}
+  ],
+  "sources": [
+    {"label": "AFSK long-field burst", "kind": "burst", "offset_hz": 40000, "bandwidth_hz": 24000, "period_frames": 36, "duration_frames": 18, "power": 0.9}
+  ]
+}

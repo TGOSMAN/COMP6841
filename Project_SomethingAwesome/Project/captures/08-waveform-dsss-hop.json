@@ -1,0 +1,23 @@
+{
+  "scheme_id": "C08-DSSS-FHSS-WAVEFORM-RE",
+  "center_hz": 1296000000,
+  "span_hz": 1800000,
+  "bins": 144,
+  "frames": 190,
+  "seed": 808,
+  "description": "Challenge 8 waveform RE capture: a DSSS-looking widened telemetry burst overlaid on a FHSS hop schedule.",
+  "protocol_notes": {
+    "modulation": "DSSS training burst over FHSS channel plan",
+    "preamble": "0xA7D5",
+    "sync_word": "0xC35A",
+    "whitening_seed": "0x5d"
+  },
+  "annotations": [
+    {"label": "spread payload", "offset_hz": 0, "color": "#59d7e8", "row": 0},
+    {"label": "hop markers", "offset_hz": -480000, "color": "#73f2a6", "row": 1}
+  ],
+  "sources": [
+    {"label": "Wide DSSS payload", "kind": "burst", "hop_offsets_hz": [-480000, -240000, 0, 240000, 480000], "bandwidth_hz": 90000, "period_frames": 22, "duration_frames": 8, "power": 0.78},
+    {"label": "Sync marker", "kind": "burst", "offset_hz": 0, "bandwidth_hz": 18000, "period_frames": 55, "duration_frames": 4, "phase_frames": 9, "power": 0.95}
+  ]
+}

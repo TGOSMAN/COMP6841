@@ -1,0 +1,24 @@
+{
+  "scheme_id": "C03-BPSK-FRAME-DECODE",
+  "center_hz": 2405000000,
+  "span_hz": 800000,
+  "bins": 120,
+  "frames": 132,
+  "seed": 303,
+  "description": "Challenge 3 packet decode capture: a narrow BPSK-like telemetry burst with visible preamble, payload, and checksum timing blocks.",
+  "protocol_notes": {
+    "modulation": "BPSK training burst",
+    "preamble": "alternating 1010 training block",
+    "integrity": "weak additive checksum, not authentication"
+  },
+  "annotations": [
+    {"label": "preamble cadence", "offset_hz": -60000, "color": "#73f2a6", "row": 0},
+    {"label": "payload body", "offset_hz": 0, "color": "#59d7e8", "row": 1},
+    {"label": "checksum trailer", "offset_hz": 60000, "color": "#ffc766", "row": 2}
+  ],
+  "sources": [
+    {"label": "BPSK preamble", "kind": "burst", "offset_hz": -60000, "bandwidth_hz": 16000, "period_frames": 36, "duration_frames": 6, "power": 0.82},
+    {"label": "BPSK payload", "kind": "burst", "offset_hz": 0, "bandwidth_hz": 26000, "period_frames": 36, "duration_frames": 16, "phase_frames": 6, "power": 0.88},
+    {"label": "Checksum trailer", "kind": "burst", "offset_hz": 60000, "bandwidth_hz": 12000, "period_frames": 36, "duration_frames": 4, "phase_frames": 24, "power": 0.7}
+  ]
+}

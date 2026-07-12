@@ -518,6 +518,12 @@ def radio_intercept() -> dict:
         "timestamp": telemetry["timestamp"],
         "nonce": telemetry["nonce"],
         "checksum": "0x5e",
+        "operator_note": (
+            "RF-origin operator_note field: schedule anomaly requires review. "
+            "<button onclick=\"document.querySelector('#operator-flag').textContent='CTF{CONSOLE_XSS_CHAIN}'\">"
+            "Render test</button>"
+        ),
+        "sink_warning": "This decoded note is untrusted RF-origin text. Attack Mode renders it as HTML; Secure Mode renders it as text.",
         "operator_action": "Correlate burst with toll event, then review trust boundary before posting to console.",
     }
 

@@ -1,0 +1,23 @@
+{
+  "scheme_id": "C02-2FSK-HOP-SCHEME",
+  "center_hz": 915000000,
+  "span_hz": 1200000,
+  "bins": 128,
+  "frames": 150,
+  "seed": 202,
+  "description": "Challenge 2 scheme-finding capture: 2-FSK bursts hop across a small channel plan with a fixed pilot tone.",
+  "protocol_notes": {
+    "modulation": "2-FSK",
+    "symbol_rate": 4800,
+    "channel_spacing_hz": 100000,
+    "expected_recovery": "vehicle ID VH-7A29"
+  },
+  "annotations": [
+    {"label": "pilot", "offset_hz": -420000, "color": "#73f2a6", "row": 0},
+    {"label": "hop set", "offset_hz": -200000, "color": "#59d7e8", "row": 1}
+  ],
+  "sources": [
+    {"label": "Fixed pilot", "kind": "burst", "offset_hz": -420000, "bandwidth_hz": 15000, "period_frames": 24, "duration_frames": 6, "power": 0.72},
+    {"label": "Vehicle 2-FSK hopset", "kind": "burst", "hop_offsets_hz": [-200000, -100000, 0, 100000, 200000], "bandwidth_hz": 28000, "period_frames": 18, "duration_frames": 7, "phase_frames": 3, "power": 0.9}
+  ]
+}

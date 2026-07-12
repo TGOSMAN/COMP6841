@@ -48,7 +48,7 @@
           <div class="console-head">
             <div>
               <strong>Waterfall</strong>
-              <span>2.437 GHz centre / simulated tolling telemetry</span>
+              <span id="console-signal-label">2.437 GHz centre / range overview</span>
             </div>
             <div class="console-controls">
               <label>
@@ -163,10 +163,11 @@
       <section class="operator-console" id="operator-console">
         <div class="section-header compact">
           <p class="eyebrow">Operator Console</p>
-          <h2>RF event notes and XSS sink</h2>
+          <h2>RF-to-Operator Trust Boundary</h2>
           <p>
-            Attack Mode intentionally renders operator comments as markup.
-            Secure Mode renders the same content as text.
+            Decoded RF fields become operator-console data. Attack Mode shows
+            what happens when one decoded note is rendered as HTML; Secure Mode
+            treats the same note as text.
           </p>
         </div>
         <div class="operator-grid">
@@ -184,8 +185,8 @@
               <input id="operator-route-note" value="Synthetic decoded training event">
             </label>
             <label>
-              Operator comment
-              <textarea id="operator-comment">&lt;button onclick="document.querySelector('#operator-flag').textContent='CTF{CONSOLE_XSS_CHAIN}'"&gt;Reveal local flag&lt;/button&gt;</textarea>
+              Decoded operator note
+              <textarea id="operator-comment">RF-origin operator_note field: schedule anomaly requires review. &lt;button onclick="document.querySelector('#operator-flag').textContent='CTF{CONSOLE_XSS_CHAIN}'"&gt;Render test&lt;/button&gt;</textarea>
             </label>
             <button type="submit">Post comment</button>
             <p id="operator-flag" class="flag-result" aria-live="polite"></p>

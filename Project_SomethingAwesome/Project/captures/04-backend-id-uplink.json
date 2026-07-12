@@ -1,0 +1,22 @@
+{
+  "scheme_id": "C04-ID-UPLINK-BACKEND-BRIDGE",
+  "center_hz": 868300000,
+  "span_hz": 700000,
+  "bins": 112,
+  "frames": 128,
+  "seed": 404,
+  "description": "Challenge 4 backend bridge capture: a LoRa-like chirp/sweep training uplink carrying a recovered vehicle identifier used by the API.",
+  "protocol_notes": {
+    "modulation": "CSS/LoRa-like training chirp",
+    "cyber_bridge": "demodulated vehicle_id enters a toll API query",
+    "risk": "SQL injection exists after RF values cross into backend input"
+  },
+  "annotations": [
+    {"label": "up-chirp", "offset_hz": -250000, "color": "#59d7e8", "row": 0},
+    {"label": "ID burst", "offset_hz": 180000, "color": "#73f2a6", "row": 1}
+  ],
+  "sources": [
+    {"label": "CSS sweep uplink", "kind": "sweep", "sweep_start_hz": -300000, "sweep_stop_hz": 300000, "sweep_period_frames": 42, "bandwidth_hz": 14000, "power": 0.7},
+    {"label": "Identifier marker", "kind": "burst", "offset_hz": 180000, "bandwidth_hz": 18000, "period_frames": 42, "duration_frames": 5, "phase_frames": 27, "power": 0.85}
+  ]
+}

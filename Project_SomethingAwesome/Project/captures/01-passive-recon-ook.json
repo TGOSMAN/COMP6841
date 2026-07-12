@@ -1,0 +1,22 @@
+{
+  "scheme_id": "C01-OOK-PASSIVE-RECON",
+  "center_hz": 433920000,
+  "span_hz": 400000,
+  "bins": 96,
+  "frames": 110,
+  "seed": 101,
+  "description": "Challenge 1 passive recon capture: a low-duty-cycle OOK roadside beacon with two weak neighbouring telemetry bursts.",
+  "protocol_notes": {
+    "modulation": "OOK/ASK",
+    "purpose": "teach that unencrypted RF energy is observable before any cyber exploit happens",
+    "expected_observation": "periodic bursts at a fixed offset"
+  },
+  "annotations": [
+    {"label": "primary OOK beacon", "offset_hz": -85000, "color": "#73f2a6", "row": 0},
+    {"label": "weak neighbour", "offset_hz": 125000, "color": "#59d7e8", "row": 1}
+  ],
+  "sources": [
+    {"label": "Primary OOK beacon", "kind": "burst", "offset_hz": -85000, "bandwidth_hz": 9000, "period_frames": 28, "duration_frames": 5, "power": 0.93},
+    {"label": "Neighbour burst", "kind": "burst", "offset_hz": 125000, "bandwidth_hz": 7000, "period_frames": 47, "duration_frames": 4, "phase_frames": 18, "power": 0.42}
+  ]
+}

@@ -47,6 +47,7 @@ const operatorDecode = document.querySelector("#operator-decode");
 const zoomFreq = document.querySelector("#zoom-freq");
 const zoomTime = document.querySelector("#zoom-time");
 const zoomReadout = document.querySelector("#zoom-readout");
+const consoleSignalLabel = document.querySelector("#console-signal-label");
 
 async function boot() {
   ensureWorkbench();
@@ -125,6 +126,7 @@ function selectTask(taskId) {
   state.selectedTask = task;
   renderTasks(document.querySelector(".filter.active")?.dataset.filter || "all");
   renderDetail(task);
+  loadTaskSignal(task);
 }
 
 function renderDetail(task) {
@@ -141,6 +143,12 @@ function renderDetail(task) {
     <div class="concept-list">
       ${task.concepts.map((concept) => `<span>${concept}</span>`).join("")}
     </div>
+    ${task.signal_scheme ? `
+      <div class="signal-scheme">
+        <strong>Signal scheme</strong>
+        <p>${task.signal_scheme}</p>
+      </div>
+    ` : ""}
     <h4>Small Steps</h4>
     <ol class="step-list">
       ${task.steps.map((step) => `<li>${step}</li>`).join("")}
@@ -170,6 +178,22 @@ function renderDetail(task) {
   detailPanel.querySelectorAll("[data-artifact]").forEach((button) => {
     button.addEventListener("click", () => openArtifact(JSON.parse(button.dataset.artifact)));
   });
+}
+
+async function loadTaskSignal(task) {
+  const signalArtifact = task.artifacts?.find((artifact) => artifact.role === "signal");
+  if (!signalArtifact) return;
+  try {
+    const response = await fetch(signalArtifact.href);
+    const data = await response.json();
+    state.waterfallArtifact = data;
+    state.waterfallRows = rowsForArtifact(data);
+    state.frame = 0;
+    consoleSignalLabel.textContent = task.signal_scheme || data.description || signalArtifact.label;
+    seedWaterfall();
+  } catch {
+    consoleSignalLabel.textContent = "Signal artifact failed to load";
+  }
 }
 
 async function submitFlag(event) {
@@ -279,8 +303,7 @@ async function receiveRadioIntercept() {
   const data = await response.json();
   document.querySelector("#operator-callsign").value = data.callsign;
   document.querySelector("#operator-route-note").value = `${data.modulation} ${data.channel_label}: ${data.vehicle_id} ${data.route_code}/${data.schedule_code}`;
-  document.querySelector("#operator-comment").value =
-    `RF intercept ${data.frame_id}: RSSI ${data.rssi_dbm} dBm, CFO ${data.carrier_offset_hz} Hz, checksum ${data.checksum}. <button onclick="document.querySelector('#operator-flag').textContent='CTF{CONSOLE_XSS_CHAIN}'">Reveal local flag</button>`;
+  document.querySelector("#operator-comment").value = data.operator_note;
   operatorDecode.innerHTML = `
     <dl>
       <dt>frame</dt><dd>${data.frame_id}</dd>
@@ -289,6 +312,7 @@ async function receiveRadioIntercept() {
       <dt>vehicle</dt><dd>${data.vehicle_id}</dd>
       <dt>route</dt><dd>${data.route_code}</dd>
       <dt>checksum</dt><dd>${data.checksum}</dd>
+      <dt>sink</dt><dd>${data.sink_warning}</dd>
     </dl>
   `;
 }

@@ -12,7 +12,7 @@ Signal Forge is a sim-first contested-spectrum CTF about a smart tolling and ETA
 8. Firmware reverse engineering and hardware trust analysis.
 9. Local parser memory-safety analysis with vulnerable and safe C sources.
 10. TLV length-field binary exploitation.
-11. Operator-console XSS as an RF-to-web trust-boundary lesson.
+11. RF-to-operator XSS sink as an RF-to-web trust-boundary lesson.
 12. Propagation, replay, and jamming analysis.
 13. SOTA layered assurance across RF, hardware, cyber, and detection.
 14. Defensive design across RF, backend, browser, and parser controls.
@@ -41,7 +41,7 @@ The server initializes `data/tolling.db` on startup and serves both the webpage 
 - `server.py` - dependency-free Python HTTP API and static server.
 - `config/range.json` - editable RF, telemetry, and security settings.
 - `data/challenges.json` - editable challenge definitions and flags.
-- `captures/` - RF artifacts, SigMF metadata, decoded packet notes, and waterfall JSON.
+- `captures/` - RF artifacts, SigMF metadata, decoded packet notes, and per-challenge waterfall JSON.
 - `artifacts/` - cyber challenge inputs such as telemetry frames.
 - `tools/` - local RE and parser challenge sources/harnesses.
 - `docs/gnu-radio-workflow.md` - GNU Radio development path.
@@ -104,6 +104,8 @@ GET /api/radio/intercept
 
 Attack Mode intentionally renders operator comments as HTML in the browser. Secure Mode renders them as text.
 
+The XSS task exists to teach a specific contested-spectrum trust boundary: decoded RF strings are still attacker-controlled input. In this CTF the `operator_note` field is received from `/api/radio/intercept`, posted to the operator console, and then rendered differently in Attack versus Secure Mode.
+
 ## Cyber Tools
 
 Reverse engineering challenge:
@@ -136,12 +138,13 @@ Add or edit challenges in `data/challenges.json`. Each challenge supports:
 
 - `id`, `title`, `track`, `difficulty`, `points`
 - `scenario`, `objective`, `concepts`
+- `signal_scheme` for the unique RF/protocol scheme attached to that task
 - ordered `steps`
 - downloadable `artifacts`
 - hint ladder
 - expected `flag`
 
-For new RF tasks, add captures under `captures/` and link them from the challenge JSON.
+For new RF tasks, add captures under `captures/` and link them from the challenge JSON with `"role": "signal"` so selecting the task updates the live waterfall.
 
 For new cyber tasks, add local-only artifacts under `artifacts/` or `tools/`, then link them from the challenge JSON.
 

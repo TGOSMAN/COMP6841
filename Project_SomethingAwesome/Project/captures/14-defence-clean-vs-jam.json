@@ -1,0 +1,24 @@
+{
+  "scheme_id": "C14-DEFENCE-CLEAN-VS-JAM",
+  "center_hz": 915500000,
+  "span_hz": 1600000,
+  "bins": 144,
+  "frames": 180,
+  "seed": 1401,
+  "description": "Challenge 14 defence comparison capture: clean hopping telemetry transitions into spot jamming, sweep jamming, and replay pressure.",
+  "protocol_notes": {
+    "modulation": "FHSS telemetry with clean and contested phases",
+    "mitigation_goal": "choose hopping, freshness, signatures, backend validation, and monitoring"
+  },
+  "annotations": [
+    {"label": "clean hop phase", "offset_hz": -360000, "color": "#73f2a6", "row": 0},
+    {"label": "spot jammer", "offset_hz": 260000, "color": "#ff6b6b", "row": 1},
+    {"label": "replay pressure", "offset_hz": 560000, "color": "#ffc766", "row": 2}
+  ],
+  "sources": [
+    {"label": "Clean FHSS telemetry", "kind": "burst", "hop_offsets_hz": [-360000, -180000, 0, 180000, 360000], "bandwidth_hz": 32000, "period_frames": 18, "duration_frames": 6, "power": 0.84},
+    {"label": "Spot jammer", "kind": "noise_band", "offset_hz": 260000, "bandwidth_hz": 130000, "power": 0.34},
+    {"label": "Replay pressure", "kind": "burst", "offset_hz": 560000, "bandwidth_hz": 26000, "period_frames": 45, "duration_frames": 9, "phase_frames": 22, "drift_hz_per_frame": 95, "power": 0.66},
+    {"label": "Sweep jammer", "kind": "sweep", "sweep_start_hz": -700000, "sweep_stop_hz": 700000, "sweep_period_frames": 75, "bandwidth_hz": 15000, "power": 0.54}
+  ]
+}

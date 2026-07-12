@@ -1,0 +1,22 @@
+{
+  "scheme_id": "C09-FIRMWARE-MAINT-SIDEBAND",
+  "center_hz": 460500000,
+  "span_hz": 450000,
+  "bins": 100,
+  "frames": 126,
+  "seed": 909,
+  "description": "Challenge 9 firmware keyhunt capture: a maintenance diagnostic sideband exposes command names that also appear in the firmware strings dump.",
+  "protocol_notes": {
+    "modulation": "narrowband FSK diagnostics",
+    "firmware_link": "debug command table",
+    "trust_issue": "diagnostic command survives into attack fixture"
+  },
+  "annotations": [
+    {"label": "diag sideband", "offset_hz": -120000, "color": "#ffc766", "row": 0},
+    {"label": "status heartbeat", "offset_hz": 90000, "color": "#73f2a6", "row": 1}
+  ],
+  "sources": [
+    {"label": "Diagnostic sideband", "kind": "burst", "offset_hz": -120000, "bandwidth_hz": 16000, "period_frames": 30, "duration_frames": 11, "power": 0.84},
+    {"label": "Status heartbeat", "kind": "burst", "offset_hz": 90000, "bandwidth_hz": 9000, "period_frames": 18, "duration_frames": 3, "power": 0.62}
+  ]
+}

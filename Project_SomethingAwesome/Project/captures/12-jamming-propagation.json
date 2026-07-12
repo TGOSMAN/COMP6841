@@ -1,0 +1,26 @@
+{
+  "scheme_id": "C12-PROPAGATION-JAMMING",
+  "center_hz": 2437000000,
+  "span_hz": 2000000,
+  "bins": 128,
+  "frames": 180,
+  "seed": 1201,
+  "description": "Challenge 12 propagation and jamming capture: beacon, hopping telemetry, replay echo, sweep interferer, and noise-band jammer coexist.",
+  "protocol_notes": {
+    "modulation": "2-FSK/FHSS with replay and jamming overlays",
+    "analysis_goal": "classify interference and identify the replay as a cyber-physical threat"
+  },
+  "annotations": [
+    {"label": "fixed RSU beacon", "offset_hz": -640000, "color": "#73f2a6", "row": 0},
+    {"label": "FHSS telemetry", "offset_hz": -320000, "color": "#59d7e8", "row": 1},
+    {"label": "replay echo", "offset_hz": 410000, "color": "#ffc766", "row": 2},
+    {"label": "wideband jammer", "offset_hz": 720000, "color": "#ff6b6b", "row": 3}
+  ],
+  "sources": [
+    {"label": "RSU fixed beacon", "kind": "burst", "offset_hz": -640000, "bandwidth_hz": 26000, "period_frames": 32, "duration_frames": 7, "power": 0.95},
+    {"label": "Vehicle FHSS telemetry", "kind": "burst", "hop_offsets_hz": [-320000, -160000, 0, 160000, 320000], "bandwidth_hz": 38000, "period_frames": 18, "duration_frames": 5, "phase_frames": 4, "power": 0.88},
+    {"label": "Replay echo with oscillator drift", "kind": "burst", "offset_hz": 410000, "bandwidth_hz": 30000, "period_frames": 48, "duration_frames": 10, "phase_frames": 24, "drift_hz_per_frame": 120, "power": 0.72},
+    {"label": "Sweep interferer", "kind": "sweep", "sweep_start_hz": -900000, "sweep_stop_hz": 900000, "sweep_period_frames": 90, "bandwidth_hz": 18000, "power": 0.62},
+    {"label": "Protocol-aware noise-band jammer", "kind": "noise_band", "offset_hz": 720000, "bandwidth_hz": 260000, "power": 0.38}
+  ]
+}
