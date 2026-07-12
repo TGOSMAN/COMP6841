@@ -1,0 +1,11 @@
+SFCTF RSU TRAINING FIRMWARE
+boot: measured_boot=disabled_in_attack_fixture
+radio: fhss_profile=TOLL-LPI-TRAINING-03
+cmd: status
+cmd: radio_diag
+cmd: toll_quote_cache
+cmd: unlock_maint_diag
+debug: maint_diag token accepted
+keyslot: TRAINING_ONLY_HMAC_KEY_CHANGE_ME
+flag_path: CTF{FIRMWARE_REVEALS_THE_TRUST_BOUNDARY}
+secure_note: release builds must remove debug commands and protect keys behind attestation

@@ -1,0 +1,36 @@
+{
+  "global": {
+    "core:datatype": "cf32_le",
+    "core:sample_rate": 2000000,
+    "core:author": "Signal Forge CTF",
+    "core:description": "Simulated smart tolling OOK/ASK training capture. No SDR hardware or over-the-air transmission required.",
+    "core:version": "1.2.6",
+    "core:recorder": "GNU Radio workflow placeholder",
+    "core:license": "CC-BY-SA"
+  },
+  "captures": [
+    {
+      "core:sample_start": 0,
+      "core:frequency": 2437000000,
+      "core:datetime": "2026-07-12T06:41:00Z"
+    }
+  ],
+  "annotations": [
+    {
+      "core:sample_start": 12000,
+      "core:sample_count": 4200,
+      "core:freq_lower_edge": 2437240000,
+      "core:freq_upper_edge": 2437280000,
+      "core:label": "vehicle-beacon",
+      "core:comment": "Training burst encodes vehicle_id=VH-7A29 using a simplified OOK symbol stream."
+    },
+    {
+      "core:sample_start": 42000,
+      "core:sample_count": 4200,
+      "core:freq_lower_edge": 2437240000,
+      "core:freq_upper_edge": 2437280000,
+      "core:label": "vehicle-beacon-repeat",
+      "core:comment": "Repeating beacon interval demonstrates passive observability and replay risk."
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "mode": "attack",
+  "rf": {
+    "center_hz": 2437000000,
+    "span_hz": 2000000,
+    "sample_rate": 2000000,
+    "modulation": "training OOK/ASK",
+    "symbol_rate": 1200
+  },
+  "telemetry": {
+    "vehicle_id": "VH-7A29",
+    "pseudonym_id": "PX-41F0",
+    "booth_id": "EAST-17",
+    "route_code": "BIRCH",
+    "schedule_code": "STANDARD",
+    "timestamp": "2026-07-12T06:41:03Z",
+    "nonce": "N-6841-0001",
+    "hmac_key": "training-only-hmac-key-change-me"
+  },
+  "security": {
+    "freshness_window_seconds": 300,
+    "attack_mode_allows_replay": true,
+    "secure_mode_requires_hmac": true,
+    "secure_mode_rejects_operator_only_schedules": true
+  }
+}

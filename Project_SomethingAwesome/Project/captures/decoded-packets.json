@@ -1,0 +1,19 @@
+{
+  "capture": "tolling-beacon.sigmf-meta",
+  "modulation": "training OOK/ASK",
+  "symbol_rate": 1200,
+  "recovered_payload": {
+    "vehicle_id": "VH-7A29",
+    "booth_id": "EAST-17",
+    "route_code": "BIRCH",
+    "schedule_code": "STANDARD",
+    "timestamp": "2026-07-12T06:41:03Z",
+    "checksum": "0x5e",
+    "checksum_note": "CTF{CHECKSUM_IS_NOT_AUTH}"
+  },
+  "security_notes": [
+    "vehicle_id is attacker-controlled once decoded from RF",
+    "checksum is a teaching checksum, not authentication",
+    "schedule_code should be derived or authorized server-side, not trusted from telemetry"
+  ]
+}

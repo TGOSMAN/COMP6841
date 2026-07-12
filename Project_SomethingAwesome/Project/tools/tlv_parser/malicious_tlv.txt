@@ -1,0 +1,6 @@
+type=0x42
+declared_length=0x6f
+actual_length=0x2f
+payload=MAINT_DIAG_UNLOCKAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+expected_vulnerable_result=CTF{TLV_LENGTH_FIELDS_BITE_BACK}
+expected_safe_result=reject declared length exceeds available frame bytes

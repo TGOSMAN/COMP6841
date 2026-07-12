@@ -1,0 +1,33 @@
+{
+  "training_protocol": "SFCTF toll telemetry",
+  "physical_layer": {
+    "modulation": "2-FSK training burst",
+    "symbol_rate": 2400,
+    "channel_spacing_hz": 160000,
+    "hop_offsets_hz": [-320000, -160000, 0, 160000, 320000],
+    "preamble": "0xA7D5",
+    "sync_word": "0xC35A",
+    "whitening": {
+      "enabled": true,
+      "lfsr_polynomial": "x^7 + x^4 + 1",
+      "seed": "0x5d",
+      "note": "Whitening improves spectrum shape and transition density; it is not authentication."
+    }
+  },
+  "frame_fields": [
+    "magic",
+    "vehicle_id",
+    "pseudonym_id",
+    "booth_id",
+    "route_code",
+    "schedule_code",
+    "timestamp",
+    "nonce",
+    "checksum"
+  ],
+  "cyber_bridge": {
+    "backend_inputs": ["vehicle_id", "booth_id", "route_code", "schedule_code"],
+    "risk": "Demodulated fields remain attacker-controlled unless authenticated, fresh, and authorized server-side.",
+    "flag": "CTF{RF_RE_BUILDS_THE_PACKET}"
+  }
+}

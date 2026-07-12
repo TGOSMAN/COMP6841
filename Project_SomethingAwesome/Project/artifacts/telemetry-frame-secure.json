@@ -1,0 +1,10 @@
+{
+  "vehicle_id": "VH-7A29",
+  "pseudonym_id": "PX-41F0",
+  "booth_id": "EAST-17",
+  "route_code": "BIRCH",
+  "schedule_code": "STANDARD",
+  "timestamp": "2026-07-12T06:41:03Z",
+  "nonce": "N-6841-0001",
+  "hmac": "run /api/telemetry/example to generate a current valid HMAC"
+}

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Signal Forge CTF</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Electromagnetic Contested Spectrum</p>
+        <h1>Signal Forge CTF</h1>
+      </div>
+      <nav aria-label="Primary">
+        <a href="#operations">Operations</a>
+        <a href="#tasks">Tasks</a>
+        <a href="#api-lab">API Lab</a>
+        <a href="#operator-console">Operator</a>
+        <a href="#research">Research</a>
+        <a href="#bridge">GNU Radio</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" id="operations">
+        <div class="hero-copy">
+          <p class="status-pill"><span></span> Tolling range online</p>
+          <h2>Trace a radio tolling signal into a backend exploit chain.</h2>
+          <p>
+            A sim-first CTF for contested-spectrum principles, RF telemetry
+            analysis, reverse engineering, firmware trust, binary exploitation,
+            backend abuse, and defensive assurance. No SDR hardware is required,
+            but GNU Radio can regenerate the artifacts.
+          </p>
+          <div class="hero-actions">
+            <a class="primary-action" href="#tasks">Start challenge 1</a>
+            <a class="secondary-action" href="#api-lab">Open API lab</a>
+          </div>
+          <div class="mode-switch" aria-label="Security mode">
+            <span>Security mode</span>
+            <button id="attack-mode" class="active" type="button">Attack</button>
+            <button id="secure-mode" type="button">Secure</button>
+            <strong id="mode-status">Attack Mode</strong>
+          </div>
+        </div>
+        <div class="spectrum-console" aria-label="Live spectrum console">
+          <div class="console-head">
+            <div>
+              <strong>Waterfall</strong>
+              <span>2.437 GHz centre / simulated tolling telemetry</span>
+            </div>
+            <div class="console-controls">
+              <label>
+                <span>Mode</span>
+                <select id="data-mode">
+                  <option value="artifact">Artifact</option>
+                  <option value="simulated">Simulated</option>
+                </select>
+              </label>
+              <label>
+                <span>Freq zoom</span>
+                <input id="zoom-freq" type="range" min="1" max="8" step="0.5" value="1">
+              </label>
+              <label>
+                <span>Time zoom</span>
+                <input id="zoom-time" type="range" min="1" max="6" step="0.5" value="1">
+              </label>
+              <button id="pause-waterfall" type="button" aria-pressed="false">Pause</button>
+            </div>
+          </div>
+          <canvas id="waterfall" width="900" height="520"></canvas>
+          <div class="frequency-scale" aria-hidden="true">
+            <span>-1.0 MHz</span>
+            <span id="zoom-readout">1.0x freq / 1.0x time</span>
+            <span>+1.0 MHz</span>
+          </div>
+          <div class="signal-legend" aria-label="Signal source legend">
+            <span><i class="legend-green"></i>RSU beacon</span>
+            <span><i class="legend-cyan"></i>FHSS telemetry</span>
+            <span><i class="legend-amber"></i>Replay echo</span>
+            <span><i class="legend-red"></i>Jammer/interferer</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="mission-strip" aria-label="Range metrics">
+        <div>
+          <strong>14</strong>
+          <span>guided challenges</span>
+        </div>
+        <div>
+          <strong>RE/Bin</strong>
+          <span>technical cyber core</span>
+        </div>
+        <div>
+          <strong>SigMF</strong>
+          <span>artifact-ready RF data</span>
+        </div>
+        <div>
+          <strong>Safe</strong>
+          <span>no transmit hardware required</span>
+        </div>
+      </section>
+
+      <section class="section-header" id="tasks">
+        <p class="eyebrow">Challenge Sequence</p>
+        <h2>From waterfall to free toll trip</h2>
+        <p>
+          The challenges are ordered as a single story: passive RF observation,
+          scheme identification, packet decoding, vulnerable backend recon,
+          logic abuse, and final defensive design.
+        </p>
+      </section>
+
+      <section class="task-layout">
+        <aside class="filter-panel" aria-label="Challenge filters">
+          <h3>Tracks</h3>
+          <button class="filter active" data-filter="all" type="button">All</button>
+          <button class="filter" data-filter="signals" type="button">Signals</button>
+          <button class="filter" data-filter="cyber" type="button">Cyber</button>
+          <button class="filter" data-filter="defence" type="button">Defence</button>
+        </aside>
+
+        <div class="task-grid" id="task-grid"></div>
+      </section>
+
+      <section class="challenge-workspace">
+        <div class="section-header compact">
+          <p class="eyebrow">Selected Task</p>
+          <h2>Work the current challenge</h2>
+        </div>
+        <article class="challenge-detail" id="challenge-detail"></article>
+      </section>
+
+      <section class="api-lab" id="api-lab">
+        <div class="section-header compact">
+          <p class="eyebrow">API Lab</p>
+          <h2>Local toll backend</h2>
+          <p>
+            Use these endpoints to practice the SQL injection and logic flaw
+            tasks. The vulnerable endpoint is intentionally unsafe for training.
+          </p>
+        </div>
+        <div class="api-grid">
+          <form id="api-form" class="api-console">
+            <label for="api-path">Request path</label>
+            <input id="api-path" value="/api/toll/events?vehicle_id=VH-7A29">
+            <button type="submit">Run</button>
+          </form>
+          <div class="api-examples" aria-label="API examples">
+            <button type="button" data-api-example="/api/toll/events?vehicle_id=VH-7A29">Vulnerable events</button>
+            <button type="button" data-api-example="/api/toll/safe-events?vehicle_id=VH-7A29">Safe events</button>
+            <button type="button" data-api-example="/api/toll/events?vehicle_id=VH-7A29'">Trigger SQL error</button>
+            <button type="button" data-api-example="/api/toll/events?vehicle_id=%27%20UNION%20SELECT%20name,type,sql,%27x%27,%27x%27%20FROM%20sqlite_master--">Enumerate schema</button>
+            <button type="button" data-api-example="/api/toll/quote?vehicle_id=VH-7A29&booth_id=EAST-17&route_code=BIRCH&schedule_code=MAINT_FREE">Free trip quote</button>
+            <button type="button" data-api-example="/api/telemetry/example">Secure packet example</button>
+          </div>
+          <pre id="api-output" class="api-output">Run a request to inspect JSON output.</pre>
+        </div>
+      </section>
+
+      <section class="operator-console" id="operator-console">
+        <div class="section-header compact">
+          <p class="eyebrow">Operator Console</p>
+          <h2>RF event notes and XSS sink</h2>
+          <p>
+            Attack Mode intentionally renders operator comments as markup.
+            Secure Mode renders the same content as text.
+          </p>
+        </div>
+        <div class="operator-grid">
+          <form id="operator-form" class="operator-form">
+            <div class="radio-ops-panel">
+              <button id="receive-radio" type="button">Receive RF burst</button>
+              <div id="operator-decode" class="operator-decode">No burst decoded yet.</div>
+            </div>
+            <label>
+              Callsign
+              <input id="operator-callsign" value="WARTHOG-1">
+            </label>
+            <label>
+              Route note
+              <input id="operator-route-note" value="Synthetic decoded training event">
+            </label>
+            <label>
+              Operator comment
+              <textarea id="operator-comment">&lt;button onclick="document.querySelector('#operator-flag').textContent='CTF{CONSOLE_XSS_CHAIN}'"&gt;Reveal local flag&lt;/button&gt;</textarea>
+            </label>
+            <button type="submit">Post comment</button>
+            <p id="operator-flag" class="flag-result" aria-live="polite"></p>
+          </form>
+          <div>
+            <div class="operator-actions">
+              <button id="refresh-operator" type="button">Refresh events</button>
+            </div>
+            <div id="operator-events" class="operator-events"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lab-band">
+        <div class="lab-copy">
+          <p class="eyebrow">Animated Lab</p>
+          <h2>Signals that teach by moving</h2>
+          <p>
+            The browser can render generated frames now. Later, GNU Radio can
+            stream FFT rows through a Python bridge into this same canvas.
+          </p>
+        </div>
+        <div class="signal-animation" aria-hidden="true">
+          <span class="pulse p1"></span>
+          <span class="pulse p2"></span>
+          <span class="pulse p3"></span>
+          <span class="sweep"></span>
+        </div>
+      </section>
+
+      <section class="section-header" id="research">
+        <p class="eyebrow">Research / Techniques</p>
+        <h2>What this CTF is teaching</h2>
+        <p>
+          Keep this section open for report writing: it connects the practical
+          tasks to RF, backend, and defensive security ideas.
+        </p>
+      </section>
+
+      <section class="research-grid" id="research-panel"></section>
+
+      <section class="section-header" id="bridge">
+        <p class="eyebrow">GNU Radio Integration</p>
+        <h2>Regenerate the RF artifacts later</h2>
+        <p>
+          The assessed path uses generated files. GNU Radio Companion can be
+          used in WSL/Ubuntu to produce real SigMF IQ captures for the same
+          challenge answers.
+        </p>
+      </section>
+
+      <section class="bridge-grid">
+        <article>
+          <h3>1. Flowgraph</h3>
+          <p>Build OOK/ASK or FSK teaching bursts with vector sources, noise, file sinks, and QT frequency sinks.</p>
+        </article>
+        <article>
+          <h3>2. Artifact Export</h3>
+          <p>Write `.sigmf-data` samples and `.sigmf-meta` JSON so the tasks stay reproducible without hardware.</p>
+        </article>
+        <article>
+          <h3>3. Optional Bridge</h3>
+          <p>Publish FFT rows over ZeroMQ or a Python socket, then feed rows to the browser waterfall.</p>
+        </article>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

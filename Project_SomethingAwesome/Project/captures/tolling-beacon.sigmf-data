@@ -1,0 +1,3 @@
+SIMULATED_CF32_LE_PLACEHOLDER
+This training repository keeps the assessed path sim-first. Regenerate a real
+binary SigMF dataset from docs/gnu-radio-workflow.md when GNU Radio is installed.
