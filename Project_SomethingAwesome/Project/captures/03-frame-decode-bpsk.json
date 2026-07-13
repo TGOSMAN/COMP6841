@@ -2,7 +2,7 @@
   "scheme_id": "C03-BPSK-FRAME-DECODE",
   "center_hz": 2405000000,
   "span_hz": 800000,
-  "bins": 120,
+  "bins": 1024,
   "frames": 132,
   "seed": 303,
   "description": "Challenge 3 packet decode capture: a narrow BPSK-like telemetry burst with visible preamble, payload, and checksum timing blocks.",

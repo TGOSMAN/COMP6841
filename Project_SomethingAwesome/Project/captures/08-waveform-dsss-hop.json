@@ -2,7 +2,7 @@
   "scheme_id": "C08-DSSS-FHSS-WAVEFORM-RE",
   "center_hz": 1296000000,
   "span_hz": 1800000,
-  "bins": 144,
+  "bins": 1024,
   "frames": 190,
   "seed": 808,
   "description": "Challenge 8 waveform RE capture: a DSSS-looking widened telemetry burst overlaid on a FHSS hop schedule.",

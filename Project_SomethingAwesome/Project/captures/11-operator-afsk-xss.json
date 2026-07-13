@@ -2,7 +2,7 @@
   "scheme_id": "C11-AFSK-OPERATOR-XSS",
   "center_hz": 144390000,
   "span_hz": 260000,
-  "bins": 96,
+  "bins": 1024,
   "frames": 130,
   "seed": 1101,
   "description": "Challenge 11 RF-to-operator sink capture: an AFSK-like note field is decoded, then rendered by the console.",

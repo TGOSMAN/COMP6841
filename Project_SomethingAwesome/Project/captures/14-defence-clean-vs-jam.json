@@ -2,7 +2,7 @@
   "scheme_id": "C14-DEFENCE-CLEAN-VS-JAM",
   "center_hz": 915500000,
   "span_hz": 1600000,
-  "bins": 144,
+  "bins": 1024,
   "frames": 180,
   "seed": 1401,
   "description": "Challenge 14 defence comparison capture: clean hopping telemetry transitions into spot jamming, sweep jamming, and replay pressure.",

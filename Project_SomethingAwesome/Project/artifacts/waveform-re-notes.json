@@ -28,6 +28,6 @@
   "cyber_bridge": {
     "backend_inputs": ["vehicle_id", "booth_id", "route_code", "schedule_code"],
     "risk": "Demodulated fields remain attacker-controlled unless authenticated, fresh, and authorized server-side.",
-    "flag": "CTF{RF_RE_BUILDS_THE_PACKET}"
+    "result": "retired research module"
   }
 }

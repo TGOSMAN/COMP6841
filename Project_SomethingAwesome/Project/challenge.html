@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Challenge | Signal Forge CTF</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="challenge-page">
+    <header class="challenge-topbar">
+      <a class="back-link" href="/#tasks">&larr; All challenges</a>
+      <div class="challenge-progress" id="challenge-progress" aria-label="Challenge navigation"></div>
+      <div class="mode-switch compact" aria-label="Security mode">
+        <button id="attack-mode" class="active" type="button">Attack</button>
+        <button id="secure-mode" type="button">Secure</button>
+        <strong id="mode-status">Attack Mode</strong>
+      </div>
+    </header>
+
+    <main class="challenge-shell">
+      <section class="challenge-brief" aria-labelledby="challenge-title">
+        <div class="challenge-heading">
+          <div>
+            <p class="eyebrow" id="challenge-kicker">Signal analysis challenge</p>
+            <h1 id="challenge-title">Loading challenge...</h1>
+          </div>
+          <div class="challenge-score" id="challenge-score"></div>
+        </div>
+        <p class="challenge-scenario" id="challenge-scenario"></p>
+        <div class="objective-card">
+          <span>Mission objective</span>
+          <p id="challenge-objective"></p>
+        </div>
+        <div class="concept-list" id="challenge-concepts"></div>
+      </section>
+
+      <section class="analysis-layout">
+        <article class="analyser-panel">
+          <div class="panel-title-row">
+            <div>
+              <p class="eyebrow">RF Analysis Workbench</p>
+              <h2 id="signal-title">Waterfall analyser</h2>
+            </div>
+            <span class="capture-status" id="capture-status">Loading capture</span>
+          </div>
+
+          <div class="frontend-mode" aria-label="RF frontend mode">
+            <div>
+              <strong>RF Frontend</strong>
+              <span id="receiver-lock">Receiver idle</span>
+            </div>
+            <div>
+              <button id="frontend-basic" class="active" type="button">Basic</button>
+              <button id="frontend-advanced" type="button">Advanced</button>
+            </div>
+          </div>
+
+          <div class="analyser-controls receiver-basic" aria-label="Receiver controls">
+            <label>Centre frequency
+              <span class="unit-input"><input id="analysis-center" type="number" step="0.001"><i>MHz</i></span>
+            </label>
+            <label>Visible span
+              <span class="unit-input"><input id="analysis-span" type="number" min="1" step="1"><i>kHz</i></span>
+            </label>
+            <label>RF gain
+              <span class="unit-input"><input id="receiver-gain" type="number" min="0" max="60" value="24"><i>dB</i></span>
+            </label>
+            <label>Squelch
+              <span class="unit-input"><input id="receiver-squelch" type="number" min="-120" max="0" value="-80"><i>dB</i></span>
+            </label>
+            <label>Demodulation
+              <select id="receiver-modulation">
+                <option value="AUTO">AUTO</option>
+                <option value="2-FSK">2-FSK</option>
+                <option value="4-FSK">4-FSK</option>
+                <option value="ASK">ASK</option>
+                <option value="MANCHESTER">Manchester</option>
+                <option value="CSS">CSS</option>
+                <option value="GFSK">GFSK</option>
+                <option value="AFSK">AFSK</option>
+                <option value="AM">AM voice</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="receiver-advanced" id="receiver-advanced" hidden>
+            <label>Sample rate <span class="unit-input"><input id="receiver-sample-rate" type="number" value="2"><i>MS/s</i></span></label>
+            <label>Channel bandwidth <span class="unit-input"><input id="receiver-bandwidth" type="number" value="100"><i>kHz</i></span></label>
+            <label>FFT bins <span class="unit-input"><input value="1024" disabled><i>bins</i></span></label>
+            <label>AGC <select id="receiver-agc"><option value="fast">Fast</option><option value="slow">Slow</option><option value="off">Off</option></select></label>
+            <label>Noise floor <span class="unit-input"><input id="analysis-floor" type="number" min="-120" max="-1" value="-88"><i>dB</i></span></label>
+            <label>Dynamic range <span class="unit-input"><input id="analysis-range" type="number" min="10" max="100" value="70"><i>dB</i></span></label>
+            <label>Palette
+              <select id="analysis-palette"><option value="turbo" selected>SDR heatmap</option><option value="inferno">Inferno</option><option value="mono">Monochrome</option></select>
+            </label>
+          </div>
+
+          <div class="receiver-actions">
+            <button id="receiver-scan" type="button">Scan span</button>
+            <button id="receiver-apply" type="button">Tune / apply</button>
+            <button id="receiver-receive" class="primary-receiver-action" type="button">Receive</button>
+          </div>
+
+          <section class="tx-frontend" aria-label="Transmit frontend">
+            <header>
+              <div><strong>TX Chain</strong><span id="tx-status">Standby</span></div>
+              <small>Local simulation only</small>
+            </header>
+            <div class="tx-controls">
+              <label>Waveform
+                <select id="tx-waveform">
+                  <option value="tone">Carrier / tone</option>
+                  <option value="2-FSK">2-FSK</option>
+                  <option value="4-FSK">4-FSK</option>
+                  <option value="GFSK">GFSK</option>
+                  <option value="AFSK">AFSK</option>
+                  <option value="replay">Captured replay</option>
+                  <option value="noise">Noise band</option>
+                </select>
+              </label>
+              <label>Offset <span class="unit-input"><input id="tx-offset" type="number" value="0" step="1"><i>kHz</i></span></label>
+              <label>Bandwidth <span class="unit-input"><input id="tx-bandwidth" type="number" value="25" min="1"><i>kHz</i></span></label>
+              <label>Power <span class="unit-input"><input id="tx-power" type="number" value="-18" min="-60" max="0"><i>dB</i></span></label>
+              <label>Duration <span class="unit-input"><input id="tx-duration" type="number" value="1200" min="100" max="10000"><i>ms</i></span></label>
+            </div>
+            <div class="tx-actions">
+              <button id="tx-preview" type="button">Preview waveform</button>
+              <button id="tx-transmit" type="button">Transmit burst</button>
+            </div>
+          </section>
+
+          <div class="analysis-actions">
+            <button id="analysis-play" type="button">Play</button>
+            <label class="rate-control">Rate
+              <select id="analysis-rate">
+                <option value="15">15 fps</option>
+                <option value="30" selected>30 fps</option>
+                <option value="60">60 fps</option>
+              </select>
+            </label>
+            <label class="scrubber-label">Frame <input id="analysis-frame" type="range" min="0" max="0" value="0"></label>
+            <output id="frame-readout">0 / 0</output>
+            <button id="analysis-reset" type="button">Reset view</button>
+            <button id="analysis-cursors" type="button">Clear cursors</button>
+          </div>
+
+          <div class="sdr-display">
+            <div class="spectrum-panel">
+              <div class="spectrum-heading">
+                <strong>Current-frame spectrum</strong>
+                <div class="spectrum-readouts">
+                  <span id="resolution-readout">RBW: --</span>
+                  <span id="dynamic-range-readout">DR: --</span>
+                  <span id="noise-floor-readout">Floor: --</span>
+                  <span id="peak-readout">Peak: --</span>
+                </div>
+              </div>
+              <canvas id="spectrum-trace" width="1100" height="220" aria-label="Spectrum trace for selected frame"></canvas>
+            </div>
+            <div class="axis-scale analysis-axis" id="analysis-axis"></div>
+            <div class="plot-frame">
+              <canvas id="analysis-waterfall" width="1100" height="700" aria-label="Configurable signal waterfall"></canvas>
+            </div>
+          </div>
+          <div class="measurement-bar" id="measurement-bar">Click once for cursor A and again for cursor B.</div>
+          <div class="signal-legend" id="analysis-legend"></div>
+
+          <section class="weather-radio" id="weather-radio" hidden aria-labelledby="weather-radio-title">
+            <header>
+              <div>
+                <p class="eyebrow">Interactive voice intercept</p>
+                <h2 id="weather-radio-title">UHF protocol injection net</h2>
+              </div>
+              <span class="radio-live" id="weather-radio-status"><i></i> Standby</span>
+            </header>
+            <div class="radio-howto" id="weather-radio-help">
+              <strong>How this level works</strong>
+              <span><b>1</b> Intercept a legitimate randomized radio call.</span>
+              <span><b>2</b> Extract its callsign, sector, and AUTH code.</span>
+              <span><b>3</b> Write a diversion message and transmit it back.</span>
+            </div>
+            <div class="radio-frequency">
+              <span>GUARD AUX / AM</span>
+              <strong>251.750</strong>
+              <small>MHz</small>
+            </div>
+            <div class="radio-scope" id="weather-radio-scope" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div class="radio-controls">
+              <button id="weather-generate" type="button">1. New intercept</button>
+              <button id="weather-play" class="radio-listen-button" type="button" disabled>2. Listen to authentic call</button>
+              <button id="weather-transcript-toggle" type="button" disabled>Show text backup</button>
+              <label>Radio noise <input id="weather-noise" type="range" min="0" max="100" value="32"></label>
+            </div>
+            <ol class="radio-transcript" id="weather-transcript" hidden aria-live="polite"></ol>
+            <div class="protocol-pattern">
+              <span>Observed message structure</span>
+              <code>&lt;TARGET CALLSIGN&gt;, SECTOR &lt;ID&gt;, &lt;DECOY REASON&gt;, DIVERT &lt;DIRECTION&gt;, AUTH &lt;CODE&gt;</code>
+            </div>
+            <form class="weather-report injection-report" id="weather-report-form">
+              <label for="weather-injection">3. Compose your decoy transmission</label>
+              <textarea id="weather-injection" aria-describedby="weather-report-result" placeholder="Example structure: CALLSIGN, SECTOR X, false weather report, DIVERT EAST, AUTH CODE" disabled></textarea>
+              <button type="submit" disabled>Inject and play message</button>
+              <output id="weather-report-result" aria-live="polite">Preparing your first intercept...</output>
+            </form>
+          </section>
+
+          <section class="rf-terminal" aria-label="RF command terminal">
+            <header>
+              <div><i></i><strong>FORGE RF TERMINAL / PYTHON RANGE</strong></div>
+              <div><button id="terminal-help" type="button">Help</button><span id="terminal-user">initialising session...</span></div>
+            </header>
+            <pre id="terminal-output" aria-live="polite"></pre>
+            <form id="terminal-form">
+              <label for="terminal-input">forge@range:$</label>
+              <input id="terminal-input" autocomplete="off" spellcheck="false" placeholder="help">
+              <button type="submit">Run</button>
+            </form>
+          </section>
+        </article>
+
+        <aside class="mission-panel">
+          <section>
+            <p class="eyebrow">Mission intelligence</p>
+            <h2>What you know</h2>
+            <ol class="step-list" id="challenge-steps"></ol>
+          </section>
+          <section>
+            <p class="eyebrow">Capture notes</p>
+            <div class="signal-scheme" id="signal-scheme"></div>
+            <dl class="capture-metadata" id="capture-metadata"></dl>
+          </section>
+        </aside>
+      </section>
+
+      <section class="challenge-resources">
+        <article>
+          <p class="eyebrow">Evidence</p>
+          <h2>Challenge artifacts</h2>
+          <div class="resource-list" id="challenge-artifacts"></div>
+        </article>
+        <article>
+          <p class="eyebrow">Additional intelligence</p>
+          <h2>Field notes</h2>
+          <div class="hint-stack" id="challenge-hints"></div>
+        </article>
+      </section>
+
+      <section class="artifact-inspector" id="artifact-inspector" hidden>
+        <div class="panel-title-row">
+          <div><p class="eyebrow">Artifact inspector</p><h2 id="artifact-title">Artifact</h2></div>
+          <button id="artifact-close" type="button">Close</button>
+        </div>
+        <div class="artifact-visual" id="artifact-visual"></div>
+        <details class="artifact-raw" open>
+          <summary>Raw artifact data</summary>
+          <pre id="artifact-content"></pre>
+        </details>
+      </section>
+
+      <section class="submission-panel">
+        <div>
+          <p class="eyebrow">Complete mission</p>
+          <h2>Submit your finding</h2>
+        </div>
+        <form class="flag-form" id="challenge-flag-form">
+          <input id="challenge-flag" aria-label="Flag input" placeholder="CTF{YOUR_FLAG}" autocomplete="off">
+          <button type="submit">Submit flag</button>
+        </form>
+        <p class="flag-result" id="challenge-flag-result" aria-live="polite"></p>
+      </section>
+
+      <nav class="challenge-pagination" aria-label="Previous and next challenges">
+        <a id="previous-challenge" href="#">&larr; Previous</a>
+        <a id="next-challenge" href="#">Next &rarr;</a>
+      </nav>
+    </main>
+    <script src="/challenge.js"></script>
+  </body>
+</html>

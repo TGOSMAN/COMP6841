@@ -9,7 +9,7 @@
     "schedule_code": "STANDARD",
     "timestamp": "2026-07-12T06:41:03Z",
     "checksum": "0x5e",
-    "checksum_note": "CTF{CHECKSUM_IS_NOT_AUTH}"
+    "checksum_note": "additive checksum only; does not authenticate the sender"
   },
   "security_notes": [
     "vehicle_id is attacker-controlled once decoded from RF",

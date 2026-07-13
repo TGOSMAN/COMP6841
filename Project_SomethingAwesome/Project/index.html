@@ -28,13 +28,13 @@
           <p class="status-pill"><span></span> Tolling range online</p>
           <h2>Trace a radio tolling signal into a backend exploit chain.</h2>
           <p>
-            A sim-first CTF for contested-spectrum principles, RF telemetry
-            analysis, reverse engineering, firmware trust, binary exploitation,
-            backend abuse, and defensive assurance. No SDR hardware is required,
-            but GNU Radio can regenerate the artifacts.
+            A seven-stage operator assessment against a synthetic roadside access
+            point. Acquire its RF beacon, recover telemetry, pivot into local
+            services, and extract flags from the systems you compromise. No SDR
+            hardware is required.
           </p>
           <div class="hero-actions">
-            <a class="primary-action" href="#tasks">Start challenge 1</a>
+            <a class="primary-action" href="/challenge/find-the-scheme">Start challenge 1</a>
             <a class="secondary-action" href="#api-lab">Open API lab</a>
           </div>
           <div class="mode-switch" aria-label="Security mode">
@@ -86,8 +86,8 @@
 
       <section class="mission-strip" aria-label="Range metrics">
         <div>
-          <strong>14</strong>
-          <span>guided challenges</span>
+          <strong>7</strong>
+          <span>operator tests</span>
         </div>
         <div>
           <strong>RE/Bin</strong>
@@ -105,11 +105,11 @@
 
       <section class="section-header" id="tasks">
         <p class="eyebrow">Challenge Sequence</p>
-        <h2>From waterfall to free toll trip</h2>
+        <h2>From RSU acquisition to operator compromise</h2>
         <p>
-          The challenges are ordered as a single story: passive RF observation,
-          scheme identification, packet decoding, vulnerable backend recon,
-          logic abuse, and final defensive design.
+          Seven operator tests form one target chain: acquire the synthetic access
+          point, recover its traffic, pivot into its services, and extract each
+          flag from a successful target interaction.
         </p>
       </section>
 
@@ -119,18 +119,10 @@
           <button class="filter active" data-filter="all" type="button">All</button>
           <button class="filter" data-filter="signals" type="button">Signals</button>
           <button class="filter" data-filter="cyber" type="button">Cyber</button>
-          <button class="filter" data-filter="defence" type="button">Defence</button>
+          <button class="filter" data-filter="cema" type="button">CEMA</button>
         </aside>
 
         <div class="task-grid" id="task-grid"></div>
-      </section>
-
-      <section class="challenge-workspace">
-        <div class="section-header compact">
-          <p class="eyebrow">Selected Task</p>
-          <h2>Work the current challenge</h2>
-        </div>
-        <article class="challenge-detail" id="challenge-detail"></article>
       </section>
 
       <section class="api-lab" id="api-lab">
@@ -186,7 +178,7 @@
             </label>
             <label>
               Decoded operator note
-              <textarea id="operator-comment">RF-origin operator_note field: schedule anomaly requires review. &lt;button onclick="document.querySelector('#operator-flag').textContent='CTF{CONSOLE_XSS_CHAIN}'"&gt;Render test&lt;/button&gt;</textarea>
+              <textarea id="operator-comment" placeholder="Receive an RF burst to populate this untrusted field."></textarea>
             </label>
             <button type="submit">Post comment</button>
             <p id="operator-flag" class="flag-result" aria-live="polite"></p>

@@ -2,7 +2,7 @@
   "scheme_id": "C06-MANCHESTER-CLOCK-RE",
   "center_hz": 315000000,
   "span_hz": 500000,
-  "bins": 96,
+  "bins": 1024,
   "frames": 140,
   "seed": 606,
   "description": "Challenge 6 decoder RE capture: a Manchester-coded maintenance frame with alternating timing energy and a compact checksum trailer.",

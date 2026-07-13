@@ -24,6 +24,9 @@ const state = {
     timer: null
   }
 };
+const signalForgeSession = sessionStorage.getItem("signalForgeSession") || crypto.randomUUID();
+sessionStorage.setItem("signalForgeSession", signalForgeSession);
+const signalSessionHeaders = { "X-Signal-Session": signalForgeSession };
 
 const taskGrid = document.querySelector("#task-grid");
 const filters = document.querySelectorAll(".filter");
@@ -53,7 +56,6 @@ async function boot() {
   ensureWorkbench();
   await Promise.all([loadMode(), loadTasks(), loadResearchNotes(), loadWaterfallRows()]);
   renderTasks();
-  selectTask(state.tasks[0]?.id);
   updateZoomReadout();
   seedWaterfall();
   drawWaterfall();
@@ -105,7 +107,7 @@ function renderTasks(filter = "all") {
     .forEach((task) => {
       const solved = state.solved.has(task.id);
       const card = document.createElement("article");
-      card.className = `task-card ${state.selectedTask?.id === task.id ? "selected" : ""}`;
+      card.className = "task-card";
       card.innerHTML = `
         <div class="task-topline">
           <span class="tag">${task.track.replace("-", " ")}</span>
@@ -113,9 +115,8 @@ function renderTasks(filter = "all") {
         </div>
         <h3>${task.title}</h3>
         <p>${task.scenario}</p>
-        <button type="button">${solved ? "Solved" : "Open task"}</button>
+        <a class="task-open" href="/challenge/${encodeURIComponent(task.id)}">${solved ? "Review solved challenge" : "Open challenge"}</a>
       `;
-      card.querySelector("button").addEventListener("click", () => selectTask(task.id));
       taskGrid.appendChild(card);
     });
 }
@@ -227,7 +228,7 @@ apiForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   apiOutput.textContent = "Running request...";
   try {
-    const response = await fetch(apiPath.value);
+    const response = await fetch(apiPath.value, { headers: signalSessionHeaders });
     const text = await response.text();
     apiOutput.textContent = prettyJson(text);
   } catch (error) {
@@ -299,7 +300,7 @@ function updateZoomReadout() {
 
 async function receiveRadioIntercept() {
   operatorDecode.textContent = "Receiving burst, correlating preamble...";
-  const response = await fetch("/api/radio/intercept");
+  const response = await fetch("/api/radio/intercept", { headers: signalSessionHeaders });
   const data = await response.json();
   document.querySelector("#operator-callsign").value = data.callsign;
   document.querySelector("#operator-route-note").value = `${data.modulation} ${data.channel_label}: ${data.vehicle_id} ${data.route_code}/${data.schedule_code}`;
@@ -318,7 +319,7 @@ async function receiveRadioIntercept() {
 }
 
 async function loadOperatorEvents() {
-  const response = await fetch("/operator/events");
+  const response = await fetch("/operator/events", { headers: signalSessionHeaders });
   const data = await response.json();
   operatorEvents.innerHTML = "";
   data.events.forEach((event) => {
@@ -732,13 +733,15 @@ function seedWaterfall() {
 
 function drawWaterfall() {
   if (!state.paused) {
-    const image = ctx.getImageData(0, 0, canvas.width, canvas.height - 1);
-    ctx.putImageData(image, 0, 1);
-    for (let x = 0; x < canvas.width; x += 1) {
-      ctx.fillStyle = colorForPower(signalPower(x, canvas.width, state.frame));
-      ctx.fillRect(x, 0, 1, 1);
+    const rowsPerFrame = 2;
+    ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height - rowsPerFrame, 0, rowsPerFrame, canvas.width, canvas.height - rowsPerFrame);
+    for (let row = 0; row < rowsPerFrame; row += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        ctx.fillStyle = colorForPower(signalPower(x, canvas.width, state.frame + row));
+        ctx.fillRect(x, row, 1, 1);
+      }
     }
-    state.frame += 1;
+    state.frame += rowsPerFrame;
   }
   requestAnimationFrame(drawWaterfall);
 }

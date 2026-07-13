@@ -2,7 +2,7 @@
   "scheme_id": "C07-LONG-CALLSIGN-PARSER",
   "center_hz": 172000000,
   "span_hz": 300000,
-  "bins": 88,
+  "bins": 1024,
   "frames": 120,
   "seed": 707,
   "description": "Challenge 7 parser panic capture: a malformed long callsign field arrives in a VHF-style training telemetry burst.",

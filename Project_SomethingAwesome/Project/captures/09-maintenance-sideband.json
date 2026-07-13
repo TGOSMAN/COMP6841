@@ -2,7 +2,7 @@
   "scheme_id": "C09-FIRMWARE-MAINT-SIDEBAND",
   "center_hz": 460500000,
   "span_hz": 450000,
-  "bins": 100,
+  "bins": 1024,
   "frames": 126,
   "seed": 909,
   "description": "Challenge 9 firmware keyhunt capture: a maintenance diagnostic sideband exposes command names that also appear in the firmware strings dump.",

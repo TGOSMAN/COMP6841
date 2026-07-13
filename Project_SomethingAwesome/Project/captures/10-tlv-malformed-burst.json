@@ -2,7 +2,7 @@
   "scheme_id": "C10-TLV-LENGTH-CHAOS",
   "center_hz": 902300000,
   "span_hz": 650000,
-  "bins": 112,
+  "bins": 1024,
   "frames": 150,
   "seed": 1001,
   "description": "Challenge 10 TLV parser capture: a burst with repeated length markers and an oversized nested operator note.",

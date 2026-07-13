@@ -5,7 +5,7 @@ This project is designed to give you room to push the CTF toward serious contest
 ## Where to Extend
 
 - `config/range.json` controls RF, packet, and security settings.
-- `data/challenges.json` controls task text, hints, artifacts, and flags.
+- `data/challenges.json` controls public task intelligence and artifacts; `server.py` owns per-session flag derivation and target success conditions.
 - `captures/` stores RF-style artifacts.
 - `artifacts/` stores cyber challenge inputs.
 - `tools/` stores source-backed local RE and parser challenges.

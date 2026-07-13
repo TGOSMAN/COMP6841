@@ -7,5 +7,5 @@ cmd: toll_quote_cache
 cmd: unlock_maint_diag
 debug: maint_diag token accepted
 keyslot: TRAINING_ONLY_HMAC_KEY_CHANGE_ME
-flag_path: CTF{FIRMWARE_REVEALS_THE_TRUST_BOUNDARY}
+diagnostic_path: retired research module
 secure_note: release builds must remove debug commands and protect keys behind attestation

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import sys
+import base64
 from pathlib import Path
 
 
-FLAG = "CTF{REVERSER_FOUND_THE_FRAME}"
+EMBEDDED_RESULT = "Q1RGe1JFVkVSU0VSX0ZPVU5EX1RIRV9GUkFNRX0="
 
 
 def weak_checksum(fields: list[str]) -> str:
@@ -33,7 +34,7 @@ def decode(frame: str) -> dict[str, str | bool]:
     decoded["expected_checksum"] = expected
     decoded["checksum_valid"] = expected == parts[-1].lower()
     if decoded["checksum_valid"]:
-        decoded["flag"] = FLAG
+        decoded["flag"] = base64.b64decode(EMBEDDED_RESULT).decode("ascii")
     return decoded
 
 

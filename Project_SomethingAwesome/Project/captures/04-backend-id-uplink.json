@@ -2,7 +2,7 @@
   "scheme_id": "C04-ID-UPLINK-BACKEND-BRIDGE",
   "center_hz": 868300000,
   "span_hz": 700000,
-  "bins": 112,
+  "bins": 1024,
   "frames": 128,
   "seed": 404,
   "description": "Challenge 4 backend bridge capture: a LoRa-like chirp/sweep training uplink carrying a recovered vehicle identifier used by the API.",

@@ -6,6 +6,7 @@ import hmac
 import hashlib
 import mimetypes
 import os
+import random
 import sqlite3
 import time
 from http import HTTPStatus
@@ -21,6 +22,7 @@ CHALLENGES_PATH = DATA_DIR / "challenges.json"
 CONFIG_PATH = ROOT / "config" / "range.json"
 MODE = {"value": "attack"}
 REPLAY_CACHE: set[str] = set()
+AIR_WEATHER_SESSIONS: dict[str, dict] = {}
 OPERATOR_COMMENTS = [
     {
         "callsign": "WARTHOG-1",
@@ -28,6 +30,42 @@ OPERATOR_COMMENTS = [
         "operator_comment": "Awaiting correlation with toll event.",
     }
 ]
+RANGE_SECRET = os.urandom(32)
+RF_TARGETS = {
+    "find-the-scheme": {"center_mhz": 915.0, "span_khz": 1200, "modulations": {"AUTO", "2-FSK"}, "label": "RSU-MAINT-915"},
+    "reverse-the-decoder": {"center_mhz": 315.0, "span_khz": 500, "modulations": {"AUTO", "ASK", "MANCHESTER"}, "label": "RSU-FRAME-315"},
+    "backend-recon": {"center_mhz": 868.3, "span_khz": 700, "modulations": {"AUTO", "CSS", "LORA"}, "label": "RSU-UPLINK-868"},
+    "free-trip-logic-flaw": {"center_mhz": 2437.0, "span_khz": 1000, "modulations": {"AUTO", "GFSK"}, "label": "TOLL-REPLAY-2437"},
+    "operator-console-xss": {"center_mhz": 144.39, "span_khz": 260, "modulations": {"AUTO", "AFSK"}, "label": "OPS-NOTE-144"},
+    "length-field-chaos": {"center_mhz": 902.3, "span_khz": 650, "modulations": {"AUTO", "4-FSK"}, "label": "RSU-TLV-902"},
+    "weather-radio-watch": {"center_mhz": 251.75, "span_khz": 300, "modulations": {"AUTO", "AM"}, "label": "FORGE-WEATHER-251"},
+}
+
+
+def session_id_from(handler: SimpleHTTPRequestHandler, body: dict | None = None) -> str:
+    candidate = str((body or {}).get("session_id", "") or handler.headers.get("X-Signal-Session", "")).strip()
+    if not candidate:
+        return "anonymous"
+    return "".join(character for character in candidate if character.isalnum() or character in "-_")[:80] or "anonymous"
+
+
+def session_token(session_id: str, purpose: str, length: int = 16) -> str:
+    digest = hmac.new(RANGE_SECRET, f"{session_id}:{purpose}".encode("utf-8"), hashlib.sha256).hexdigest().upper()
+    return digest[:length]
+
+
+def flag_for(session_id: str, challenge_id: str) -> str:
+    return f"CTF{{{session_token(session_id, f'flag:{challenge_id}')}}}"
+
+
+def user_data_for(session_id: str) -> dict:
+    token = session_token(session_id, "user-data", 20)
+    return {
+        "operator_id": f"OP-{token[:6]}",
+        "callsign": f"FORGE-{token[6:10]}",
+        "vehicle_id": f"VH-{token[10:14]}",
+        "range_nonce": token[14:20],
+    }
 
 
 def load_challenges() -> list[dict]:
@@ -101,8 +139,7 @@ def init_db() -> None:
                 ('MAINT_FREE', 'BIRCH', 'Maintenance vehicle bypass', 0, 1);
 
             INSERT INTO api_notes VALUES
-                ('recon_flag', 'CTF{SCHEDULES_TABLE_FOUND}'),
-                ('logic_flag', 'CTF{TOLL_PRICE_ZERO}');
+                ('recon_flag', '__SESSION_RECON_FLAG__');
             """
         )
 
@@ -173,8 +210,22 @@ class CTFHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path in {"/data/challenges.json", "/data/tolling.db", "/config/range.json", "/server.py"} or parsed.path.startswith("/."):
+            self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+            return
+        if parsed.path.startswith("/challenge/"):
+            challenge_id = parsed.path.removeprefix("/challenge/").strip("/")
+            known_ids = {task["id"] for task in load_challenges()}
+            if challenge_id not in known_ids:
+                self.send_error(HTTPStatus.NOT_FOUND, "Unknown challenge")
+                return
+            self.path = "/challenge.html"
+            super().do_GET()
+            return
         if parsed.path == "/api/config":
-            self.write_json(load_config())
+            public_config = load_config()
+            public_config["telemetry"].pop("hmac_key", None)
+            self.write_json(public_config)
             return
         if parsed.path == "/api/mode":
             self.write_json({"mode": MODE["value"]})
@@ -195,7 +246,29 @@ class CTFHandler(SimpleHTTPRequestHandler):
             self.write_json(example_secure_packet())
             return
         if parsed.path == "/api/radio/intercept":
-            self.write_json(radio_intercept())
+            self.write_json(radio_intercept(session_id_from(self)))
+            return
+        if parsed.path == "/api/air/weather":
+            session_id = session_id_from(self)
+            intercept = generate_air_weather_intercept(session_id)
+            AIR_WEATHER_SESSIONS[session_id] = intercept
+            self.write_json({key: value for key, value in intercept.items() if key not in {"answer", "auth_code"}})
+            return
+        if parsed.path == "/api/rf/session":
+            session_id = session_id_from(self)
+            self.write_json({"session_id": session_id, "user_data": user_data_for(session_id), "fft_bins": 1024})
+            return
+        if parsed.path == "/api/rsu/maintenance":
+            self.write_json(
+                {
+                    "target": "RSU maintenance TLV parser",
+                    "method": "POST",
+                    "path": "/api/rsu/maintenance/parse",
+                    "content_type": "application/json",
+                    "schema": {"type": "0x42", "declared_length": 111, "payload": "operator note"},
+                    "operator_note": "Attack Mode models the native parser's trusted-length behaviour; Secure Mode requires exact length agreement.",
+                }
+            )
             return
         if parsed.path == "/operator/events":
             self.handle_operator_events()
@@ -221,6 +294,15 @@ class CTFHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/operator/comment":
             self.handle_operator_comment()
+            return
+        if parsed.path == "/api/rsu/maintenance/parse":
+            self.handle_maintenance_parser()
+            return
+        if parsed.path == "/api/rf/command":
+            self.handle_rf_command()
+            return
+        if parsed.path == "/api/air/inject":
+            self.handle_air_voice_injection()
             return
         self.write_json({"error": "unknown endpoint"}, HTTPStatus.NOT_FOUND)
 
@@ -256,11 +338,48 @@ class CTFHandler(SimpleHTTPRequestHandler):
             self.write_json({"ok": False, "message": "Unknown task."}, HTTPStatus.NOT_FOUND)
             return
 
-        expected = task["flag"].upper()
+        session_id = session_id_from(self, body)
+        expected = flag_for(session_id, task_id).upper()
         if submitted == expected:
             self.write_json({"ok": True, "message": "Correct. Task solved.", "points": task["points"]})
         else:
             self.write_json({"ok": False, "message": "Not quite. Re-check the signal evidence and hints."})
+
+    def handle_air_voice_injection(self) -> None:
+        try:
+            body = read_json_body(self)
+        except json.JSONDecodeError:
+            self.write_json({"ok": False, "message": "Invalid report payload."}, HTTPStatus.BAD_REQUEST)
+            return
+
+        session_id = session_id_from(self, body)
+        intercept = AIR_WEATHER_SESSIONS.get(session_id)
+        if not intercept or str(body.get("intercept_id", "")) != intercept["intercept_id"]:
+            self.write_json({"ok": False, "message": "Generate a current intercept before filing the report."}, HTTPStatus.BAD_REQUEST)
+            return
+
+        message = " ".join(str(body.get("message", "")).strip().upper().split())
+        required = {
+            "target callsign": intercept["callsign"].upper() in message,
+            "sector identifier": f"SECTOR {intercept['sector']}" in message,
+            "diversion command": "DIVERT " in message,
+            "authentication code": f"AUTH {intercept['auth_code']}" in message,
+            "credible decoy reason": any(word in message for word in {"WEATHER", "STORM", "TRAFFIC", "RADAR", "EMERGENCY", "HAZARD", "RUNWAY"}),
+        }
+        missing = [label for label, present in required.items() if not present]
+        if not missing:
+            self.write_json({
+                "ok": True,
+                "message": "Protocol accepted. The synthetic diversion was rebroadcast on the training net.",
+                "flag": flag_for(session_id, "weather-radio-watch"),
+                "broadcast": message,
+            })
+            return
+        self.write_json({
+            "ok": False,
+            "message": f"Injection rejected. Missing or incorrect: {', '.join(missing)}.",
+            "accepted_fields": [label for label, present in required.items() if present],
+        })
 
     def handle_mode(self) -> None:
         try:
@@ -296,13 +415,16 @@ class CTFHandler(SimpleHTTPRequestHandler):
         )
         try:
             rows = query_db(sql)
-            schema_found = any("schedules" in {str(value) for value in row.values()} for row in rows)
+            session_id = session_id_from(self)
+            for row in rows:
+                for key, value in row.items():
+                    if value == "__SESSION_RECON_FLAG__":
+                        row[key] = flag_for(session_id, "backend-recon")
             self.write_json(
                 {
                     "warning": "Intentionally vulnerable training endpoint. Do not copy this pattern.",
                     "query": sql,
                     "rows": rows,
-                    "flag": "CTF{SCHEDULES_TABLE_FOUND}" if schema_found else None,
                 }
             )
         except sqlite3.Error as exc:
@@ -373,7 +495,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
             "logic_flaw": "The endpoint trusts schedule_code from telemetry instead of deriving entitlement server-side.",
         }
         if schedule["price_cents"] == 0:
-            result["flag"] = "CTF{TOLL_PRICE_ZERO}"
+            result["flag"] = flag_for(session_id_from(self), "free-trip-logic-flaw")
         self.write_json(result)
 
     def handle_secure_quote(self) -> None:
@@ -443,7 +565,6 @@ class CTFHandler(SimpleHTTPRequestHandler):
             {
                 "mode": MODE["value"],
                 "events": OPERATOR_COMMENTS,
-                "xss_training_flag": "CTF{CONSOLE_XSS_CHAIN}",
                 "rendering_note": "Attack Mode intentionally renders comments as HTML in the browser. Secure Mode renders text only.",
             }
         )
@@ -463,6 +584,162 @@ class CTFHandler(SimpleHTTPRequestHandler):
             event = {key: html.escape(value) for key, value in event.items()}
         OPERATOR_COMMENTS.append(event)
         self.write_json({"ok": True, "mode": MODE["value"], "event": event})
+
+    def handle_maintenance_parser(self) -> None:
+        try:
+            body = read_json_body(self)
+            tlv_type = int(str(body.get("type", "0")), 0)
+            declared_length = int(body.get("declared_length", 0))
+            payload = str(body.get("payload", ""))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            self.write_json({"error": "type and declared_length must be valid integers"}, HTTPStatus.BAD_REQUEST)
+            return
+
+        actual_length = len(payload.encode("utf-8"))
+        if tlv_type != 0x42:
+            self.write_json({"decision": "rejected", "reason": "unsupported TLV type"}, HTTPStatus.BAD_REQUEST)
+            return
+        if MODE["value"] == "secure" and declared_length != actual_length:
+            self.write_json(
+                {
+                    "mode": "secure",
+                    "decision": "rejected",
+                    "declared_length": declared_length,
+                    "actual_length": actual_length,
+                    "reason": "declared length does not equal available payload length",
+                },
+                HTTPStatus.BAD_REQUEST,
+            )
+            return
+
+        result = {
+            "mode": MODE["value"],
+            "decision": "parsed",
+            "declared_length": declared_length,
+            "actual_length": actual_length,
+            "length_mismatch": declared_length != actual_length,
+            "diagnostic_command_seen": "MAINT_DIAG_UNLOCK" in payload,
+        }
+        if MODE["value"] == "attack" and declared_length > actual_length and "MAINT_DIAG_UNLOCK" in payload:
+            result["diagnostic_access"] = "granted"
+            result["flag"] = flag_for(session_id_from(self, body), "length-field-chaos")
+        self.write_json(result)
+
+    def handle_rf_command(self) -> None:
+        try:
+            body = read_json_body(self)
+        except json.JSONDecodeError:
+            self.write_json({"ok": False, "lines": ["Invalid command payload."]}, HTTPStatus.BAD_REQUEST)
+            return
+
+        session_id = session_id_from(self, body)
+        challenge_id = str(body.get("challenge_id", ""))
+        action = str(body.get("action", "")).lower().strip()
+        arguments = str(body.get("arguments", "")).strip()
+        receiver = body.get("receiver", {}) if isinstance(body.get("receiver", {}), dict) else {}
+        target = RF_TARGETS.get(challenge_id)
+        if not target:
+            self.write_json({"ok": False, "lines": ["No RF target is assigned to this module."]}, HTTPStatus.NOT_FOUND)
+            return
+
+        try:
+            center_mhz = float(receiver.get("center_mhz", 0))
+            span_khz = max(1.0, float(receiver.get("span_khz", 1)))
+            gain_db = float(receiver.get("gain_db", 0))
+            squelch_db = float(receiver.get("squelch_db", -90))
+        except (TypeError, ValueError):
+            self.write_json({"ok": False, "lines": ["Receiver values must be numeric."]}, HTTPStatus.BAD_REQUEST)
+            return
+
+        modulation = str(receiver.get("modulation", "AUTO")).upper()
+        offset_khz = abs(center_mhz - target["center_mhz"]) * 1000
+        in_view = offset_khz <= span_khz / 2
+        tuned = offset_khz <= max(8.0, min(40.0, span_khz / 16))
+        demod_ok = modulation in target["modulations"]
+        level_db = -72 + min(28, gain_db * 0.7)
+        above_squelch = level_db >= squelch_db
+        locked = tuned and demod_ok and above_squelch
+
+        base = {
+            "ok": True,
+            "action": action,
+            "locked": locked,
+            "target": target["label"],
+            "receiver": {"center_mhz": center_mhz, "offset_khz": round(offset_khz, 3), "modulation": modulation},
+            "user_data": user_data_for(session_id),
+        }
+
+        if action == "scan":
+            if in_view:
+                base["lines"] = [
+                    f"ENERGY  {target['label']}  {target['center_mhz']:.6f} MHz  level {level_db:.1f} dBFS",
+                    f"OFFSET  {offset_khz:.1f} kHz  candidate demodulations: {', '.join(sorted(target['modulations']))}",
+                ]
+            else:
+                base["lines"] = ["No target energy inside the selected span.", "Adjust centre/span or inspect the module's signal intelligence."]
+            self.write_json(base)
+            return
+
+        if action in {"status", "tune"}:
+            base["lines"] = [
+                f"RX {center_mhz:.6f} MHz / span {span_khz:.0f} kHz / {modulation} / gain {gain_db:.0f} dB",
+                f"TARGET {'LOCKED' if locked else 'UNLOCKED'} / offset {offset_khz:.1f} kHz / squelch {'open' if above_squelch else 'closed'}",
+            ]
+            self.write_json(base)
+            return
+
+        if not locked:
+            base["ok"] = False
+            base["lines"] = [
+                "Receiver not locked: no usable target output.",
+                f"Check centre frequency, demodulation, gain, and squelch (offset {offset_khz:.1f} kHz).",
+            ]
+            self.write_json(base, HTTPStatus.BAD_REQUEST)
+            return
+
+        if action == "receive":
+            lines = [f"LOCK {target['label']} / sync acquired / CRC usable"]
+            if challenge_id == "find-the-scheme":
+                lines += ["BEACON vendor user_data decoded", f"FLAG {flag_for(session_id, challenge_id)}"]
+                base["flag"] = flag_for(session_id, challenge_id)
+            elif challenge_id == "reverse-the-decoder":
+                lines += ["FRAME SFCTF1|VH-7A29|PX-41F0|EAST-17|BIRCH|STANDARD|...|5e", "Decoder input buffered. Try `decode`." ]
+            elif challenge_id == "backend-recon":
+                lines += ["UPLINK vehicle_id=VH-7A29 service=/api/toll/events", "The terminal can run same-origin requests with `request <path>`." ]
+            elif challenge_id == "free-trip-logic-flaw":
+                lines += ["TOLL FRAME schedule=STANDARD price=750", "Replay/interference controls can alter the observed maintenance schedule." ]
+            elif challenge_id == "operator-console-xss":
+                lines += ["AFSK operator_note decoded", "NOTE contains an active console control; use `forward console`." ]
+            elif challenge_id == "weather-radio-watch":
+                lines += ["AM voice carrier acquired on 251.750 MHz", "Open the UHF protocol injection net, intercept the exchange, and recover its message fields."]
+            else:
+                lines += ["TLV type=0x42 declared=111 actual=47", "PAYLOAD MAINT_DIAG_UNLOCKAAAAAAAAAAAAAAAAAAAAAAAAAAAA"]
+            base["lines"] = lines
+            self.write_json(base)
+            return
+
+        if action == "decode" and challenge_id == "reverse-the-decoder":
+            base["flag"] = flag_for(session_id, challenge_id)
+            base["lines"] = ["CHECKSUM expected=5e provided=5e valid=true", f"DECODER OUTPUT {base['flag']}"]
+        elif action == "interfere" and MODE["value"] == "attack" and challenge_id == "free-trip-logic-flaw" and any(word in arguments.lower() for word in {"replay", "maint_free", "maintenance"}):
+            base["flag"] = flag_for(session_id, challenge_id)
+            base["lines"] = ["INTERFERENCE replay aligned / schedule=MAINT_FREE", "TOLL OUTPUT price=0", f"FLAG {base['flag']}"]
+        elif action == "transmit":
+            if MODE["value"] == "attack" and challenge_id == "free-trip-logic-flaw" and "replay" in arguments.lower():
+                base["flag"] = flag_for(session_id, challenge_id)
+                base["lines"] = ["TX replay waveform visible in receiver passband", "TARGET OUTPUT schedule=MAINT_FREE price=0", f"FLAG {base['flag']}"]
+            else:
+                base["lines"] = ["TX burst injected into local spectrum simulation.", "No target state change was observed for this waveform."]
+        elif action == "forward" and MODE["value"] == "attack" and challenge_id == "operator-console-xss" and "console" in arguments.lower():
+            base["flag"] = flag_for(session_id, challenge_id)
+            base["lines"] = ["FORWARD operator_note -> console", "Console rendered RF-origin control in Attack Mode.", f"UI OUTPUT {base['flag']}"]
+        elif action == "send" and MODE["value"] == "attack" and challenge_id == "length-field-chaos" and "maint_diag_unlock" in arguments.lower():
+            base["flag"] = flag_for(session_id, challenge_id)
+            base["lines"] = ["TX TLV accepted / length mismatch reached native parser", "DIAGNOSTIC ACCESS granted", f"TARGET OUTPUT {base['flag']}"]
+        else:
+            base["ok"] = False
+            base["lines"] = ["Command reached the target but did not trigger its success condition.", "Use `receive` and the module intelligence to inspect the target output."]
+        self.write_json(base, HTTPStatus.OK if base["ok"] else HTTPStatus.BAD_REQUEST)
 
 
 def verify_telemetry_packet(packet: dict) -> dict:
@@ -495,7 +772,56 @@ def verify_telemetry_packet(packet: dict) -> dict:
     }
 
 
-def radio_intercept() -> dict:
+def generate_air_weather_intercept(session_id: str) -> dict:
+    rng = random.SystemRandom()
+    callsign = f"{rng.choice(['VIPER', 'RAZOR', 'TALON', 'HAVOC', 'SABRE', 'RAVEN', 'COBRA'])} {rng.randint(1, 9)}-{rng.randint(1, 4)}"
+    controller = rng.choice(["FORGE CONTROL", "NOMAD CONTROL", "OVERLORD", "SENTRY", "ATLAS CONTROL"])
+    aircraft = rng.choice(["two F-35s", "a C-130", "two Super Hornets", "a P-8", "three Hawks", "a KC-30"])
+    sector = rng.choice(["BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT", "GOLF"])
+    altitude = rng.choice(["flight level one eight zero", "flight level two one zero", "flight level two six zero", "flight level three one zero", "one two thousand feet"])
+    direction = rng.choice(["northbound", "southbound", "eastbound", "westbound"])
+    wind_direction = rng.randrange(10, 360, 10)
+    wind_speed = rng.randrange(12, 46)
+    gust = wind_speed + rng.randrange(6, 21)
+    visibility = rng.choice(["three", "five", "seven", "ten", "more than ten"])
+    cloud = rng.choice(["broken cloud at four thousand", "overcast at two thousand five hundred", "scattered cloud at six thousand", "broken cloud at eight thousand"])
+    pressure = rng.randrange(995, 1028)
+    auth_code = f"{rng.choice(['ORBIT', 'LANCER', 'CITADEL', 'NOMAD', 'VECTOR', 'ANCHOR'])}-{rng.randint(2, 9)}"
+    hazard, advisory, readback = rng.choice([
+        ("thunderstorms", "embedded thunderstorms with tops above flight level three five zero", "thunderstorms and deviation east"),
+        ("severe turbulence", "severe turbulence reported between flight levels two zero zero and two eight zero", "severe turbulence, maintaining below two zero zero"),
+        ("airframe icing", "moderate to severe airframe icing in cloud above six thousand", "airframe icing, remaining clear of cloud"),
+        ("wind shear", "significant wind shear on the western approach below three thousand", "wind shear, western approach not available"),
+        ("volcanic ash", "volcanic ash reported across the northern half of the sector", "volcanic ash, routing south"),
+        ("heavy precipitation", "heavy precipitation reducing radar and visual contact", "heavy precipitation, requesting vectors"),
+    ])
+    request = rng.choice([
+        "request updated weather and routing recommendation",
+        "say weather for the sector and any significant hazards",
+        "request conditions along track and hazard status",
+    ])
+    acknowledgement = rng.choice(["copy all", "roger weather", "good readback", "affirm, that is correct"])
+    intercept_id = session_token(session_id, f"air-weather:{time.time_ns()}:{rng.random()}", 12)
+    lines = [
+        {"speaker": callsign, "role": "aircraft", "text": f"{controller}, {callsign}, {aircraft}, {direction} {altitude}, approaching sector {sector}, {request}."},
+        {"speaker": controller, "role": "controller", "text": f"{callsign}, {controller}. Sector {sector}: wind {wind_direction:03d} at {wind_speed}, gusting {gust}; visibility {visibility} miles; {cloud}; QNH {pressure}. Primary hazard is {advisory}. Recommend deviation {rng.choice(['east', 'west', 'south'])} by {rng.choice(['ten', 'fifteen', 'twenty'])} miles."},
+        {"speaker": callsign, "role": "aircraft", "text": f"{controller}, {callsign}, copy wind {wind_direction:03d} at {wind_speed}, QNH {pressure}, {readback}."},
+        {"speaker": controller, "role": "controller", "text": f"{callsign}, {acknowledgement}. Report clear of sector {sector}. Authentication for further routing is {auth_code}."},
+    ]
+    return {
+        "intercept_id": intercept_id,
+        "channel": "251.750 MHz",
+        "modulation": "AM",
+        "callsign": callsign,
+        "controller": controller,
+        "sector": sector,
+        "lines": lines,
+        "answer": hazard,
+        "auth_code": auth_code,
+    }
+
+
+def radio_intercept(session_id: str = "anonymous") -> dict:
     config = load_config()
     telemetry = config["telemetry"]
     return {
@@ -520,7 +846,7 @@ def radio_intercept() -> dict:
         "checksum": "0x5e",
         "operator_note": (
             "RF-origin operator_note field: schedule anomaly requires review. "
-            "<button onclick=\"document.querySelector('#operator-flag').textContent='CTF{CONSOLE_XSS_CHAIN}'\">"
+            f"<button onclick=\"document.querySelector('#operator-flag').textContent='{flag_for(session_id, 'operator-console-xss')}'\">"
             "Render test</button>"
         ),
         "sink_warning": "This decoded note is untrusted RF-origin text. Attack Mode renders it as HTML; Secure Mode renders it as text.",

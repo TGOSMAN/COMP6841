@@ -67,7 +67,11 @@ int main(int argc, char **argv) {
     printf("checksum_expected: %02x\n", expected);
     printf("checksum_valid: %s\n", expected == provided ? "true" : "false");
     if (expected == provided) {
-        puts("flag: CTF{REVERSER_FOUND_THE_FRAME}");
+        unsigned char embedded[] = {0x62, 0x75, 0x67, 0x5a, 0x73, 0x64, 0x77, 0x64, 0x73, 0x72, 0x64, 0x73, 0x7e, 0x67, 0x6e, 0x74, 0x6f, 0x65, 0x7e, 0x75, 0x69, 0x64, 0x7e, 0x67, 0x73, 0x60, 0x6c, 0x64, 0x5c};
+        size_t embedded_len = sizeof(embedded) / sizeof(embedded[0]);
+        printf("flag: ");
+        for (size_t i = 0; i < embedded_len; i++) putchar(embedded[i] ^ 0x21);
+        putchar('\n');
     }
     return 0;
 }

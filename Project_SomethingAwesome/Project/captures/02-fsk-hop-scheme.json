@@ -2,7 +2,7 @@
   "scheme_id": "C02-2FSK-HOP-SCHEME",
   "center_hz": 915000000,
   "span_hz": 1200000,
-  "bins": 128,
+  "bins": 1024,
   "frames": 150,
   "seed": 202,
   "description": "Challenge 2 scheme-finding capture: 2-FSK bursts hop across a small channel plan with a fixed pilot tone.",
@@ -10,7 +10,13 @@
     "modulation": "2-FSK",
     "symbol_rate": 4800,
     "channel_spacing_hz": 100000,
-    "expected_recovery": "vehicle ID VH-7A29"
+    "expected_recovery": "synthetic RSU maintenance access point"
+  },
+  "access_point": {
+    "bssid": "02:68:41:91:50:01",
+    "service": "RSU-MAINT-915",
+    "vendor_ie_encoding": "base64",
+    "vendor_ie_b64": "Q1RGe1JTVV9BUF9BQ1FVSVJFRH0="
   },
   "annotations": [
     {"label": "pilot", "offset_hz": -420000, "color": "#73f2a6", "row": 0},

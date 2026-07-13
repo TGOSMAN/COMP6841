@@ -24,7 +24,7 @@ static bool radio_diag_handler(const char *argument) {
 
 static bool maint_unlock_handler(const char *argument) {
     if (strcmp(argument, "TRAINING_ONLY_HMAC_KEY_CHANGE_ME") == 0) {
-        puts("CTF{FIRMWARE_REVEALS_THE_TRUST_BOUNDARY}");
+        puts("diagnostic path unlocked (retired research module)");
         return true;
     }
     puts("denied");

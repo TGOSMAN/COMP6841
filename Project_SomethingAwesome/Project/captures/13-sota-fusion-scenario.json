@@ -2,7 +2,7 @@
   "scheme_id": "C13-SOTA-FUSION-RANGE",
   "center_hz": 3500000000,
   "span_hz": 3000000,
-  "bins": 160,
+  "bins": 1024,
   "frames": 210,
   "seed": 1301,
   "description": "Challenge 13 SOTA assurance capture: simultaneous adaptive hops, attested-device heartbeat, suspicious valid packet, and beam/null steering training markers.",

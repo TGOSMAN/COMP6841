@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
 
     printf("vehicle=%s callsign=%s override=%d\n", rec.vehicle_id, rec.callsign, rec.maintenance_override);
     if (rec.maintenance_override == 0x6841) {
-        puts("flag: CTF{PARSER_MEMORY_CORRUPTION}");
+        puts("diagnostic path reached (retired research module)");
     }
     return 0;
 }

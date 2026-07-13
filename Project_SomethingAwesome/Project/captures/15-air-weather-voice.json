@@ -1,0 +1,22 @@
+{
+  "scheme_id": "C15-UHF-AM-WEATHER",
+  "center_hz": 251750000,
+  "span_hz": 300000,
+  "bins": 1024,
+  "frames": 150,
+  "seed": 251750,
+  "description": "Synthetic UHF AM military aviation channel used to infer a voice protocol and test a local message injection.",
+  "protocol_notes": {
+    "modulation": "AM voice",
+    "channel": "251.750 MHz",
+    "content": "randomized aircraft/controller exchange with callsign, sector, routing, and authentication fields"
+  },
+  "annotations": [
+    {"label": "AM voice channel", "offset_hz": 0, "color": "#73f2a6", "row": 0},
+    {"label": "controller reply", "offset_hz": 0, "color": "#59d7e8", "row": 1}
+  ],
+  "sources": [
+    {"label": "aircraft check-in", "kind": "burst", "offset_hz": -3500, "bandwidth_hz": 26000, "period_frames": 54, "duration_frames": 25, "power": 0.86},
+    {"label": "controller reply", "kind": "burst", "offset_hz": 2500, "bandwidth_hz": 30000, "period_frames": 54, "duration_frames": 26, "phase_frames": 27, "power": 0.94}
+  ]
+}

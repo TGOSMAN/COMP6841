@@ -16,5 +16,5 @@
     "remote attestation required before backend trust"
   ],
   "training_goal": "Find the diagnostic command and explain why it belongs behind signed firmware, protected key storage, and attestation.",
-  "flag": "CTF{FIRMWARE_REVEALS_THE_TRUST_BOUNDARY}"
+  "status": "retired research module"
 }

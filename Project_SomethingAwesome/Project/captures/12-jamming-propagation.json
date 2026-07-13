@@ -2,7 +2,7 @@
   "scheme_id": "C12-PROPAGATION-JAMMING",
   "center_hz": 2437000000,
   "span_hz": 2000000,
-  "bins": 128,
+  "bins": 1024,
   "frames": 180,
   "seed": 1201,
   "description": "Challenge 12 propagation and jamming capture: beacon, hopping telemetry, replay echo, sweep interferer, and noise-band jammer coexist.",
