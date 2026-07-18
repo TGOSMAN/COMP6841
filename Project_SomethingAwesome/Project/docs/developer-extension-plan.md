@@ -6,7 +6,9 @@ This project is designed to give you room to push the CTF toward serious contest
 
 - `config/range.json` controls RF, packet, and security settings.
 - `data/challenges.json` controls public task intelligence and artifacts; `server.py` owns per-session flag derivation and target success conditions.
-- `captures/` stores RF-style artifacts.
+- `radio/profiles/training_signals.json` is the editable source of truth for RF artifact parameters.
+- `radio/generate_gnuradio_artifacts.py` exports profile-derived capture JSON and optional SigMF IQ files.
+- `captures/` stores generated RF-style artifacts consumed by the browser.
 - `artifacts/` stores cyber challenge inputs.
 - `tools/` stores source-backed local RE and parser challenges.
 
@@ -45,11 +47,11 @@ Use GNU Radio to generate or replay artifacts, not to transmit over the air by d
 
 Suggested flow:
 
-1. Read packet fields from `config/range.json`.
-2. Generate a synthetic OOK/ASK or FSK baseband burst.
-3. Add controlled noise or jamming effects.
-4. Export SigMF data and metadata.
-5. Export a waterfall JSON preview for the browser workbench.
+1. Edit a profile in `radio/profiles/training_signals.json`.
+2. Generate a synthetic OOK/ASK, FSK, AM, CSS-like, replay, or TLV burst.
+3. Add controlled noise, hopping, drift, replay, or jamming effects.
+4. Export SigMF data and metadata when IQ artifacts are needed.
+5. Export a capture JSON preview for the browser workbench.
 
 ## Beyond Scope
 

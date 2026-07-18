@@ -1,0 +1,23 @@
+{
+  "global": {
+    "core:datatype": "cf32_le",
+    "core:sample_rate": 2000000,
+    "core:version": "1.0.0",
+    "core:description": "Synthetic tunnel sign OOK/ASK training capture generated for Signal Forge CTF."
+  },
+  "captures": [
+    {
+      "core:sample_start": 0,
+      "core:frequency": 915000000
+    }
+  ],
+  "annotations": [
+    {
+      "core:sample_start": 0,
+      "core:sample_count": 360000,
+      "core:freq_lower_edge": 914400000,
+      "core:freq_upper_edge": 915600000,
+      "core:label": "fixed OOK tunnel sign packet stream"
+    }
+  ]
+}

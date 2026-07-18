@@ -14,8 +14,9 @@
       </div>
       <nav aria-label="Primary">
         <a href="#operations">Operations</a>
+        <a href="#safety">Safety</a>
+        <a href="#blueprint">Learning Arc</a>
         <a href="#tasks">Tasks</a>
-        <a href="#api-lab">API Lab</a>
         <a href="#operator-console">Operator</a>
         <a href="#research">Research</a>
         <a href="#bridge">GNU Radio</a>
@@ -25,17 +26,17 @@
     <main>
       <section class="hero" id="operations">
         <div class="hero-copy">
-          <p class="status-pill"><span></span> Tolling range online</p>
-          <h2>Trace a radio tolling signal into a backend exploit chain.</h2>
+          <p class="status-pill"><span></span> Civilian spectrum range online</p>
+          <h2>Train contested-spectrum thinking from tuning to trusted systems.</h2>
           <p>
-            A seven-stage operator assessment against a synthetic roadside access
-            point. Acquire its RF beacon, recover telemetry, pivot into local
-            services, and extract flags from the systems you compromise. No SDR
-            hardware is required.
+            A situation-driven, sim-first CTF for learning how radio signals, receiver
+            limits, protocol decisions, firmware parsers, and backend trust
+            boundaries interact. The assessed path is generated, local, and
+            receive-only; GNU Radio can regenerate artifacts for deeper research.
           </p>
           <div class="hero-actions">
-            <a class="primary-action" href="/challenge/find-the-scheme">Start challenge 1</a>
-            <a class="secondary-action" href="#api-lab">Open API lab</a>
+            <a class="primary-action" href="#tasks">Browse situations</a>
+            <a class="secondary-action" href="#blueprint">View learning arc</a>
           </div>
           <div class="mode-switch" aria-label="Security mode">
             <span>Security mode</span>
@@ -86,36 +87,119 @@
 
       <section class="mission-strip" aria-label="Range metrics">
         <div>
-          <strong>7</strong>
-          <span>operator tests</span>
+          <strong>6</strong>
+          <span>spreadsheet situations</span>
         </div>
         <div>
-          <strong>RE/Bin</strong>
-          <span>technical cyber core</span>
+          <strong>22</strong>
+          <span>flag-bearing subtasks</span>
         </div>
         <div>
-          <strong>SigMF</strong>
-          <span>artifact-ready RF data</span>
+          <strong>RF/Cyber</strong>
+          <span>joined evidence chain</span>
         </div>
         <div>
-          <strong>Safe</strong>
+          <strong>Local</strong>
           <span>no transmit hardware required</span>
         </div>
       </section>
 
-      <section class="section-header" id="tasks">
-        <p class="eyebrow">Challenge Sequence</p>
-        <h2>From RSU acquisition to operator compromise</h2>
+      <section class="safety-panel" id="safety" aria-labelledby="safety-title">
+        <div>
+          <p class="eyebrow">Safety and intent</p>
+          <h2 id="safety-title">Attacker mindset for defensive awareness</h2>
+        </div>
         <p>
-          Seven operator tests form one target chain: acquire the synthetic access
-          point, recover its traffic, pivot into its services, and extract each
-          flag from a successful target interaction.
+          This range is not a guide to misuse radio systems or abuse real
+          infrastructure. It uses synthetic captures, local services, and
+          controlled simulations to raise awareness of threats, failure modes,
+          and defensive engineering choices. Do not transmit, interfere with, or
+          test against systems you do not own or have explicit permission to use.
+        </p>
+      </section>
+
+      <section class="section-header" id="blueprint">
+        <p class="eyebrow">Programme Blueprint</p>
+        <h2>Progression from basic exposure to SOTA research</h2>
+        <p>
+          The build keeps room for you as the developer: beginner modules are
+          runnable now, while the advanced and expert lanes expose where GNU
+          Radio, C/C++, HDL review, fuzzing, propagation modelling, jamming
+          resilience, and cognitive-radio research can be added.
+        </p>
+      </section>
+
+      <section class="level-ladder" aria-label="Concept progression">
+        <article class="level-card">
+          <span>Basic</span>
+          <h3>Tune, observe, decode</h3>
+          <p>Use civilian tunnel signs and broadcast metadata to practise tuning, waterfall interpretation, OOK/ASK/FSK concepts, time-series inspection, and plain-text recovery.</p>
+          <ul>
+            <li>Tunnel infrastructure sign link</li>
+            <li>Local radio metadata side channel</li>
+          </ul>
+        </article>
+        <article class="level-card">
+          <span>Moderate</span>
+          <h3>Audio, hopping, and backend trust</h3>
+          <p>Move from visible packets into audio announcements, weak hopping patterns, RF-derived backend identifiers, and fields that cross into web/operator workflows.</p>
+          <ul>
+            <li>Council emergency audio network</li>
+            <li>RF-to-service API pivot</li>
+          </ul>
+        </article>
+        <article class="level-card">
+          <span>Advanced</span>
+          <h3>Firmware, parsers, and resilience</h3>
+          <p>Add native parser faults, C/C++ receiver code review, fuzz harnesses, simulated beam/null steering, and HDL-style design defects in controlled local targets.</p>
+          <ul>
+            <li>Farm gate measurement and access system</li>
+            <li>Emergency relay anomaly detection</li>
+          </ul>
+        </article>
+        <article class="level-card">
+          <span>Expert</span>
+          <h3>Integrated sensing and cognitive defence</h3>
+          <p>Use SOTA topics as extension lanes: integrated communications and sensing, adaptive hopping, LPI/LPD tradeoffs, sensor fusion, anomaly models, and red/blue operations.</p>
+          <ul>
+            <li>Qam's grocery-store IC&S scenario</li>
+            <li>Red team / blue team arena extension</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="mode-grid" aria-label="Information modes">
+        <article>
+          <h3>Raw digital</h3>
+          <p>Packet fields, checksums, identifiers, timing, and metadata.</p>
+        </article>
+        <article>
+          <h3>Audio</h3>
+          <p>Voice intercepts, noisy playback, transcripts, and protocol inference.</p>
+        </article>
+        <article>
+          <h3>Steganographic</h3>
+          <p>Planned extension for hidden flags in metadata, symbols, or audio side channels.</p>
+        </article>
+        <article>
+          <h3>Radar-style</h3>
+          <p>Planned extension for simple sensing, propagation, Doppler, and IC&S concepts.</p>
+        </article>
+      </section>
+
+      <section class="section-header" id="tasks">
+        <p class="eyebrow">Available Situations</p>
+        <h2>Choose a context, then solve its subtasks</h2>
+        <p>
+          Each card is a scenario context from the task spreadsheet. Open a
+          situation to see the individual flag-bearing subtasks, flag locations,
+          artifacts, radio operations, and defensive comparisons that live inside it.
         </p>
       </section>
 
       <section class="task-layout">
-        <aside class="filter-panel" aria-label="Challenge filters">
-          <h3>Tracks</h3>
+        <aside class="filter-panel" aria-label="Situation filters">
+          <h3>Situation tracks</h3>
           <button class="filter active" data-filter="all" type="button">All</button>
           <button class="filter" data-filter="signals" type="button">Signals</button>
           <button class="filter" data-filter="cyber" type="button">Cyber</button>
@@ -125,41 +209,15 @@
         <div class="task-grid" id="task-grid"></div>
       </section>
 
-      <section class="api-lab" id="api-lab">
-        <div class="section-header compact">
-          <p class="eyebrow">API Lab</p>
-          <h2>Local toll backend</h2>
-          <p>
-            Use these endpoints to practice the SQL injection and logic flaw
-            tasks. The vulnerable endpoint is intentionally unsafe for training.
-          </p>
-        </div>
-        <div class="api-grid">
-          <form id="api-form" class="api-console">
-            <label for="api-path">Request path</label>
-            <input id="api-path" value="/api/toll/events?vehicle_id=VH-7A29">
-            <button type="submit">Run</button>
-          </form>
-          <div class="api-examples" aria-label="API examples">
-            <button type="button" data-api-example="/api/toll/events?vehicle_id=VH-7A29">Vulnerable events</button>
-            <button type="button" data-api-example="/api/toll/safe-events?vehicle_id=VH-7A29">Safe events</button>
-            <button type="button" data-api-example="/api/toll/events?vehicle_id=VH-7A29'">Trigger SQL error</button>
-            <button type="button" data-api-example="/api/toll/events?vehicle_id=%27%20UNION%20SELECT%20name,type,sql,%27x%27,%27x%27%20FROM%20sqlite_master--">Enumerate schema</button>
-            <button type="button" data-api-example="/api/toll/quote?vehicle_id=VH-7A29&booth_id=EAST-17&route_code=BIRCH&schedule_code=MAINT_FREE">Free trip quote</button>
-            <button type="button" data-api-example="/api/telemetry/example">Secure packet example</button>
-          </div>
-          <pre id="api-output" class="api-output">Run a request to inspect JSON output.</pre>
-        </div>
-      </section>
-
       <section class="operator-console" id="operator-console">
         <div class="section-header compact">
           <p class="eyebrow">Operator Console</p>
           <h2>RF-to-Operator Trust Boundary</h2>
           <p>
-            Decoded RF fields become operator-console data. Attack Mode shows
-            what happens when one decoded note is rendered as HTML; Secure Mode
-            treats the same note as text.
+            Decoded RF fields become operator-console data. This section exists
+            to show why RF-origin text is still untrusted input: Attack Mode
+            renders one note as active markup, while Secure Mode treats the same
+            field as inert text.
           </p>
         </div>
         <div class="operator-grid">
@@ -170,7 +228,7 @@
             </div>
             <label>
               Callsign
-              <input id="operator-callsign" value="WARTHOG-1">
+              <input id="operator-callsign" value="CIVIC-OPS-1">
             </label>
             <label>
               Route note
@@ -195,10 +253,12 @@
       <section class="lab-band">
         <div class="lab-copy">
           <p class="eyebrow">Animated Lab</p>
-          <h2>Signals that teach by moving</h2>
+          <h2>Instrument-style views, not gimmicks</h2>
           <p>
-            The browser can render generated frames now. Later, GNU Radio can
-            stream FFT rows through a Python bridge into this same canvas.
+            The browser renders generated FFT frames, spectrum traces, cursors,
+            tuning controls, and artifact previews now. The next developer step
+            is to feed these same views from GNU Radio-generated SigMF captures
+            or a live ZeroMQ/WebSocket bridge.
           </p>
         </div>
         <div class="signal-animation" aria-hidden="true">
@@ -222,26 +282,35 @@
 
       <section class="section-header" id="bridge">
         <p class="eyebrow">GNU Radio Integration</p>
-        <h2>Regenerate the RF artifacts later</h2>
+        <h2>Regenerate RF artifacts as developer work</h2>
         <p>
-          The assessed path uses generated files. GNU Radio Companion can be
-          used in WSL/Ubuntu to produce real SigMF IQ captures for the same
-          challenge answers.
+          The assessed path uses generated files. Your developer path should be
+          profile-driven: edit signal parameters in Python, C/C++, or GNU Radio,
+          export IQ/SigMF data, convert it into waterfall JSON, and attach it to
+          a challenge without redesigning the website.
         </p>
       </section>
 
       <section class="bridge-grid">
         <article>
-          <h3>1. Flowgraph</h3>
-          <p>Build OOK/ASK or FSK teaching bursts with vector sources, noise, file sinks, and QT frequency sinks.</p>
+          <h3>1. Profile</h3>
+          <p>Define centre frequency, span, payload, modulation, noise, hopping, and flags in editable Python/C/C++ configuration.</p>
         </article>
         <article>
-          <h3>2. Artifact Export</h3>
-          <p>Write `.sigmf-data` samples and `.sigmf-meta` JSON so the tasks stay reproducible without hardware.</p>
+          <h3>2. Flowgraph</h3>
+          <p>Build GNU Radio Companion generators for OOK/ASK, FSK, audio, hopping, interference, and sensing-style captures.</p>
         </article>
         <article>
-          <h3>3. Optional Bridge</h3>
-          <p>Publish FFT rows over ZeroMQ or a Python socket, then feed rows to the browser waterfall.</p>
+          <h3>3. Export</h3>
+          <p>Write `.sigmf-data`, `.sigmf-meta`, waterfall JSON, decoded examples, and expected-answer notes for each module.</p>
+        </article>
+        <article>
+          <h3>4. Bridge</h3>
+          <p>Optionally publish FFT rows over ZeroMQ or a Python socket, then feed rows to the browser waterfall.</p>
+        </article>
+        <article>
+          <h3>5. Script Terminal</h3>
+          <p>Drive subtasks from Python through <code>/api/script/terminal</code>, using the generated client under <code>tools/script_clients/</code>.</p>
         </article>
       </section>
     </main>

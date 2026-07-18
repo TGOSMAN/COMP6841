@@ -14,31 +14,80 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+from radio.live_signal_pipeline import generate_live_frame, live_signal_profile, raw_iq_bytes
+
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 DB_PATH = DATA_DIR / "tolling.db"
 CHALLENGES_PATH = DATA_DIR / "challenges.json"
+CONTEXTS_PATH = DATA_DIR / "contexts.json"
 CONFIG_PATH = ROOT / "config" / "range.json"
 MODE = {"value": "attack"}
 REPLAY_CACHE: set[str] = set()
 AIR_WEATHER_SESSIONS: dict[str, dict] = {}
 OPERATOR_COMMENTS = [
     {
-        "callsign": "WARTHOG-1",
+        "callsign": "CIVIC-OPS-1",
         "route_note": "Decoded training frame looked normal.",
         "operator_comment": "Awaiting correlation with toll event.",
     }
 ]
 RANGE_SECRET = os.urandom(32)
 RF_TARGETS = {
-    "find-the-scheme": {"center_mhz": 915.0, "span_khz": 1200, "modulations": {"AUTO", "2-FSK"}, "label": "RSU-MAINT-915"},
-    "reverse-the-decoder": {"center_mhz": 315.0, "span_khz": 500, "modulations": {"AUTO", "ASK", "MANCHESTER"}, "label": "RSU-FRAME-315"},
-    "backend-recon": {"center_mhz": 868.3, "span_khz": 700, "modulations": {"AUTO", "CSS", "LORA"}, "label": "RSU-UPLINK-868"},
-    "free-trip-logic-flaw": {"center_mhz": 2437.0, "span_khz": 1000, "modulations": {"AUTO", "GFSK"}, "label": "TOLL-REPLAY-2437"},
-    "operator-console-xss": {"center_mhz": 144.39, "span_khz": 260, "modulations": {"AUTO", "AFSK"}, "label": "OPS-NOTE-144"},
-    "length-field-chaos": {"center_mhz": 902.3, "span_khz": 650, "modulations": {"AUTO", "4-FSK"}, "label": "RSU-TLV-902"},
-    "weather-radio-watch": {"center_mhz": 251.75, "span_khz": 300, "modulations": {"AUTO", "AM"}, "label": "FORGE-WEATHER-251"},
+    "tunnel-reading-signals": {"center_mhz": 915.0, "span_khz": 1200, "modulations": {"AUTO", "OOK", "ASK", "2-FSK"}, "label": "TUNNEL-SIGN-915"},
+    "tunnel-tuning": {"center_mhz": 915.0, "span_khz": 1200, "modulations": {"AUTO", "OOK", "ASK", "2-FSK"}, "label": "TUNNEL-TUNE-915"},
+    "tunnel-basic-dos": {"center_mhz": 915.0, "span_khz": 1200, "modulations": {"AUTO", "OOK", "ASK", "2-FSK"}, "label": "TUNNEL-DOS-915"},
+    "tunnel-packet-injection": {"center_mhz": 915.0, "span_khz": 1200, "modulations": {"AUTO", "OOK", "ASK", "2-FSK"}, "label": "TUNNEL-INJECT-915"},
+    "broadcast-reading-signals": {"center_mhz": 315.0, "span_khz": 500, "modulations": {"AUTO", "ASK", "MANCHESTER", "2-FSK"}, "label": "BROADCAST-META-315"},
+    "broadcast-tuning": {"center_mhz": 315.0, "span_khz": 500, "modulations": {"AUTO", "ASK", "MANCHESTER", "2-FSK"}, "label": "BROADCAST-TUNE-315"},
+    "broadcast-basic-dos": {"center_mhz": 315.0, "span_khz": 500, "modulations": {"AUTO", "ASK", "MANCHESTER", "2-FSK"}, "label": "BROADCAST-DOS-315"},
+    "broadcast-packet-injection": {"center_mhz": 315.0, "span_khz": 500, "modulations": {"AUTO", "ASK", "MANCHESTER", "2-FSK"}, "label": "BROADCAST-INJECT-315"},
+    "weather-boring-intercept": {"center_mhz": 169.65, "span_khz": 300, "modulations": {"AUTO", "AM", "QAM"}, "label": "WEATHER-HOP-169"},
+    "weather-boring-obscured": {"center_mhz": 169.65, "span_khz": 300, "modulations": {"AUTO", "AM", "QAM"}, "label": "WEATHER-PRNG-169"},
+    "weather-boring-active-re": {"center_mhz": 169.65, "span_khz": 300, "modulations": {"AUTO", "AM", "FSK"}, "label": "WEATHER-META-169"},
+    "civilian-emergency-intercept": {"center_mhz": 169.65, "span_khz": 300, "modulations": {"AUTO", "AM"}, "label": "CIVIL-AUDIO-169"},
+    "civilian-emergency-obscured": {"center_mhz": 169.65, "span_khz": 300, "modulations": {"AUTO", "AM"}, "label": "CIVIL-PRNG-169"},
+    "civilian-emergency-active-re": {"center_mhz": 169.65, "span_khz": 300, "modulations": {"AUTO", "AM", "FSK"}, "label": "CIVIL-WARNING-169"},
+    "bushfire-re-embedded": {"center_mhz": 433.92, "span_khz": 900, "modulations": {"AUTO", "FSK", "GFSK", "QAM"}, "label": "BUSHFIRE-RE-433"},
+    "bushfire-hdl-flaw": {"center_mhz": 433.92, "span_khz": 900, "modulations": {"AUTO", "FSK", "GFSK", "QAM"}, "label": "BUSHFIRE-HDL-433"},
+    "bushfire-rce": {"center_mhz": 433.92, "span_khz": 900, "modulations": {"AUTO", "FSK", "GFSK", "QAM"}, "label": "BUSHFIRE-RCE-433"},
+    "bushfire-fuzz-spoof": {"center_mhz": 433.92, "span_khz": 900, "modulations": {"AUTO", "FSK", "GFSK", "QAM"}, "label": "BUSHFIRE-SPOOF-433"},
+    "farm-gate-re-embedded": {"center_mhz": 902.3, "span_khz": 650, "modulations": {"AUTO", "4-FSK", "FSK"}, "label": "FARM-GATE-RE-902"},
+    "farm-gate-hdl-flaw": {"center_mhz": 902.3, "span_khz": 650, "modulations": {"AUTO", "4-FSK", "FSK"}, "label": "FARM-GATE-HDL-902"},
+    "farm-gate-rce": {"center_mhz": 902.3, "span_khz": 650, "modulations": {"AUTO", "4-FSK", "FSK"}, "label": "FARM-GATE-RCE-902"},
+    "farm-gate-fuzz-spoof": {"center_mhz": 902.3, "span_khz": 650, "modulations": {"AUTO", "4-FSK", "FSK"}, "label": "FARM-GATE-SPOOF-902"},
+}
+SCRIPT_TERMINALS: dict[str, dict] = {}
+
+RECEIVE_FLAG_TASKS = {
+    "tunnel-reading-signals",
+    "tunnel-tuning",
+    "broadcast-reading-signals",
+    "weather-boring-intercept",
+    "civilian-emergency-intercept",
+}
+DECODE_FLAG_TASKS = {
+    "broadcast-tuning",
+    "weather-boring-obscured",
+    "civilian-emergency-obscured",
+    "farm-gate-re-embedded",
+}
+INTERFERENCE_FLAG_TASKS = {"tunnel-basic-dos", "broadcast-basic-dos"}
+TRANSMIT_FLAG_TASKS = {
+    "tunnel-packet-injection",
+    "broadcast-packet-injection",
+    "bushfire-rce",
+    "bushfire-fuzz-spoof",
+    "farm-gate-rce",
+}
+SEND_FLAG_TASKS = {
+    "weather-boring-active-re",
+    "civilian-emergency-active-re",
+    "bushfire-re-embedded",
+    "bushfire-hdl-flaw",
+    "farm-gate-hdl-flaw",
+    "farm-gate-fuzz-spoof",
 }
 
 
@@ -73,6 +122,11 @@ def load_challenges() -> list[dict]:
         return json.load(handle)
 
 
+def load_contexts() -> list[dict]:
+    with CONTEXTS_PATH.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 def load_config() -> dict:
     with CONFIG_PATH.open("r", encoding="utf-8") as handle:
         return json.load(handle)
@@ -80,6 +134,253 @@ def load_config() -> dict:
 
 def public_task(task: dict) -> dict:
     return {key: value for key, value in task.items() if key != "flag"}
+
+
+def public_contexts() -> list[dict]:
+    tasks_by_id = {task["id"]: public_task(task) for task in load_challenges()}
+    contexts = []
+    for context in load_contexts():
+        subtasks = [tasks_by_id[task_id] for task_id in context.get("subtask_ids", []) if task_id in tasks_by_id]
+        total_points = sum(int(task.get("points", 0)) for task in subtasks)
+        contexts.append(
+            {
+                **context,
+                "subtasks": subtasks,
+                "subtask_count": len(subtasks),
+                "total_points": total_points,
+            }
+        )
+    return contexts
+
+
+def default_receiver_for(challenge_id: str) -> dict:
+    target = RF_TARGETS.get(challenge_id, next(iter(RF_TARGETS.values())))
+    return {
+        "center_mhz": target["center_mhz"],
+        "span_khz": target["span_khz"],
+        "gain_db": 32,
+        "squelch_db": -90,
+        "modulation": "AUTO",
+    }
+
+
+def build_rf_command_response(session_id: str, challenge_id: str, action: str, arguments: str, receiver: dict) -> tuple[dict, HTTPStatus]:
+    action = action.lower().strip()
+    target = RF_TARGETS.get(challenge_id)
+    if not target:
+        return {"ok": False, "lines": ["No RF target is assigned to this subtask."]}, HTTPStatus.NOT_FOUND
+
+    try:
+        center_mhz = float(receiver.get("center_mhz", target["center_mhz"]))
+        span_khz = max(1.0, float(receiver.get("span_khz", target.get("span_khz", 500))))
+        gain_db = float(receiver.get("gain_db", 0))
+        squelch_db = float(receiver.get("squelch_db", -90))
+    except (TypeError, ValueError):
+        return {"ok": False, "lines": ["Receiver values must be numeric."]}, HTTPStatus.BAD_REQUEST
+
+    modulation = str(receiver.get("modulation", "AUTO")).upper()
+    offset_khz = abs(center_mhz - target["center_mhz"]) * 1000
+    in_view = offset_khz <= span_khz / 2
+    tuned = offset_khz <= max(8.0, min(40.0, span_khz / 16))
+    demod_ok = modulation in target["modulations"]
+    level_db = -72 + min(28, gain_db * 0.7)
+    above_squelch = level_db >= squelch_db
+    locked = tuned and demod_ok and above_squelch
+
+    base = {
+        "ok": True,
+        "action": action,
+        "challenge_id": challenge_id,
+        "locked": locked,
+        "target": target["label"],
+        "receiver": {
+            "center_mhz": center_mhz,
+            "span_khz": span_khz,
+            "offset_khz": round(offset_khz, 3),
+            "modulation": modulation,
+            "gain_db": gain_db,
+            "squelch_db": squelch_db,
+        },
+        "user_data": user_data_for(session_id),
+    }
+
+    if action == "scan":
+        base["lines"] = (
+            [
+                f"ENERGY  {target['label']}  {target['center_mhz']:.6f} MHz  level {level_db:.1f} dBFS",
+                f"OFFSET  {offset_khz:.1f} kHz  candidate demodulations: {', '.join(sorted(target['modulations']))}",
+            ]
+            if in_view
+            else ["No target energy inside the selected span.", "Adjust centre/span or inspect the subtask intelligence."]
+        )
+        return base, HTTPStatus.OK
+
+    if action in {"status", "tune"}:
+        base["lines"] = [
+            f"RX {center_mhz:.6f} MHz / span {span_khz:.0f} kHz / {modulation} / gain {gain_db:.0f} dB",
+            f"TARGET {'LOCKED' if locked else 'UNLOCKED'} / offset {offset_khz:.1f} kHz / squelch {'open' if above_squelch else 'closed'}",
+        ]
+        return base, HTTPStatus.OK
+
+    if not locked:
+        base["ok"] = False
+        base["lines"] = [
+            "Receiver not locked: no usable target output.",
+            f"Check centre frequency, demodulation, gain, and squelch (offset {offset_khz:.1f} kHz).",
+        ]
+        return base, HTTPStatus.BAD_REQUEST
+
+    if action == "receive":
+        lines = [f"LOCK {target['label']} / sync acquired / CRC usable"]
+        if challenge_id in RECEIVE_FLAG_TASKS:
+            base["flag"] = flag_for(session_id, challenge_id)
+            lines += ["PLAINTEXT/CALLSIGN RECOVERED", f"FLAG {base['flag']}"]
+        elif challenge_id in DECODE_FLAG_TASKS:
+            lines += ["FRAME BUFFERED / additional reconstruction required", "Try `decode` with the recovered timing or PRNG state."]
+        elif challenge_id in INTERFERENCE_FLAG_TASKS:
+            lines += ["EXPECTED STRING buffered", "Apply a controlled `interfere` action to observe mismatch behaviour."]
+        elif challenge_id in TRANSMIT_FLAG_TASKS:
+            lines += ["TARGET READY / local TX chain armed", "Use `transmit` with the required payload pattern."]
+        elif challenge_id in SEND_FLAG_TASKS:
+            lines += ["TARGET READY / accepts structured `send` input", "Use the subtask evidence to craft the accepted message."]
+        else:
+            lines += ["TARGET DATA buffered for analysis."]
+        base["lines"] = lines
+        return base, HTTPStatus.OK
+
+    lower_args = arguments.lower()
+    if action == "decode" and challenge_id in DECODE_FLAG_TASKS and any(
+        word in lower_args for word in {"", "weak", "prng", "admin", "metadata", "packet"}
+    ):
+        base["flag"] = flag_for(session_id, challenge_id)
+        base["lines"] = ["DECODE accepted / recovered hidden field", f"FLAG {base['flag']}"]
+    elif action == "interfere" and MODE["value"] == "attack" and challenge_id in INTERFERENCE_FLAG_TASKS and any(
+        word in lower_args for word in {"noise", "dos", "mismatch", "jam", "metadata"}
+    ):
+        base["flag"] = flag_for(session_id, challenge_id)
+        base["lines"] = ["INTERFERENCE accepted / decoded string mismatch observed", f"DISPLAY OUTPUT {base['flag']}"]
+    elif action == "transmit" and MODE["value"] == "attack" and challenge_id in TRANSMIT_FLAG_TASKS and any(
+        word in lower_args for word in {"sign", "message", "metadata", "fibonacci", "tone", "gate", "null", "theta"}
+    ):
+        base["flag"] = flag_for(session_id, challenge_id)
+        base["lines"] = ["TX waveform accepted by local target", "TARGET EFFECT matched success condition", f"FLAG {base['flag']}"]
+    elif action == "send" and MODE["value"] == "attack" and challenge_id in SEND_FLAG_TASKS and any(
+        word in lower_args
+        for word in {"warning", "light", "auth", "evacuation", "anomaly", "testbench", "latch", "default", "bitstream", "superuser", "kill"}
+    ):
+        base["flag"] = flag_for(session_id, challenge_id)
+        base["lines"] = ["STRUCTURED INPUT accepted by local target", "SIMULATED EFFECT reached success condition", f"FLAG {base['flag']}"]
+    else:
+        base["ok"] = False
+        base["lines"] = [
+            "Command reached the target but did not trigger its success condition.",
+            "Use the subtask's flag-location note, evidence, and script commands to shape the payload.",
+        ]
+        return base, HTTPStatus.BAD_REQUEST
+    return base, HTTPStatus.OK
+
+
+def script_interface_description() -> dict:
+    return {
+        "name": "Signal Forge Script Terminal",
+        "base_url": "http://localhost:8002",
+        "endpoints": {
+            "GET /api/script/interface": "Describe this script-facing interface.",
+            "POST /api/script/terminal": "Run one terminal command against a selected subtask.",
+            "GET /api/contexts": "List situations and nested subtasks.",
+            "GET /api/tasks": "List all subtasks.",
+            "GET /api/rf/live": "Stream live Python-generated FFT rows, time slices, and parser events.",
+            "GET /api/rf/raw": "Download raw complex16 IQ samples generated from the same Python signal profile.",
+        },
+        "terminal_payload": {
+            "session_id": "stable id chosen by your script",
+            "challenge_id": "subtask id, e.g. tunnel-tuning",
+            "command": "scan | tune <MHz> | span <kHz> | demod <mode> | receive | decode | interfere <effect> | transmit <payload> | send <payload>",
+        },
+        "example": {
+            "session_id": "dev-script-01",
+            "challenge_id": "tunnel-tuning",
+            "command": "tune 915.000",
+        },
+        "client": "/tools/script_clients/signal_terminal_client.py",
+    }
+
+
+def script_get_response(path: str, session_id: str) -> tuple[dict, HTTPStatus]:
+    parsed = urlparse(path)
+    if parsed.path == "/api/tasks":
+        return {"tasks": [public_task(task) for task in load_challenges()]}, HTTPStatus.OK
+    if parsed.path == "/api/contexts":
+        return {"contexts": public_contexts()}, HTTPStatus.OK
+    if parsed.path == "/api/radio/intercept":
+        return radio_intercept(session_id), HTTPStatus.OK
+    if parsed.path == "/api/script/interface":
+        return script_interface_description(), HTTPStatus.OK
+    return {"error": "script terminal request supports /api/tasks, /api/contexts, /api/radio/intercept, and /api/script/interface"}, HTTPStatus.NOT_FOUND
+
+
+def run_script_terminal_command(session_id: str, body: dict) -> tuple[dict, HTTPStatus]:
+    terminal = SCRIPT_TERMINALS.setdefault(
+        session_id,
+        {"challenge_id": "tunnel-reading-signals", "receivers": {}},
+    )
+    if body.get("challenge_id"):
+        terminal["challenge_id"] = str(body["challenge_id"])
+    challenge_id = terminal["challenge_id"]
+    receiver = terminal["receivers"].setdefault(challenge_id, default_receiver_for(challenge_id))
+    command_line = str(body.get("command", "")).strip()
+    if not command_line:
+        return {"ok": False, "lines": ["No command supplied."]}, HTTPStatus.BAD_REQUEST
+
+    command, _, arguments = command_line.partition(" ")
+    command = command.lower()
+    arguments = arguments.strip()
+
+    if command == "help":
+        return {
+            "ok": True,
+            "session_id": session_id,
+            "challenge_id": challenge_id,
+            "receiver": receiver,
+            "lines": [
+                "Commands: challenge <id>, scan, tune <MHz>, span <kHz>, gain <dB>, squelch <dB>, demod <mode>, receive, decode, interfere, transmit, send, request <path>",
+                "Use GET /api/contexts to discover situation and subtask ids.",
+            ],
+        }, HTTPStatus.OK
+
+    if command == "challenge":
+        if arguments not in RF_TARGETS:
+            return {"ok": False, "lines": [f"Unknown subtask id: {arguments}"]}, HTTPStatus.NOT_FOUND
+        terminal["challenge_id"] = arguments
+        receiver = terminal["receivers"].setdefault(arguments, default_receiver_for(arguments))
+        return {"ok": True, "session_id": session_id, "challenge_id": arguments, "receiver": receiver, "lines": [f"Active subtask set to {arguments}."]}, HTTPStatus.OK
+
+    if command == "request":
+        return script_get_response(arguments, session_id)
+
+    numeric_controls = {
+        "tune": ("center_mhz", "status"),
+        "center": ("center_mhz", "status"),
+        "span": ("span_khz", "status"),
+        "gain": ("gain_db", "status"),
+        "squelch": ("squelch_db", "status"),
+    }
+    if command in numeric_controls:
+        field, action = numeric_controls[command]
+        try:
+            receiver[field] = float(arguments)
+        except ValueError:
+            return {"ok": False, "lines": [f"{command}: numeric value required."]}, HTTPStatus.BAD_REQUEST
+        return build_rf_command_response(session_id, challenge_id, "tune" if command == "tune" else action, "", receiver)
+
+    if command == "demod":
+        receiver["modulation"] = arguments.upper()
+        return build_rf_command_response(session_id, challenge_id, "status", "", receiver)
+
+    if command in {"scan", "status", "receive", "decode", "interfere", "transmit", "send"}:
+        return build_rf_command_response(session_id, challenge_id, command, arguments, receiver)
+
+    return {"ok": False, "lines": [f"{command}: command not found. Try help."]}, HTTPStatus.BAD_REQUEST
 
 
 def init_db() -> None:
@@ -204,14 +505,29 @@ def vehicle_is_operator(vehicle_id: str) -> bool:
 class CTFHandler(SimpleHTTPRequestHandler):
     server_version = "SignalForgeCTF/1.0"
 
+    def handle(self) -> None:
+        try:
+            super().handle()
+        except ConnectionAbortedError:
+            return
+
     def end_headers(self) -> None:
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path in {"/data/challenges.json", "/data/tolling.db", "/config/range.json", "/server.py"} or parsed.path.startswith("/."):
+        if parsed.path in {"/data/challenges.json", "/data/contexts.json", "/data/tolling.db", "/config/range.json", "/server.py"} or parsed.path.startswith("/."):
             self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+            return
+        if parsed.path.startswith("/context/"):
+            context_id = parsed.path.removeprefix("/context/").strip("/")
+            known_ids = {context["id"] for context in load_contexts()}
+            if context_id not in known_ids:
+                self.send_error(HTTPStatus.NOT_FOUND, "Unknown context")
+                return
+            self.path = "/context.html"
+            super().do_GET()
             return
         if parsed.path.startswith("/challenge/"):
             challenge_id = parsed.path.removeprefix("/challenge/").strip("/")
@@ -232,6 +548,9 @@ class CTFHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/tasks":
             self.write_json({"tasks": [public_task(task) for task in load_challenges()]})
+            return
+        if parsed.path == "/api/contexts":
+            self.write_json({"contexts": public_contexts()})
             return
         if parsed.path == "/api/toll/events":
             self.handle_vulnerable_events(parsed.query)
@@ -257,6 +576,15 @@ class CTFHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/rf/session":
             session_id = session_id_from(self)
             self.write_json({"session_id": session_id, "user_data": user_data_for(session_id), "fft_bins": 1024})
+            return
+        if parsed.path == "/api/rf/live":
+            self.handle_rf_live(parsed.query)
+            return
+        if parsed.path == "/api/rf/raw":
+            self.handle_rf_raw(parsed.query)
+            return
+        if parsed.path == "/api/script/interface":
+            self.write_json(script_interface_description())
             return
         if parsed.path == "/api/rsu/maintenance":
             self.write_json(
@@ -301,6 +629,9 @@ class CTFHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/rf/command":
             self.handle_rf_command()
             return
+        if parsed.path == "/api/script/terminal":
+            self.handle_script_terminal()
+            return
         if parsed.path == "/api/air/inject":
             self.handle_air_voice_injection()
             return
@@ -323,6 +654,55 @@ class CTFHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)
+
+    def handle_rf_live(self, query: str) -> None:
+        params = parse_qs(query)
+        challenge_id = params.get("challenge_id", ["tunnel-reading-signals"])[0]
+        session_id = params.get("session_id", [session_id_from(self)])[0]
+        target = RF_TARGETS.get(challenge_id, RF_TARGETS["tunnel-reading-signals"])
+        try:
+            bins = int(params.get("bins", ["384"])[0])
+            rate = float(params.get("rate", ["18"])[0])
+        except ValueError:
+            bins = 384
+            rate = 18.0
+        rate = max(3.0, min(40.0, rate))
+        profile = live_signal_profile(challenge_id, target=target, bins=bins)
+
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+
+        def send_event(event_name: str, payload: dict) -> None:
+            encoded = json.dumps(payload, separators=(",", ":"))
+            self.wfile.write(f"event: {event_name}\n".encode("utf-8"))
+            self.wfile.write(f"data: {encoded}\n\n".encode("utf-8"))
+            self.wfile.flush()
+
+        try:
+            send_event("meta", profile)
+            frame = 0
+            while frame < int(profile.get("frames", 720)):
+                send_event("frame", generate_live_frame(profile, frame, session_id=session_id))
+                frame += 1
+                time.sleep(1 / rate)
+            send_event("complete", {"ok": True, "message": "live profile ended; reconnect to replay"})
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
+
+    def handle_rf_raw(self, query: str) -> None:
+        params = parse_qs(query)
+        challenge_id = params.get("challenge_id", ["tunnel-reading-signals"])[0]
+        target = RF_TARGETS.get(challenge_id, RF_TARGETS["tunnel-reading-signals"])
+        body = raw_iq_bytes(challenge_id, target=target, frame_count=96)
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Disposition", f'attachment; filename="{challenge_id}-complex16.iq"')
+        self.end_headers()
+        self.wfile.write(body)
 
     def handle_flag(self) -> None:
         try:
@@ -359,19 +739,21 @@ class CTFHandler(SimpleHTTPRequestHandler):
             return
 
         message = " ".join(str(body.get("message", "")).strip().upper().split())
+        zone = str(intercept.get("zone", intercept.get("sector", ""))).upper()
         required = {
             "target callsign": intercept["callsign"].upper() in message,
-            "sector identifier": f"SECTOR {intercept['sector']}" in message,
-            "diversion command": "DIVERT " in message,
+            "zone identifier": f"ZONE {zone}" in message,
+            "alert reason": "ALERT " in message,
+            "action instruction": "ACTION " in message,
             "authentication code": f"AUTH {intercept['auth_code']}" in message,
-            "credible decoy reason": any(word in message for word in {"WEATHER", "STORM", "TRAFFIC", "RADAR", "EMERGENCY", "HAZARD", "RUNWAY"}),
+            "credible public-safety wording": any(word in message for word in {"WEATHER", "STORM", "FLOOD", "FIRE", "SMOKE", "CLOSURE", "EVACUATE", "SHELTER", "HAZARD"}),
         }
         missing = [label for label, present in required.items() if not present]
         if not missing:
             self.write_json({
                 "ok": True,
-                "message": "Protocol accepted. The synthetic diversion was rebroadcast on the training net.",
-                "flag": flag_for(session_id, "weather-radio-watch"),
+                "message": "Protocol accepted. The synthetic public-warning message was rebroadcast on the training net.",
+                "flag": flag_for(session_id, "civilian-emergency-intercept"),
                 "broadcast": message,
             })
             return
@@ -637,6 +1019,9 @@ class CTFHandler(SimpleHTTPRequestHandler):
         action = str(body.get("action", "")).lower().strip()
         arguments = str(body.get("arguments", "")).strip()
         receiver = body.get("receiver", {}) if isinstance(body.get("receiver", {}), dict) else {}
+        response, status = build_rf_command_response(session_id, challenge_id, action, arguments, receiver)
+        self.write_json(response, status)
+        return
         target = RF_TARGETS.get(challenge_id)
         if not target:
             self.write_json({"ok": False, "lines": ["No RF target is assigned to this module."]}, HTTPStatus.NOT_FOUND)
@@ -711,7 +1096,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
             elif challenge_id == "operator-console-xss":
                 lines += ["AFSK operator_note decoded", "NOTE contains an active console control; use `forward console`." ]
             elif challenge_id == "weather-radio-watch":
-                lines += ["AM voice carrier acquired on 251.750 MHz", "Open the UHF protocol injection net, intercept the exchange, and recover its message fields."]
+                lines += ["AM voice carrier acquired on 169.650 MHz", "Open the council warning audio net, intercept the exchange, and recover its message fields."]
             else:
                 lines += ["TLV type=0x42 declared=111 actual=47", "PAYLOAD MAINT_DIAG_UNLOCKAAAAAAAAAAAAAAAAAAAAAAAAAAAA"]
             base["lines"] = lines
@@ -740,6 +1125,17 @@ class CTFHandler(SimpleHTTPRequestHandler):
             base["ok"] = False
             base["lines"] = ["Command reached the target but did not trigger its success condition.", "Use `receive` and the module intelligence to inspect the target output."]
         self.write_json(base, HTTPStatus.OK if base["ok"] else HTTPStatus.BAD_REQUEST)
+
+    def handle_script_terminal(self) -> None:
+        try:
+            body = read_json_body(self)
+        except json.JSONDecodeError:
+            self.write_json({"ok": False, "lines": ["Invalid script terminal payload."]}, HTTPStatus.BAD_REQUEST)
+            return
+        session_id = session_id_from(self, body)
+        response, status = run_script_terminal_command(session_id, body)
+        response.setdefault("session_id", session_id)
+        self.write_json(response, status)
 
 
 def verify_telemetry_packet(packet: dict) -> dict:
@@ -774,49 +1170,49 @@ def verify_telemetry_packet(packet: dict) -> dict:
 
 def generate_air_weather_intercept(session_id: str) -> dict:
     rng = random.SystemRandom()
-    callsign = f"{rng.choice(['VIPER', 'RAZOR', 'TALON', 'HAVOC', 'SABRE', 'RAVEN', 'COBRA'])} {rng.randint(1, 9)}-{rng.randint(1, 4)}"
-    controller = rng.choice(["FORGE CONTROL", "NOMAD CONTROL", "OVERLORD", "SENTRY", "ATLAS CONTROL"])
-    aircraft = rng.choice(["two F-35s", "a C-130", "two Super Hornets", "a P-8", "three Hawks", "a KC-30"])
-    sector = rng.choice(["BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT", "GOLF"])
-    altitude = rng.choice(["flight level one eight zero", "flight level two one zero", "flight level two six zero", "flight level three one zero", "one two thousand feet"])
-    direction = rng.choice(["northbound", "southbound", "eastbound", "westbound"])
+    callsign = f"{rng.choice(['LIBRARY', 'DEPOT', 'SHELTER', 'STATION', 'TUNNEL', 'CIVIC'])}-{rng.randint(1, 9)}"
+    controller = rng.choice(["COUNCIL CONTROL", "CIVIC DISPATCH", "CITY WARNING", "RANGE CONTROL"])
+    facility = rng.choice(["public library", "bus depot", "sports centre", "river pump station", "tunnel control room", "community shelter"])
+    zone = rng.choice(["NORTH", "RIVER", "CBD", "EAST", "WEST", "HILLS"])
     wind_direction = rng.randrange(10, 360, 10)
     wind_speed = rng.randrange(12, 46)
     gust = wind_speed + rng.randrange(6, 21)
     visibility = rng.choice(["three", "five", "seven", "ten", "more than ten"])
-    cloud = rng.choice(["broken cloud at four thousand", "overcast at two thousand five hundred", "scattered cloud at six thousand", "broken cloud at eight thousand"])
+    cloud = rng.choice(["heavy cloud over the ridge", "low cloud over the river", "clear air west of the city", "rain bands moving through the zone"])
     pressure = rng.randrange(995, 1028)
-    auth_code = f"{rng.choice(['ORBIT', 'LANCER', 'CITADEL', 'NOMAD', 'VECTOR', 'ANCHOR'])}-{rng.randint(2, 9)}"
-    hazard, advisory, readback = rng.choice([
-        ("thunderstorms", "embedded thunderstorms with tops above flight level three five zero", "thunderstorms and deviation east"),
-        ("severe turbulence", "severe turbulence reported between flight levels two zero zero and two eight zero", "severe turbulence, maintaining below two zero zero"),
-        ("airframe icing", "moderate to severe airframe icing in cloud above six thousand", "airframe icing, remaining clear of cloud"),
-        ("wind shear", "significant wind shear on the western approach below three thousand", "wind shear, western approach not available"),
-        ("volcanic ash", "volcanic ash reported across the northern half of the sector", "volcanic ash, routing south"),
-        ("heavy precipitation", "heavy precipitation reducing radar and visual contact", "heavy precipitation, requesting vectors"),
+    auth_code = f"{rng.choice(['RIVER', 'ANCHOR', 'CIVIC', 'VECTOR', 'HARBOUR', 'SUMMIT'])}-{rng.randint(2, 9)}"
+    hazard, advisory, action, readback = rng.choice([
+        ("storm", "severe storm cells crossing low-lying roads", "SHELTER", "storm warning and shelter instruction"),
+        ("flood", "river gauge rising above the local warning threshold", "EVACUATE", "flood warning and evacuation instruction"),
+        ("smoke", "smoke reducing visibility near public roads", "CLOSE ROUTE", "smoke warning and route closure"),
+        ("heat", "extreme heat affecting public transport shelters", "WELFARE CHECK", "heat warning and welfare checks"),
+        ("wind", "damaging wind reported around exposed infrastructure", "SECURE SITE", "wind warning and site security"),
+        ("closure", "building access restricted by local hazard reports", "HOLD POSITION", "closure warning and hold instruction"),
     ])
     request = rng.choice([
-        "request updated weather and routing recommendation",
-        "say weather for the sector and any significant hazards",
-        "request conditions along track and hazard status",
+        "request current warning status and action",
+        "say weather for the zone and public safety action",
+        "request local hazard status and council instruction",
     ])
-    acknowledgement = rng.choice(["copy all", "roger weather", "good readback", "affirm, that is correct"])
-    intercept_id = session_token(session_id, f"air-weather:{time.time_ns()}:{rng.random()}", 12)
+    acknowledgement = rng.choice(["copy all", "good readback", "affirm, that is correct", "confirmed"])
+    intercept_id = session_token(session_id, f"council-weather:{time.time_ns()}:{rng.random()}", 12)
     lines = [
-        {"speaker": callsign, "role": "aircraft", "text": f"{controller}, {callsign}, {aircraft}, {direction} {altitude}, approaching sector {sector}, {request}."},
-        {"speaker": controller, "role": "controller", "text": f"{callsign}, {controller}. Sector {sector}: wind {wind_direction:03d} at {wind_speed}, gusting {gust}; visibility {visibility} miles; {cloud}; QNH {pressure}. Primary hazard is {advisory}. Recommend deviation {rng.choice(['east', 'west', 'south'])} by {rng.choice(['ten', 'fifteen', 'twenty'])} miles."},
-        {"speaker": callsign, "role": "aircraft", "text": f"{controller}, {callsign}, copy wind {wind_direction:03d} at {wind_speed}, QNH {pressure}, {readback}."},
-        {"speaker": controller, "role": "controller", "text": f"{callsign}, {acknowledgement}. Report clear of sector {sector}. Authentication for further routing is {auth_code}."},
+        {"speaker": callsign, "role": "site", "text": f"{controller}, {callsign}, {facility}, zone {zone}, {request}."},
+        {"speaker": controller, "role": "controller", "text": f"{callsign}, {controller}. Zone {zone}: wind {wind_direction:03d} at {wind_speed}, gusting {gust}; visibility {visibility} kilometres; {cloud}; QNH {pressure}. Primary alert is {advisory}. Action {action}."},
+        {"speaker": callsign, "role": "site", "text": f"{controller}, {callsign}, copy wind {wind_direction:03d} at {wind_speed}, QNH {pressure}, {readback}."},
+        {"speaker": controller, "role": "controller", "text": f"{callsign}, {acknowledgement}. Report when action is complete for zone {zone}. Authentication for warning updates is {auth_code}."},
     ]
     return {
         "intercept_id": intercept_id,
-        "channel": "251.750 MHz",
+        "channel": "169.650 MHz",
         "modulation": "AM",
         "callsign": callsign,
         "controller": controller,
-        "sector": sector,
+        "sector": zone,
+        "zone": zone,
         "lines": lines,
         "answer": hazard,
+        "action": action,
         "auth_code": auth_code,
     }
 
@@ -826,7 +1222,7 @@ def radio_intercept(session_id: str = "anonymous") -> dict:
     telemetry = config["telemetry"]
     return {
         "frame_id": "RF-INT-2437-0007",
-        "callsign": "WARTHOG-1",
+        "callsign": "CIVIC-OPS-1",
         "channel_label": "TOLL-LPI-TRAINING-03",
         "center_hz": config["rf"]["center_hz"],
         "carrier_offset_hz": -320000,

@@ -1,4 +1,5 @@
 const analysis = {
+  contexts: [],
   tasks: [],
   task: null,
   meta: null,
@@ -13,7 +14,10 @@ const analysis = {
   sessionId: sessionStorage.getItem("signalForgeSession") || crypto.randomUUID(),
   userData: null,
   frontendMode: "basic",
-  tx: { config: null, remainingFrames: 0, history: new Map() }
+  tx: { config: null, remainingFrames: 0, history: new Map() },
+  sourceMode: "live",
+  live: { stream: null, started: false, events: [], lastSamples: [], fallbackAttempted: false },
+  audio: { context: null, oscillator: null, gain: null, timer: null, playing: false }
 };
 const weatherRadio = {
   intercept: null,
@@ -31,17 +35,21 @@ const waterfall = byId("analysis-waterfall");
 const waterfallContext = waterfall.getContext("2d");
 const spectrum = byId("spectrum-trace");
 const spectrumContext = spectrum.getContext("2d");
+const timeSeries = byId("time-series");
+const timeSeriesContext = timeSeries.getContext("2d");
 const nativeWaterfall = document.createElement("canvas");
 const nativeWaterfallContext = nativeWaterfall.getContext("2d");
 
 async function bootChallenge() {
   const sessionHeaders = { "X-Signal-Session": analysis.sessionId };
-  const [tasksResponse, modeResponse, sessionResponse] = await Promise.all([
+  const [tasksResponse, contextsResponse, modeResponse, sessionResponse] = await Promise.all([
     fetch("/api/tasks"),
+    fetch("/api/contexts"),
     fetch("/api/mode"),
     fetch("/api/rf/session", { headers: sessionHeaders })
   ]);
   analysis.tasks = (await tasksResponse.json()).tasks;
+  analysis.contexts = (await contextsResponse.json()).contexts;
   renderMode((await modeResponse.json()).mode);
   const session = await sessionResponse.json();
   analysis.userData = session.user_data;
@@ -63,25 +71,50 @@ async function bootChallenge() {
 function renderChallenge() {
   const task = analysis.task;
   const solved = new Set(JSON.parse(localStorage.getItem("solvedTasks") || "[]"));
-  const index = analysis.tasks.findIndex((candidate) => candidate.id === task.id);
+  const context = contextForTask(task);
+  const sequence = context?.subtasks?.length ? context.subtasks : analysis.tasks;
+  const index = sequence.findIndex((candidate) => candidate.id === task.id);
   document.title = `${task.title} | Signal Forge CTF`;
-  byId("challenge-kicker").textContent = `${task.track} / challenge ${index + 1} of ${analysis.tasks.length}`;
+  byId("challenge-kicker").textContent = context ? `${context.title} / ${task.track}` : task.context || `${task.track} / challenge ${index + 1} of ${analysis.tasks.length}`;
   byId("challenge-title").textContent = task.title;
   byId("challenge-score").innerHTML = `<strong>${solved.has(task.id) ? "Solved" : `${task.points} pts`}</strong><span>${task.difficulty}</span>`;
   byId("challenge-scenario").textContent = task.scenario;
   byId("challenge-objective").textContent = task.objective;
   byId("challenge-concepts").replaceChildren(...task.concepts.map((concept) => element("span", concept)));
   byId("challenge-steps").replaceChildren(...task.steps.map((step) => element("li", step)));
+  byId("flag-location").textContent = task.flag_location || "Recover the task output and submit the generated CTF flag.";
+  renderScriptCommands(task);
   byId("signal-scheme").textContent = task.signal_scheme || "No RF capture is required for this challenge.";
   byId("challenge-hints").innerHTML = task.hints.map((hint, hintIndex) => `
     <details><summary>Hint ${hintIndex + 1}</summary><p>${escapeHtml(hint)}</p></details>
   `).join("");
   renderArtifacts();
-  renderPagination(index);
-  byId("challenge-progress").textContent = `${String(index + 1).padStart(2, "0")} / ${String(analysis.tasks.length).padStart(2, "0")}`;
-  const isWeatherRadio = task.id === "weather-radio-watch";
+  byId("source-raw-download").href = `/api/rf/raw?challenge_id=${encodeURIComponent(task.id)}`;
+  renderParserStages();
+  updateEffectStage("idle", "Awaiting receiver output");
+  renderPagination(index, sequence);
+  byId("challenge-progress").textContent = `${String(index + 1).padStart(2, "0")} / ${String(sequence.length).padStart(2, "0")}`;
+  const backLink = document.querySelector(".back-link");
+  if (context) {
+    backLink.href = `/context/${encodeURIComponent(context.id)}`;
+    backLink.textContent = "Back to situation subtasks";
+  } else {
+    backLink.href = "/#tasks";
+    backLink.textContent = "Back to all situations";
+  }
+  const isWeatherRadio = task.id === "civilian-emergency-intercept";
   byId("weather-radio").hidden = !isWeatherRadio;
   if (isWeatherRadio) initialiseWeatherRadio();
+}
+
+function renderScriptCommands(task) {
+  const commands = task.script_commands || [];
+  const commandList = byId("script-commands");
+  if (!commands.length) {
+    commandList.textContent = "No script commands are defined for this subtask yet.";
+    return;
+  }
+  commandList.innerHTML = commands.map((command) => `<code>${escapeHtml(command)}</code>`).join("");
 }
 
 function initialiseWeatherRadio() {
@@ -120,7 +153,7 @@ async function generateWeatherIntercept() {
     byId("weather-report-form").querySelector("button").disabled = false;
     byId("weather-injection").value = "";
     byId("weather-radio-status").innerHTML = "<i></i> Intercept ready";
-    byId("weather-report-result").textContent = `Intercept ready: ${weatherRadio.intercept.callsign} on ${weatherRadio.intercept.channel}. Listen for the protocol fields, then write your own decoy.`;
+    byId("weather-report-result").textContent = `Intercept ready: ${weatherRadio.intercept.callsign} on ${weatherRadio.intercept.channel}. Listen for the protocol fields, then write your own warning message.`;
     terminalWrite(`VOICE INTERCEPT ${weatherRadio.intercept.intercept_id} buffered on ${weatherRadio.intercept.channel}`, "system");
   } catch (error) {
     byId("weather-radio-status").innerHTML = "<i></i> Link failed";
@@ -218,7 +251,7 @@ async function submitWeatherInjection(event) {
   const result = byId("weather-report-result");
   const injectionMessage = byId("weather-injection").value.trim();
   if (!injectionMessage) {
-    result.textContent = "Write a decoy transmission before attempting the injection.";
+    result.textContent = "Write a warning message before attempting the injection.";
     result.classList.remove("success");
     byId("weather-injection").focus();
     return;
@@ -239,6 +272,7 @@ async function submitWeatherInjection(event) {
   if (data.flag) {
     byId("challenge-flag").value = data.flag;
     terminalWrite(`VOICE PROTOCOL INJECTION ACCEPTED / FLAG ${data.flag}`, "system");
+    updateEffectStage("warning", `Warning light accepted ${data.flag}`);
     speakInjectedMessage(data.broadcast || injectionMessage);
   }
 }
@@ -282,17 +316,27 @@ function renderArtifacts() {
   const list = byId("challenge-artifacts");
   list.innerHTML = "";
   analysis.task.artifacts.forEach((artifact) => {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.innerHTML = `<span><strong>${escapeHtml(artifact.label)}</strong><small>${escapeHtml(artifact.type || "artifact")}</small></span><i>Inspect &rarr;</i>`;
-    item.addEventListener("click", () => inspectArtifact(artifact));
+    const href = artifact.href.startsWith("/api/rf/raw") ? `/api/rf/raw?challenge_id=${encodeURIComponent(analysis.task.id)}` : artifact.href;
+    const item = document.createElement("div");
+    item.className = "resource-item";
+    item.innerHTML = `
+      <button type="button"><span><strong>${escapeHtml(artifact.label)}</strong><small>${escapeHtml(artifact.type || "artifact")}</small></span><i>Inspect</i></button>
+      <a href="${escapeHtml(href)}" download>Download</a>
+    `;
+    item.querySelector("button").addEventListener("click", () => inspectArtifact({ ...artifact, href }));
     list.appendChild(item);
   });
 }
 
-function renderPagination(index) {
-  const previous = analysis.tasks[index - 1];
-  const next = analysis.tasks[index + 1];
+function contextForTask(task) {
+  return analysis.contexts.find((context) =>
+    context.id === task.context_id || context.subtasks.some((subtask) => subtask.id === task.id)
+  );
+}
+
+function renderPagination(index, sequence = analysis.tasks) {
+  const previous = sequence[index - 1];
+  const next = sequence[index + 1];
   setPageLink(byId("previous-challenge"), previous, "Previous");
   setPageLink(byId("next-challenge"), next, "Next");
 }
@@ -313,6 +357,20 @@ async function loadSignalCapture() {
     renderEmptyPlots();
     return;
   }
+  if (analysis.sourceMode === "live") {
+    startLiveStream();
+    return;
+  }
+  await loadArtifactCapture(artifact);
+}
+
+async function loadArtifactCapture(artifact = analysis.task.artifacts.find((candidate) => candidate.role === "signal")) {
+  stopLiveStream(false);
+  if (!artifact) {
+    byId("capture-status").textContent = "No signal artifact";
+    renderEmptyPlots();
+    return;
+  }
   try {
     const response = await fetch(artifact.href);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -322,12 +380,13 @@ async function loadSignalCapture() {
     analysis.captureCenter = Number(analysis.meta.center_hz || 0);
     analysis.captureSpan = Number(analysis.meta.span_hz || 0);
     byId("signal-title").textContent = artifact.label;
-    byId("capture-status").textContent = `${analysis.rows.length} frames / ${analysis.rows[0]?.length || 0} FFT bins`;
+    byId("capture-status").textContent = `${analysis.rows.length} artifact frames / ${analysis.rows[0]?.length || 0} FFT bins`;
+    byId("live-stream-status").textContent = "Artifact replay loaded";
     resetAnalysisView();
     renderCaptureMetadata();
     renderLegend();
     if (!analysis.playing) togglePlayback();
-    if (analysis.task.id === "weather-radio-watch") await runRfCommand("tune");
+    if (analysis.task.id === "civilian-emergency-intercept") await runRfCommand("tune");
   } catch (error) {
     byId("capture-status").textContent = "Capture failed to load";
     byId("measurement-bar").textContent = error.message;
@@ -335,14 +394,85 @@ async function loadSignalCapture() {
   }
 }
 
+function startLiveStream() {
+  stopLiveStream(false);
+  const artifact = analysis.task.artifacts.find((candidate) => candidate.role === "signal");
+  analysis.rows = [];
+  analysis.frame = 0;
+  analysis.live.events = [];
+  analysis.live.lastSamples = [];
+  analysis.live.fallbackAttempted = false;
+  analysis.playing = true;
+  byId("analysis-play").textContent = "Pause";
+  byId("source-live").classList.add("active");
+  byId("source-artifact").classList.remove("active");
+  byId("capture-status").textContent = "Connecting live parser";
+  byId("live-stream-status").textContent = "Connecting to Python stream";
+  byId("signal-title").textContent = artifact?.label || "Live RF stream";
+  const params = new URLSearchParams({
+    challenge_id: analysis.task.id,
+    session_id: analysis.sessionId,
+    bins: "384",
+    rate: byId("analysis-rate").value || "18"
+  });
+  const stream = new EventSource(`/api/rf/live?${params.toString()}`);
+  analysis.live.stream = stream;
+  stream.addEventListener("meta", (event) => {
+    analysis.meta = JSON.parse(event.data);
+    analysis.captureCenter = Number(analysis.meta.center_hz || 0);
+    analysis.captureSpan = Number(analysis.meta.span_hz || 0);
+    byId("capture-status").textContent = `${analysis.meta.scheme_id} / live`;
+    byId("live-stream-status").textContent = "Streaming raw samples into parser";
+    resetAnalysisView();
+    renderCaptureMetadata();
+    renderLegend();
+  });
+  stream.addEventListener("frame", (event) => {
+    const payload = JSON.parse(event.data);
+    analysis.rows.push(payload.row);
+    if (analysis.rows.length > 180) analysis.rows.shift();
+    analysis.frame = Math.max(0, analysis.rows.length - 1);
+    analysis.live.lastSamples = payload.samples || [];
+    byId("analysis-frame").max = Math.max(0, analysis.rows.length - 1);
+    byId("analysis-frame").value = analysis.frame;
+    byId("capture-status").textContent = `${analysis.rows.length} live frames / ${payload.row.length} FFT bins`;
+    renderParserEvent(payload.parser);
+    renderAnalysis();
+  });
+  stream.addEventListener("complete", () => {
+    byId("live-stream-status").textContent = "Live profile complete; press Play to restart";
+    stopLiveStream(false);
+  });
+  stream.onerror = () => {
+    byId("live-stream-status").textContent = "Live parser unavailable";
+    if (!analysis.rows.length && !analysis.live.fallbackAttempted) {
+      analysis.live.fallbackAttempted = true;
+      analysis.sourceMode = "artifact";
+      loadArtifactCapture();
+    }
+  };
+}
+
+function stopLiveStream(updateStatus = true) {
+  if (analysis.live.stream) {
+    analysis.live.stream.close();
+    analysis.live.stream = null;
+  }
+  clearInterval(analysis.timer);
+  analysis.timer = null;
+  analysis.playing = false;
+  byId("analysis-play").textContent = "Play";
+  if (updateStatus) byId("live-stream-status").textContent = analysis.sourceMode === "live" ? "Live parser paused" : "Artifact replay paused";
+}
+
 function resetAnalysisView() {
-  const isVoiceInjection = analysis.task?.id === "weather-radio-watch";
+  const alreadyTuned = isIntroductorySignalTask(analysis.task);
   const lockWindowHz = Math.max(8000, Math.min(40000, analysis.captureSpan / 16));
   const presetOffsetHz = lockWindowHz + 4000;
-  const initialCenter = isVoiceInjection ? analysis.captureCenter : analysis.captureCenter - presetOffsetHz;
+  const initialCenter = alreadyTuned ? analysis.captureCenter : analysis.captureCenter - presetOffsetHz;
   byId("analysis-center").value = (initialCenter / 1e6).toFixed(6);
   byId("analysis-span").value = Math.round(analysis.captureSpan / 1e3);
-  if (isVoiceInjection) byId("receiver-modulation").value = "AM";
+  byId("receiver-modulation").value = preferredDemodulation();
   byId("analysis-floor").value = "-88";
   byId("analysis-range").value = "70";
   byId("analysis-frame").max = Math.max(0, analysis.rows.length - 1);
@@ -350,11 +480,22 @@ function resetAnalysisView() {
   analysis.cursorA = null;
   analysis.cursorB = null;
   renderAnalysis();
-  if (isVoiceInjection) {
-    byId("receiver-lock").textContent = "Preset on target / press Tune to verify";
-  } else {
-    byId("receiver-lock").textContent = `Near target / adjust +${Math.round(presetOffsetHz / 1000)} kHz toward ${formatHz(analysis.captureCenter)}`;
-  }
+  byId("receiver-lock").textContent = alreadyTuned ? "Receiver centred on live profile" : "Survey preset / acquire signal from evidence";
+}
+
+function isIntroductorySignalTask(task) {
+  if (!task) return false;
+  return task.source_task_id && !String(task.source_task_id).includes(".");
+}
+
+function preferredDemodulation() {
+  const modulation = String(analysis.meta?.protocol_notes?.modulation || analysis.task?.signal_scheme || "").toUpperCase();
+  if (modulation.includes("4-FSK")) return "4-FSK";
+  if (modulation.includes("GFSK")) return "GFSK";
+  if (modulation.includes("2-FSK") || modulation.includes("FSK")) return "2-FSK";
+  if (modulation.includes("AM") || modulation.includes("VOICE")) return "AM";
+  if (modulation.includes("ASK") || modulation.includes("OOK") || modulation.includes("MANCHESTER")) return "ASK";
+  return "AUTO";
 }
 
 function renderCaptureMetadata() {
@@ -424,6 +565,7 @@ function renderAnalysis() {
   drawMeasurementCursor(analysis.cursorA, "A", "#73f2a6", viewport);
   drawMeasurementCursor(analysis.cursorB, "B", "#ffc766", viewport);
   drawSpectrum(viewport);
+  drawTimeSeries(viewport);
   updateReadouts(viewport);
 }
 
@@ -561,6 +703,54 @@ function drawSpectrum(viewport) {
   byId("peak-readout").textContent = `Peak: ${formatHz(peakFrequency)} / ${powerToDb(peak.power).toFixed(1)} dBFS`;
 }
 
+function drawTimeSeries(viewport) {
+  timeSeriesContext.fillStyle = "#020607";
+  timeSeriesContext.fillRect(0, 0, timeSeries.width, timeSeries.height);
+  drawGrid(timeSeriesContext, timeSeries.width, timeSeries.height, 10, 4);
+  const samples = analysis.live.lastSamples.length ? analysis.live.lastSamples : samplesFromCurrentRow(viewport);
+  if (!samples.length) {
+    timeSeriesContext.fillStyle = "#a8b4ae";
+    timeSeriesContext.font = "16px system-ui";
+    timeSeriesContext.fillText("Waiting for tuned sample slice.", 28, 44);
+    return;
+  }
+  const midY = timeSeries.height / 2;
+  timeSeriesContext.strokeStyle = "rgba(115, 242, 166, .22)";
+  timeSeriesContext.beginPath();
+  timeSeriesContext.moveTo(0, midY);
+  timeSeriesContext.lineTo(timeSeries.width, midY);
+  timeSeriesContext.stroke();
+  const gradient = timeSeriesContext.createLinearGradient(0, 0, timeSeries.width, 0);
+  gradient.addColorStop(0, "#73f2a6");
+  gradient.addColorStop(.55, "#59d7e8");
+  gradient.addColorStop(1, "#ffc766");
+  timeSeriesContext.strokeStyle = gradient;
+  timeSeriesContext.lineWidth = 2;
+  timeSeriesContext.beginPath();
+  samples.forEach((sample, index) => {
+    const x = index / Math.max(1, samples.length - 1) * timeSeries.width;
+    const y = midY - Number(sample) * (timeSeries.height * 0.42);
+    if (index === 0) timeSeriesContext.moveTo(x, y);
+    else timeSeriesContext.lineTo(x, y);
+  });
+  timeSeriesContext.stroke();
+  byId("timeseries-readout").textContent = `Samples: ${samples.length}`;
+  byId("symbol-readout").textContent = `Symbols: ${byId("parser-bit-buffer").textContent.slice(0, 12) || "--"}`;
+}
+
+function samplesFromCurrentRow(viewport) {
+  const row = analysis.rows[analysis.frame] || [];
+  if (!row.length) return [];
+  const centerBin = Math.max(viewport.startBin, Math.min(viewport.endBin - 1, Math.round((viewport.startBin + viewport.endBin) / 2)));
+  const samples = [];
+  for (let index = 0; index < 160; index += 1) {
+    const bin = Math.max(0, Math.min(row.length - 1, centerBin - 4 + index % 9));
+    const power = row[bin] || 0;
+    samples.push((power - 0.45) * Math.sin(index * 0.32));
+  }
+  return samples;
+}
+
 function updateReadouts(viewport) {
   const tickCount = 7;
   byId("analysis-axis").innerHTML = Array.from({ length: tickCount }, (_, index) => {
@@ -587,7 +777,7 @@ function updateReadouts(viewport) {
 }
 
 function renderEmptyPlots() {
-  for (const [context, canvas] of [[waterfallContext, waterfall], [spectrumContext, spectrum]]) {
+  for (const [context, canvas] of [[waterfallContext, waterfall], [spectrumContext, spectrum], [timeSeriesContext, timeSeries]]) {
     context.fillStyle = "#030708";
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = "#a8b4ae";
@@ -650,7 +840,7 @@ function rowsForArtifact(artifact) {
     const row = [];
     for (let bin = 0; bin < bins; bin += 1) {
       const offset = -span / 2 + bin / Math.max(1, bins - 1) * span;
-      let power = 0.04 + deterministicNoise(bin, frame, Number(artifact.seed || 6841)) * 0.09;
+      let power = backgroundArtifactPower(bin, frame, Number(artifact.seed || 6841));
       artifact.sources.forEach((source) => { power = Math.max(power, sourcePower(source, offset, frame)); });
       row.push(Math.min(1, power));
     }
@@ -665,19 +855,30 @@ function sourcePower(source, offsetHz, frame) {
   const period = Number(source.period_frames || 40);
   const duration = Number(source.duration_frames || 10);
   const hopSet = source.hop_offsets_hz;
-  const hop = hopSet ? Number(hopSet[Math.floor(frame / Math.max(1, period)) % hopSet.length]) : baseOffset;
+  const hopIndex = Math.floor(frame / Math.max(1, period));
+  const hop = hopSet ? smoothHop(hopSet, hopIndex, frame % period, period) : baseOffset;
   const driftedOffset = hop + Number(source.drift_hz_per_frame || 0) * frame;
-  const active = source.kind === "noise_band" || (frame + Number(source.phase_frames || 0)) % period < duration;
+  const phase = (frame + Number(source.phase_frames || 0)) % period;
+  const temporalEnvelope = source.kind === "noise_band" ? 1 : raisedTemporalEnvelope(phase, duration, Math.min(5, Math.max(2, duration / 4)));
+  const active = temporalEnvelope > 0;
   if (source.kind === "sweep") {
     const start = Number(source.sweep_start_hz || -800000);
     const stop = Number(source.sweep_stop_hz || 800000);
     const sweepPeriod = Number(source.sweep_period_frames || 90);
-    const sweepOffset = start + (frame % sweepPeriod) / sweepPeriod * (stop - start);
-    return Math.abs(offsetHz - sweepOffset) < bandwidth ? Number(source.power || 0.65) : 0;
+    const amount = (frame % sweepPeriod) / sweepPeriod;
+    const sweepOffset = start + (0.5 - 0.5 * Math.cos(amount * Math.PI)) * (stop - start);
+    return Math.abs(offsetHz - sweepOffset) < bandwidth ? Number(source.power || 0.65) * 0.84 : 0;
   }
   if (!active) return 0;
   if (source.kind === "noise_band") {
     return Math.abs(offsetHz - driftedOffset) < bandwidth / 2 ? Number(source.power || 0.32) * (0.75 + deterministicNoise(Math.round(offsetHz), frame, 17) * 0.25) : 0;
+  }
+  if (source.kind === "ook") {
+    const bitstream = String(source.symbol_pattern || "1011010011100101");
+    const bit = bitstream[Math.floor(frame / 3) % bitstream.length] === "1" ? 1 : 0.18;
+    const distance = Math.abs(offsetHz - driftedOffset) / Math.max(1, bandwidth / 2);
+    if (distance >= 1) return 0;
+    return Number(source.power || 0.88) * Math.pow(1 - distance, 0.5) * temporalEnvelope * bit;
   }
   const distance = Math.abs(offsetHz - driftedOffset) / Math.max(1, bandwidth / 2);
   if (distance >= 1) return 0;
@@ -685,7 +886,34 @@ function sourcePower(source, offsetHz, frame) {
   const spectralTexture = 0.64 + deterministicNoise(Math.round(offsetHz / Math.max(1, bandwidth) * 900), frame, 31) * 0.26;
   const voiceRipple = 0.78 + Math.pow(Math.sin(offsetHz / Math.max(1, bandwidth) * 38 + frame * 0.37), 2) * 0.22;
   const carrier = distance < 0.045 ? 0.16 : 0;
-  return Math.min(1, Number(source.power || 0.9) * envelope * spectralTexture * voiceRipple + carrier);
+  return Math.min(1, Number(source.power || 0.9) * envelope * spectralTexture * voiceRipple * temporalEnvelope + carrier * temporalEnvelope);
+}
+
+function backgroundArtifactPower(bin, frame, seed) {
+  return Math.max(
+    0.01,
+    0.045
+    + Math.sin(bin * 0.023 + frame * 0.029 + seed) * 0.014
+    + Math.sin(bin * 0.11 + frame * 0.013) * 0.01
+    + deterministicNoise(Math.floor(bin / 5), Math.floor(frame / 4), seed) * 0.02
+  );
+}
+
+function raisedTemporalEnvelope(phase, duration, ramp) {
+  if (phase >= duration) return 0;
+  if (phase < ramp) return 0.5 - 0.5 * Math.cos(Math.PI * phase / ramp);
+  if (duration - phase < ramp) return 0.5 - 0.5 * Math.cos(Math.PI * (duration - phase) / ramp);
+  return 1;
+}
+
+function smoothHop(hopSet, hopIndex, phase, period) {
+  const current = Number(hopSet[hopIndex % hopSet.length]);
+  const next = Number(hopSet[(hopIndex + 1) % hopSet.length]);
+  const transition = Math.min(5, Math.max(2, period / 6));
+  if (phase < period - transition) return current;
+  const amount = (phase - (period - transition)) / transition;
+  const smooth = amount * amount * (3 - 2 * amount);
+  return current + (next - current) * smooth;
 }
 
 function deterministicNoise(x, y, seed) {
@@ -768,6 +996,48 @@ function renderTextArtifactPreview(container, text, type = "") {
 function renderBinaryArtifactPreview(container, bytes) {
   const visible = bytes.slice(0, 512);
   container.innerHTML = `<div class="artifact-preview-heading"><strong>Binary / IQ artifact</strong><span>${bytes.length} bytes</span></div><div class="binary-map">${Array.from(visible, (byte) => `<i style="--level:${byte / 255}" title="0x${byte.toString(16).padStart(2, "0")}"></i>`).join("")}</div>`;
+}
+
+function renderParserStages(activeStage = "") {
+  const stages = [
+    ["raw_iq", "Raw IQ"],
+    ["fft", "FFT rows"],
+    ["energy_detect", "Energy detect"],
+    ["symbol_clock", "Clock"],
+    ["bit_slice", "Bit slice"],
+    ["frame_sync", "Frame sync"],
+    ["field_decode", "Field decode"],
+    ["policy_check", "Policy check"]
+  ];
+  byId("parser-stages").innerHTML = stages.map(([id, label]) => `<li class="${id === activeStage ? "active" : ""}">${escapeHtml(label)}</li>`).join("");
+}
+
+function renderParserEvent(parser) {
+  if (!parser) return;
+  renderParserStages(parser.stage);
+  byId("parser-confidence").textContent = `Confidence ${(Number(parser.confidence || 0) * 100).toFixed(0)}%`;
+  byId("parser-bit-buffer").textContent = parser.bit_buffer || "--";
+  const fields = Object.entries(parser.fields || {});
+  byId("parser-fields").innerHTML = fields.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(String(value))}</dd>`).join("");
+  const line = `${parser.stage}: ${parser.note || parser.label || "parser update"}`;
+  if (analysis.live.events[0] !== line) analysis.live.events.unshift(line);
+  analysis.live.events = analysis.live.events.slice(0, 5);
+  byId("parser-event-log").innerHTML = analysis.live.events.map((event) => `<div>${escapeHtml(event)}</div>`).join("");
+}
+
+function updateEffectStage(kind = "idle", message = "Awaiting receiver output") {
+  const context = analysis.task?.context_id || "";
+  const effectLabel = context.includes("tunnel") ? "Tunnel sign"
+    : context.includes("broadcast") ? "Broadcast console"
+    : context.includes("emergency") || context.includes("weather") ? "Warning light"
+    : context.includes("bushfire") ? "Relay node"
+    : context.includes("farm") ? "Gate controller"
+    : "Mission effect";
+  byId("effect-label").textContent = effectLabel;
+  byId("effect-message").textContent = message;
+  byId("effect-stage").classList.toggle("active", kind !== "idle");
+  byId("effect-light").classList.toggle("active", ["warning", "success", "transmit", "interference"].includes(kind));
+  byId("effect-light-text").textContent = kind === "idle" ? "Idle" : kind.toUpperCase();
 }
 
 function hexDump(bytes) {
@@ -876,6 +1146,7 @@ function terminalWrite(message, kind = "output") {
 
 async function runRfCommand(action, argumentsText = "") {
   terminalWrite(`$ ${action}${argumentsText ? ` ${argumentsText}` : ""}`, "command");
+  setActionFeedback(action, true);
   try {
     const response = await fetch("/api/rf/command", {
       method: "POST",
@@ -892,10 +1163,48 @@ async function runRfCommand(action, argumentsText = "") {
     (data.lines || [JSON.stringify(data, null, 2)]).forEach((line) => terminalWrite(line, data.ok ? "output" : "error"));
     byId("receiver-lock").textContent = data.locked ? `LOCKED / ${data.target}` : "Receiver unlocked";
     byId("receiver-lock").classList.toggle("locked", Boolean(data.locked));
+    if (data.flag) byId("challenge-flag").value = data.flag;
+    updateEffectFromRf(action, data);
     return data;
   } catch (error) {
     terminalWrite(`Frontend error: ${error.message}`, "error");
     return null;
+  } finally {
+    setTimeout(() => setActionFeedback(action, false), 650);
+  }
+}
+
+function setActionFeedback(action, active) {
+  const buttonIds = {
+    scan: "receiver-scan",
+    tune: "receiver-apply",
+    status: "receiver-apply",
+    receive: "receiver-receive",
+    transmit: "tx-transmit",
+    send: "tx-transmit",
+    interfere: "tx-preview"
+  };
+  const button = byId(buttonIds[action] || "");
+  if (button) button.classList.toggle("active", active);
+}
+
+function updateEffectFromRf(action, data) {
+  if (!data) return;
+  if (!data.ok) {
+    updateEffectStage("idle", "No accepted target state change");
+    return;
+  }
+  const text = (data.lines || []).join(" / ");
+  if (action === "receive") {
+    updateEffectStage("success", data.locked ? "Decoded receiver output buffered" : "Receiver output unavailable");
+  } else if (action === "interfere") {
+    updateEffectStage("interference", text.includes("FLAG") ? text.match(/FLAG\s+CTF\{[^}]+\}/)?.[0] || "Mismatch produced task output" : "Interference visible in local spectrum");
+  } else if (action === "transmit") {
+    updateEffectStage("transmit", text.includes("FLAG") ? text.match(/FLAG\s+CTF\{[^}]+\}/)?.[0] || "Transmission accepted" : "Local transmission drawn on spectrum");
+  } else if (action === "send") {
+    updateEffectStage("warning", text.includes("FLAG") ? text.match(/FLAG\s+CTF\{[^}]+\}/)?.[0] || "Structured input accepted" : "Structured input accepted");
+  } else if (action === "scan" || action === "tune" || action === "status") {
+    updateEffectStage(data.locked ? "success" : "idle", data.locked ? "Receiver lock achieved" : "Signal not yet locked");
   }
 }
 
@@ -969,6 +1278,11 @@ function setFrontendMode(mode) {
 }
 
 function togglePlayback() {
+  if (analysis.sourceMode === "live") {
+    if (analysis.live.stream) stopLiveStream(true);
+    else startLiveStream();
+    return;
+  }
   analysis.playing = !analysis.playing;
   byId("analysis-play").textContent = analysis.playing ? "Pause" : "Play";
   clearInterval(analysis.timer);
@@ -999,12 +1313,74 @@ async function setMode(mode) {
   renderMode((await response.json()).mode);
 }
 
+function toggleTunedAudio() {
+  if (analysis.audio.playing) {
+    stopTunedAudio();
+    return;
+  }
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    terminalWrite("Browser audio is unavailable.", "error");
+    return;
+  }
+  analysis.audio.context ||= new AudioContextClass();
+  analysis.audio.context.resume();
+  const oscillator = analysis.audio.context.createOscillator();
+  const gain = analysis.audio.context.createGain();
+  oscillator.type = preferredDemodulation() === "AM" ? "sine" : "square";
+  oscillator.frequency.value = preferredDemodulation() === "AM" ? 720 : 960;
+  gain.gain.value = 0.0001;
+  oscillator.connect(gain).connect(analysis.audio.context.destination);
+  oscillator.start();
+  analysis.audio.oscillator = oscillator;
+  analysis.audio.gain = gain;
+  analysis.audio.playing = true;
+  byId("analysis-audio").classList.add("active");
+  byId("analysis-audio").setAttribute("aria-pressed", "true");
+  byId("analysis-audio").textContent = "Stop tuned audio";
+  analysis.audio.timer = setInterval(() => {
+    const samples = analysis.live.lastSamples.length ? analysis.live.lastSamples : samplesFromCurrentRow(currentViewport());
+    const average = samples.reduce((sum, sample) => sum + Math.abs(Number(sample)), 0) / Math.max(1, samples.length);
+    const targetGain = Math.min(0.08, Math.max(0.006, average * 0.075));
+    analysis.audio.gain.gain.setTargetAtTime(targetGain, analysis.audio.context.currentTime, 0.025);
+    analysis.audio.oscillator.frequency.setTargetAtTime(preferredDemodulation() === "AM" ? 620 + average * 820 : 880 + average * 540, analysis.audio.context.currentTime, 0.04);
+  }, 55);
+}
+
+function stopTunedAudio() {
+  clearInterval(analysis.audio.timer);
+  analysis.audio.timer = null;
+  try { analysis.audio.oscillator?.stop(); } catch { /* already stopped */ }
+  analysis.audio.oscillator = null;
+  analysis.audio.gain = null;
+  analysis.audio.playing = false;
+  byId("analysis-audio").classList.remove("active");
+  byId("analysis-audio").setAttribute("aria-pressed", "false");
+  byId("analysis-audio").textContent = "Play tuned audio";
+}
+
 byId("analysis-play").addEventListener("click", togglePlayback);
-byId("analysis-rate").addEventListener("change", () => { if (analysis.playing) { analysis.playing = false; togglePlayback(); } });
+byId("analysis-rate").addEventListener("change", () => {
+  if (analysis.sourceMode === "live" && analysis.live.stream) startLiveStream();
+  else if (analysis.playing) { analysis.playing = false; togglePlayback(); }
+});
 byId("analysis-reset").addEventListener("click", resetAnalysisView);
 byId("analysis-cursors").addEventListener("click", () => { analysis.cursorA = null; analysis.cursorB = null; renderAnalysis(); });
 byId("analysis-frame").addEventListener("input", (event) => { analysis.frame = Number(event.target.value); renderAnalysis(); });
 ["analysis-center", "analysis-span", "analysis-floor", "analysis-range", "analysis-palette"].forEach((id) => byId(id).addEventListener("input", renderAnalysis));
+byId("source-live").addEventListener("click", () => {
+  analysis.sourceMode = "live";
+  byId("source-live").classList.add("active");
+  byId("source-artifact").classList.remove("active");
+  startLiveStream();
+});
+byId("source-artifact").addEventListener("click", async () => {
+  analysis.sourceMode = "artifact";
+  byId("source-live").classList.remove("active");
+  byId("source-artifact").classList.add("active");
+  await loadArtifactCapture();
+});
+byId("analysis-audio").addEventListener("click", toggleTunedAudio);
 waterfall.addEventListener("click", (event) => {
   const bounds = waterfall.getBoundingClientRect();
   const cursor = { x: (event.clientX - bounds.left) / bounds.width * waterfall.width };

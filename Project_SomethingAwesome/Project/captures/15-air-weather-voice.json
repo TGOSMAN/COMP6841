@@ -1,22 +1,54 @@
 {
-  "scheme_id": "C15-UHF-AM-WEATHER",
-  "center_hz": 251750000,
+  "scheme_id": "C15-CIVIC-AM-WEATHER",
+  "center_hz": 169650000,
   "span_hz": 300000,
   "bins": 1024,
   "frames": 150,
-  "seed": 251750,
-  "description": "Synthetic UHF AM military aviation channel used to infer a voice protocol and test a local message injection.",
+  "seed": 169650,
+  "description": "Synthetic civilian AM council warning channel generated from a GNU Radio profile for voice protocol inference and local message-injection training.",
   "protocol_notes": {
     "modulation": "AM voice",
-    "channel": "251.750 MHz",
-    "content": "randomized aircraft/controller exchange with callsign, sector, routing, and authentication fields"
+    "channel": "169.650 MHz",
+    "content": "randomized council/site exchange with callsign, zone, public-warning action, and authentication fields"
   },
   "annotations": [
-    {"label": "AM voice channel", "offset_hz": 0, "color": "#73f2a6", "row": 0},
-    {"label": "controller reply", "offset_hz": 0, "color": "#59d7e8", "row": 1}
+    {
+      "label": "council voice channel",
+      "offset_hz": 0,
+      "color": "#73f2a6",
+      "row": 0
+    },
+    {
+      "label": "site reply",
+      "offset_hz": 0,
+      "color": "#59d7e8",
+      "row": 1
+    }
   ],
   "sources": [
-    {"label": "aircraft check-in", "kind": "burst", "offset_hz": -3500, "bandwidth_hz": 26000, "period_frames": 54, "duration_frames": 25, "power": 0.86},
-    {"label": "controller reply", "kind": "burst", "offset_hz": 2500, "bandwidth_hz": 30000, "period_frames": 54, "duration_frames": 26, "phase_frames": 27, "power": 0.94}
-  ]
+    {
+      "label": "public facility check-in",
+      "kind": "burst",
+      "offset_hz": -3500,
+      "bandwidth_hz": 26000,
+      "period_frames": 54,
+      "duration_frames": 25,
+      "power": 0.86
+    },
+    {
+      "label": "council control reply",
+      "kind": "burst",
+      "offset_hz": 2500,
+      "bandwidth_hz": 30000,
+      "period_frames": 54,
+      "duration_frames": 26,
+      "phase_frames": 27,
+      "power": 0.94
+    }
+  ],
+  "generated_by": "radio/generate_gnuradio_artifacts.py",
+  "source_profile": "radio/profiles/training_signals.json#council_weather_audio",
+  "generator_mode": "deterministic-python-fallback",
+  "sample_rate_hz": 300000,
+  "artifact_role": "browser waterfall preview generated from RF profile"
 }

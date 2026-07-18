@@ -1,0 +1,36 @@
+{
+  "global": {
+    "core:datatype": "cf32_le",
+    "core:sample_rate": 650000,
+    "core:description": "Advanced farm-gate parser capture generated from a GNU Radio profile: a burst with repeated length markers and an oversized nested operator note.",
+    "core:version": "1.0.0",
+    "core:author": "Signal Forge CTF GNU Radio profile generator"
+  },
+  "captures": [
+    {
+      "core:sample_start": 0,
+      "core:frequency": 902300000
+    }
+  ],
+  "annotations": [
+    {
+      "core:sample_start": 0,
+      "core:sample_count": 13000,
+      "core:freq_lower_edge": 902150000,
+      "core:freq_upper_edge": 902170000,
+      "core:label": "TLV header train"
+    },
+    {
+      "core:sample_start": 0,
+      "core:sample_count": 13000,
+      "core:freq_lower_edge": 902409000,
+      "core:freq_upper_edge": 902451000,
+      "core:label": "Oversized value block"
+    }
+  ],
+  "signal_forge": {
+    "generated_by": "radio/generate_gnuradio_artifacts.py",
+    "source_profile": "radio/profiles/training_signals.json#farm_gate_parser_fault",
+    "generator_mode": "deterministic-python-fallback"
+  }
+}

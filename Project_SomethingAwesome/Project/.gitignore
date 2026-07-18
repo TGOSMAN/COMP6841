@@ -1,3 +1,9 @@
 __pycache__/
 *.pyc
 data/*.db
+
+# Local dependency trees are reproducible and can exceed Windows/Git path limits.
+node_modules/
+
+# Temporary Microsoft Office lock files.
+~$*

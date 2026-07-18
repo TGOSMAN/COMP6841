@@ -1,0 +1,36 @@
+{
+  "global": {
+    "core:datatype": "cf32_le",
+    "core:sample_rate": 260000,
+    "core:description": "RF-to-operator trust-boundary capture generated from a GNU Radio profile: an AFSK-like note field is decoded, then rendered by the console.",
+    "core:version": "1.0.0",
+    "core:author": "Signal Forge CTF GNU Radio profile generator"
+  },
+  "captures": [
+    {
+      "core:sample_start": 0,
+      "core:frequency": 144390000
+    }
+  ],
+  "annotations": [
+    {
+      "core:sample_start": 0,
+      "core:sample_count": 5200,
+      "core:freq_lower_edge": 144320000,
+      "core:freq_upper_edge": 144330000,
+      "core:label": "AFSK sync preamble"
+    },
+    {
+      "core:sample_start": 0,
+      "core:sample_count": 5200,
+      "core:freq_lower_edge": 144374000,
+      "core:freq_upper_edge": 144406000,
+      "core:label": "Decoded operator note"
+    }
+  ],
+  "signal_forge": {
+    "generated_by": "radio/generate_gnuradio_artifacts.py",
+    "source_profile": "radio/profiles/training_signals.json#operator_radio_note",
+    "generator_mode": "deterministic-python-fallback"
+  }
+}

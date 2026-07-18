@@ -1,0 +1,23 @@
+{
+  "scheme_id": "C01-TUNNEL-OOK-SIGN",
+  "center_hz": 915000000,
+  "span_hz": 1200000,
+  "bins": 1024,
+  "frames": 180,
+  "seed": 91501,
+  "description": "Tunnel sign training capture: a fixed-carrier OOK/ASK packet stream. No hopping is used in this beginner capture.",
+  "protocol_notes": {
+    "modulation": "OOK/ASK",
+    "purpose": "show a tuned tunnel sign message with visible on/off symbols",
+    "expected_observation": "one fixed carrier with raised burst envelopes and symbol sidebands"
+  },
+  "annotations": [
+    {"label": "OOK sign carrier", "offset_hz": 0, "color": "#73f2a6", "row": 0},
+    {"label": "symbol sideband", "offset_hz": 28000, "color": "#ffc766", "row": 1},
+    {"label": "weak receiver pilot", "offset_hz": -90000, "color": "#59d7e8", "row": 2}
+  ],
+  "sources": [
+    {"label": "Tunnel sign OOK carrier", "kind": "ook", "offset_hz": 0, "bandwidth_hz": 22000, "period_frames": 42, "duration_frames": 30, "symbol_pattern": "101101001110010111000100101011110011", "power": 0.94},
+    {"label": "Receiver pilot", "kind": "burst", "offset_hz": -90000, "bandwidth_hz": 8000, "period_frames": 64, "duration_frames": 44, "phase_frames": 9, "power": 0.34}
+  ]
+}

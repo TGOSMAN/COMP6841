@@ -1,0 +1,98 @@
+[
+  {
+    "id": "tunnel-radio-infrastructure",
+    "source_context_id": 1,
+    "title": "Tunnel Radio Infrastructure",
+    "level": "Basic",
+    "status": "Active",
+    "tracks": ["signals", "cema"],
+    "summary": "A tunnel operator drives a small radio-linked sign board. Learners begin by reading tuned traffic, then progress into tuning, denial-of-service observation, and controlled packet injection.",
+    "situation": "This context teaches the first contested-spectrum idea: RF output is visible to anyone in range, and weak signalling can be observed, jammed, or overwritten inside a controlled local simulation.",
+    "subtask_ids": ["tunnel-reading-signals", "tunnel-tuning", "tunnel-basic-dos", "tunnel-packet-injection"],
+    "planned_subtasks": [
+      "Add a larger sign-board state machine with message history and operator acknowledgement.",
+      "Add a generated GNU Radio OOK flowgraph matching the sign-board packets.",
+      "Add a C packet encoder so developers can modify framing and payload format."
+    ]
+  },
+  {
+    "id": "broadcast-song-metadata",
+    "source_context_id": 2,
+    "title": "Broadcasting Song Metadata",
+    "level": "Basic",
+    "status": "Active",
+    "tracks": ["signals", "cyber"],
+    "summary": "A local broadcaster sends song and advisory metadata on a low-rate side channel. Learners read, tune, disrupt, and inject metadata frames.",
+    "situation": "This context uses an approachable broadcast story to show how plain RF-origin data can become software input, console output, and ultimately a trust-boundary problem.",
+    "subtask_ids": ["broadcast-reading-signals", "broadcast-tuning", "broadcast-basic-dos", "broadcast-packet-injection"],
+    "planned_subtasks": [
+      "Add an audio side-channel variant where metadata is hidden inside a tone burst.",
+      "Add a small metadata parser binary with safe and unsafe builds.",
+      "Add a receiver console printout that mirrors the spreadsheet evidence requirement."
+    ]
+  },
+  {
+    "id": "weather-broadcast-boring-voice",
+    "source_context_id": 3,
+    "title": "Weather Broadcast Boring Voice",
+    "level": "Moderate",
+    "status": "Active",
+    "tracks": ["signals", "cema"],
+    "summary": "A plain voice weather broadcast moves into predictable hopping and then digital audio metadata. Learners recover callsigns, identify weak hopping, and reverse metadata handling.",
+    "situation": "This context bridges audio radio operations and reverse engineering: the learner must reassemble enough of the RF/audio path to make a simulated receiver act on warning metadata.",
+    "subtask_ids": ["weather-boring-intercept", "weather-boring-obscured", "weather-boring-active-re"],
+    "planned_subtasks": [
+      "Add downloadable IQ recordings for every hop segment.",
+      "Add a Python hopping-receiver template with TODO sections.",
+      "Add a visible warning light and siren widget for the metadata trigger."
+    ]
+  },
+  {
+    "id": "civilian-emergency-radio-audio-network",
+    "source_context_id": 4,
+    "title": "Civilian Emergency Radio Audio Network",
+    "level": "Moderate",
+    "status": "Active",
+    "tracks": ["signals", "cyber"],
+    "summary": "A public-facility announcement network sends short audio bursts across frequencies. Learners recover messages, predict weak pseudorandom hops, and submit valid warning audio.",
+    "situation": "This is the more operational audio network: participants recover an emergency call, reason about weak hopping state, then use reverse-engineered metadata to activate the simulated public-address receiver.",
+    "subtask_ids": ["civilian-emergency-intercept", "civilian-emergency-obscured", "civilian-emergency-active-re"],
+    "planned_subtasks": [
+      "Add a second callsign on Q and I for optional bonus analysis.",
+      "Add an exported sample file from the tuned receiver for offline scripting.",
+      "Add a receiver-side C integrity check exercise."
+    ]
+  },
+  {
+    "id": "bushfire-command-and-control",
+    "source_context_id": 5,
+    "title": "Bushfire Command and Control",
+    "level": "Advanced",
+    "status": "Active",
+    "tracks": ["cema", "cyber"],
+    "summary": "A bushfire sensor/relay network introduces firmware reverse engineering, HDL review, crafted command packets, remote-code-execution style behaviour, and spoofing/null-steering logic.",
+    "situation": "This advanced context is where the CTF becomes serious: RF-derived command packets interact with embedded code, hardware logic, anomaly detection, and distributed receiver behaviour.",
+    "subtask_ids": ["bushfire-re-embedded", "bushfire-hdl-flaw", "bushfire-rce", "bushfire-fuzz-spoof"],
+    "planned_subtasks": [
+      "Add a compiled stripped firmware target and a safe source build.",
+      "Add a HDL testbench runner with waveform output.",
+      "Add a propagation/null-steering visualiser for receiver trust decisions."
+    ]
+  },
+  {
+    "id": "farm-gates",
+    "source_context_id": 6,
+    "title": "Farm Gates",
+    "level": "Advanced",
+    "status": "Active",
+    "tracks": ["cema", "cyber"],
+    "summary": "A rural gate system uses long-range maintenance traffic, embedded admin logic, HDL control paths, and packet-driven actuation. Learners reverse, exploit, and spoof the local simulation.",
+    "situation": "This context keeps the rural long-range story but structures it around firmware, hardware logic, remote actuation, and spoofed authority in a synthetic local target.",
+    "subtask_ids": ["farm-gate-re-embedded", "farm-gate-hdl-flaw", "farm-gate-rce", "farm-gate-fuzz-spoof"],
+    "planned_subtasks": [
+      "Add a gate animation that reflects command timing and lock state.",
+      "Add a bitstream patching exercise with a visible super-user logic state.",
+      "Add a log-removal/kill-switch defensive write-up comparing safe controller design."
+    ]
+  }
+]

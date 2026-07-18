@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Situation | Signal Forge CTF</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="challenge-page">
+    <header class="challenge-topbar context-topbar">
+      <a class="back-link" href="/#tasks">&larr; All situations</a>
+      <div class="challenge-progress" id="context-progress" aria-label="Situation status"></div>
+      <div class="mode-switch compact" aria-label="Security mode">
+        <button id="attack-mode" class="active" type="button">Attack</button>
+        <button id="secure-mode" type="button">Secure</button>
+        <strong id="mode-status">Attack Mode</strong>
+      </div>
+    </header>
+
+    <main class="challenge-shell context-shell">
+      <section class="challenge-brief context-brief" aria-labelledby="context-title">
+        <div class="challenge-heading">
+          <div>
+            <p class="eyebrow" id="context-kicker">Situation</p>
+            <h1 id="context-title">Loading situation...</h1>
+          </div>
+          <div class="challenge-score" id="context-score"></div>
+        </div>
+        <p class="challenge-scenario" id="context-summary"></p>
+        <div class="objective-card">
+          <span>Situation</span>
+          <p id="context-situation"></p>
+        </div>
+      </section>
+
+      <section class="context-board">
+        <article>
+          <p class="eyebrow">Flag-bearing subtasks</p>
+          <h2>Work packages inside this situation</h2>
+          <div class="subtask-grid" id="subtask-grid"></div>
+        </article>
+        <aside>
+          <p class="eyebrow">Expansion queue</p>
+          <h2>Planned subtasks</h2>
+          <ul class="planned-list" id="planned-list"></ul>
+        </aside>
+      </section>
+    </main>
+
+    <script src="/context.js"></script>
+  </body>
+</html>

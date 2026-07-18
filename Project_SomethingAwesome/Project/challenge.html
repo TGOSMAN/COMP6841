@@ -8,7 +8,7 @@
   </head>
   <body class="challenge-page">
     <header class="challenge-topbar">
-      <a class="back-link" href="/#tasks">&larr; All challenges</a>
+      <a class="back-link" href="/#tasks">&larr; All situations</a>
       <div class="challenge-progress" id="challenge-progress" aria-label="Challenge navigation"></div>
       <div class="mode-switch compact" aria-label="Security mode">
         <button id="attack-mode" class="active" type="button">Attack</button>
@@ -52,6 +52,18 @@
             <div>
               <button id="frontend-basic" class="active" type="button">Basic</button>
               <button id="frontend-advanced" type="button">Advanced</button>
+            </div>
+          </div>
+
+          <div class="stream-source-bar" aria-label="Signal source">
+            <div>
+              <strong>Signal source</strong>
+              <span id="live-stream-status">Python parser idle</span>
+            </div>
+            <div>
+              <button id="source-live" class="active" type="button">Live parser</button>
+              <button id="source-artifact" type="button">Artifact replay</button>
+              <a id="source-raw-download" href="/api/rf/raw" download>Raw IQ</a>
             </div>
           </div>
 
@@ -142,6 +154,7 @@
             <output id="frame-readout">0 / 0</output>
             <button id="analysis-reset" type="button">Reset view</button>
             <button id="analysis-cursors" type="button">Clear cursors</button>
+            <button id="analysis-audio" type="button" aria-pressed="false">Play tuned audio</button>
           </div>
 
           <div class="sdr-display">
@@ -157,6 +170,16 @@
               </div>
               <canvas id="spectrum-trace" width="1100" height="220" aria-label="Spectrum trace for selected frame"></canvas>
             </div>
+            <div class="timeseries-panel">
+              <div class="spectrum-heading">
+                <strong>Tuned time-series</strong>
+                <div class="spectrum-readouts">
+                  <span id="timeseries-readout">Samples: --</span>
+                  <span id="symbol-readout">Symbols: --</span>
+                </div>
+              </div>
+              <canvas id="time-series" width="1100" height="220" aria-label="Live tuned sample time series"></canvas>
+            </div>
             <div class="axis-scale analysis-axis" id="analysis-axis"></div>
             <div class="plot-frame">
               <canvas id="analysis-waterfall" width="1100" height="700" aria-label="Configurable signal waterfall"></canvas>
@@ -165,23 +188,54 @@
           <div class="measurement-bar" id="measurement-bar">Click once for cursor A and again for cursor B.</div>
           <div class="signal-legend" id="analysis-legend"></div>
 
+          <section class="live-parser-panel" aria-labelledby="live-parser-title">
+            <header>
+              <div>
+                <p class="eyebrow">Live Python Parser</p>
+                <h2 id="live-parser-title">Raw samples to decoded fields</h2>
+              </div>
+              <span id="parser-confidence">Confidence --</span>
+            </header>
+            <ol class="parser-stages" id="parser-stages"></ol>
+            <div class="parser-output-grid">
+              <div>
+                <strong>Bit buffer</strong>
+                <code id="parser-bit-buffer">waiting for stream</code>
+              </div>
+              <div>
+                <strong>Decoded fields</strong>
+                <dl id="parser-fields"></dl>
+              </div>
+            </div>
+            <div class="parser-event-log" id="parser-event-log" aria-live="polite"></div>
+          </section>
+
+          <section class="effect-stage" id="effect-stage" aria-live="polite">
+            <div class="effect-display">
+              <span id="effect-label">Mission effect</span>
+              <strong id="effect-message">Awaiting receiver output</strong>
+            </div>
+            <div class="effect-light" id="effect-light"><i></i><span id="effect-light-text">Idle</span></div>
+            <div class="effect-meter" id="effect-meter"><i></i><i></i><i></i><i></i></div>
+          </section>
+
           <section class="weather-radio" id="weather-radio" hidden aria-labelledby="weather-radio-title">
             <header>
               <div>
                 <p class="eyebrow">Interactive voice intercept</p>
-                <h2 id="weather-radio-title">UHF protocol injection net</h2>
+                <h2 id="weather-radio-title">Council warning audio net</h2>
               </div>
               <span class="radio-live" id="weather-radio-status"><i></i> Standby</span>
             </header>
             <div class="radio-howto" id="weather-radio-help">
               <strong>How this level works</strong>
               <span><b>1</b> Intercept a legitimate randomized radio call.</span>
-              <span><b>2</b> Extract its callsign, sector, and AUTH code.</span>
-              <span><b>3</b> Write a diversion message and transmit it back.</span>
+              <span><b>2</b> Extract its callsign, zone, action, and AUTH code.</span>
+              <span><b>3</b> Write a valid public-warning message and submit it.</span>
             </div>
             <div class="radio-frequency">
-              <span>GUARD AUX / AM</span>
-              <strong>251.750</strong>
+              <span>COUNCIL AUX / AM</span>
+              <strong>169.650</strong>
               <small>MHz</small>
             </div>
             <div class="radio-scope" id="weather-radio-scope" aria-hidden="true">
@@ -196,11 +250,11 @@
             <ol class="radio-transcript" id="weather-transcript" hidden aria-live="polite"></ol>
             <div class="protocol-pattern">
               <span>Observed message structure</span>
-              <code>&lt;TARGET CALLSIGN&gt;, SECTOR &lt;ID&gt;, &lt;DECOY REASON&gt;, DIVERT &lt;DIRECTION&gt;, AUTH &lt;CODE&gt;</code>
+              <code>&lt;TARGET SITE&gt;, ZONE &lt;ID&gt;, ALERT &lt;REASON&gt;, ACTION &lt;INSTRUCTION&gt;, AUTH &lt;CODE&gt;</code>
             </div>
             <form class="weather-report injection-report" id="weather-report-form">
-              <label for="weather-injection">3. Compose your decoy transmission</label>
-              <textarea id="weather-injection" aria-describedby="weather-report-result" placeholder="Example structure: CALLSIGN, SECTOR X, false weather report, DIVERT EAST, AUTH CODE" disabled></textarea>
+              <label for="weather-injection">3. Compose your warning message</label>
+              <textarea id="weather-injection" aria-describedby="weather-report-result" placeholder="Example structure: SITE, ZONE NORTH, ALERT flood warning, ACTION SHELTER, AUTH CODE" disabled></textarea>
               <button type="submit" disabled>Inject and play message</button>
               <output id="weather-report-result" aria-live="polite">Preparing your first intercept...</output>
             </form>
@@ -208,7 +262,7 @@
 
           <section class="rf-terminal" aria-label="RF command terminal">
             <header>
-              <div><i></i><strong>FORGE RF TERMINAL / PYTHON RANGE</strong></div>
+              <div><i></i><strong>SIGNAL FORGE RF TERMINAL / PYTHON RANGE</strong></div>
               <div><button id="terminal-help" type="button">Help</button><span id="terminal-user">initialising session...</span></div>
             </header>
             <pre id="terminal-output" aria-live="polite"></pre>
@@ -225,6 +279,14 @@
             <p class="eyebrow">Mission intelligence</p>
             <h2>What you know</h2>
             <ol class="step-list" id="challenge-steps"></ol>
+          </section>
+          <section>
+            <p class="eyebrow">Flag location</p>
+            <div class="signal-scheme flag-location" id="flag-location"></div>
+          </section>
+          <section>
+            <p class="eyebrow">Script interface</p>
+            <div class="script-command-list" id="script-commands"></div>
           </section>
           <section>
             <p class="eyebrow">Capture notes</p>

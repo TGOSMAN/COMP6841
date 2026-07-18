@@ -1,22 +1,54 @@
 {
-  "scheme_id": "C11-AFSK-OPERATOR-XSS",
+  "scheme_id": "C11-AFSK-OPERATOR-NOTE",
   "center_hz": 144390000,
   "span_hz": 260000,
   "bins": 1024,
   "frames": 130,
   "seed": 1101,
-  "description": "Challenge 11 RF-to-operator sink capture: an AFSK-like note field is decoded, then rendered by the console.",
+  "description": "RF-to-operator trust-boundary capture generated from a GNU Radio profile: an AFSK-like note field is decoded, then rendered by the console.",
   "protocol_notes": {
     "modulation": "AFSK note telemetry",
     "decoded_field": "operator_note",
     "sink_lesson": "RF-origin text must be output-encoded before browser rendering"
   },
   "annotations": [
-    {"label": "operator note field", "offset_hz": 0, "color": "#ffc766", "row": 0},
-    {"label": "sync preamble", "offset_hz": -65000, "color": "#73f2a6", "row": 1}
+    {
+      "label": "operator note field",
+      "offset_hz": 0,
+      "color": "#ffc766",
+      "row": 0
+    },
+    {
+      "label": "sync preamble",
+      "offset_hz": -65000,
+      "color": "#73f2a6",
+      "row": 1
+    }
   ],
   "sources": [
-    {"label": "AFSK sync preamble", "kind": "burst", "offset_hz": -65000, "bandwidth_hz": 10000, "period_frames": 32, "duration_frames": 5, "power": 0.75},
-    {"label": "Decoded operator note", "kind": "burst", "offset_hz": 0, "bandwidth_hz": 32000, "period_frames": 32, "duration_frames": 14, "phase_frames": 6, "power": 0.9}
-  ]
+    {
+      "label": "AFSK sync preamble",
+      "kind": "burst",
+      "offset_hz": -65000,
+      "bandwidth_hz": 10000,
+      "period_frames": 32,
+      "duration_frames": 5,
+      "power": 0.75
+    },
+    {
+      "label": "Decoded operator note",
+      "kind": "burst",
+      "offset_hz": 0,
+      "bandwidth_hz": 32000,
+      "period_frames": 32,
+      "duration_frames": 14,
+      "phase_frames": 6,
+      "power": 0.9
+    }
+  ],
+  "generated_by": "radio/generate_gnuradio_artifacts.py",
+  "source_profile": "radio/profiles/training_signals.json#operator_radio_note",
+  "generator_mode": "deterministic-python-fallback",
+  "sample_rate_hz": 260000,
+  "artifact_role": "browser waterfall preview generated from RF profile"
 }

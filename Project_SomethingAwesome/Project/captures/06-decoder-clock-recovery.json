@@ -5,18 +5,50 @@
   "bins": 1024,
   "frames": 140,
   "seed": 606,
-  "description": "Challenge 6 decoder RE capture: a Manchester-coded maintenance frame with alternating timing energy and a compact checksum trailer.",
+  "description": "Basic broadcast-metadata capture generated from a GNU Radio profile: a Manchester-coded ASK frame with timing energy and a compact checksum trailer.",
   "protocol_notes": {
     "modulation": "ASK with Manchester coding",
     "reverse_engineering_goal": "recover field order and checksum boundary",
     "decoder_artifact": "tools/telemetry_decoder"
   },
   "annotations": [
-    {"label": "clock transitions", "offset_hz": -70000, "color": "#59d7e8", "row": 0},
-    {"label": "field trailer", "offset_hz": 85000, "color": "#ffc766", "row": 1}
+    {
+      "label": "clock transitions",
+      "offset_hz": -70000,
+      "color": "#59d7e8",
+      "row": 0
+    },
+    {
+      "label": "field trailer",
+      "offset_hz": 85000,
+      "color": "#ffc766",
+      "row": 1
+    }
   ],
   "sources": [
-    {"label": "Manchester clocked frame", "kind": "burst", "offset_hz": -70000, "bandwidth_hz": 16000, "period_frames": 14, "duration_frames": 5, "power": 0.82},
-    {"label": "Checksum trailer", "kind": "burst", "offset_hz": 85000, "bandwidth_hz": 12000, "period_frames": 42, "duration_frames": 5, "phase_frames": 31, "power": 0.76}
-  ]
+    {
+      "label": "Manchester clocked frame",
+      "kind": "burst",
+      "offset_hz": -70000,
+      "bandwidth_hz": 16000,
+      "period_frames": 14,
+      "duration_frames": 5,
+      "power": 0.82
+    },
+    {
+      "label": "Checksum trailer",
+      "kind": "burst",
+      "offset_hz": 85000,
+      "bandwidth_hz": 12000,
+      "period_frames": 42,
+      "duration_frames": 5,
+      "phase_frames": 31,
+      "power": 0.76
+    }
+  ],
+  "generated_by": "radio/generate_gnuradio_artifacts.py",
+  "source_profile": "radio/profiles/training_signals.json#broadcast_metadata_packet",
+  "generator_mode": "deterministic-python-fallback",
+  "sample_rate_hz": 500000,
+  "artifact_role": "browser waterfall preview generated from RF profile"
 }

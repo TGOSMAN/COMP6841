@@ -1,0 +1,36 @@
+{
+  "global": {
+    "core:datatype": "cf32_le",
+    "core:sample_rate": 500000,
+    "core:description": "Basic broadcast-metadata capture generated from a GNU Radio profile: a Manchester-coded ASK frame with timing energy and a compact checksum trailer.",
+    "core:version": "1.0.0",
+    "core:author": "Signal Forge CTF GNU Radio profile generator"
+  },
+  "captures": [
+    {
+      "core:sample_start": 0,
+      "core:frequency": 315000000
+    }
+  ],
+  "annotations": [
+    {
+      "core:sample_start": 0,
+      "core:sample_count": 10000,
+      "core:freq_lower_edge": 314922000,
+      "core:freq_upper_edge": 314938000,
+      "core:label": "Manchester clocked frame"
+    },
+    {
+      "core:sample_start": 0,
+      "core:sample_count": 10000,
+      "core:freq_lower_edge": 315079000,
+      "core:freq_upper_edge": 315091000,
+      "core:label": "Checksum trailer"
+    }
+  ],
+  "signal_forge": {
+    "generated_by": "radio/generate_gnuradio_artifacts.py",
+    "source_profile": "radio/profiles/training_signals.json#broadcast_metadata_packet",
+    "generator_mode": "deterministic-python-fallback"
+  }
+}

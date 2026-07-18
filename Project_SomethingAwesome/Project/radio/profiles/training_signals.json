@@ -1,0 +1,198 @@
+[
+  {
+    "profile_id": "tunnel_sign_tuning",
+    "challenge_id": "find-the-scheme",
+    "output_json": "captures/02-fsk-hop-scheme.json",
+    "output_sigmf_stem": "captures/02-fsk-hop-scheme",
+    "scheme_id": "C02-2FSK-HOP-SCHEME",
+    "center_hz": 915000000,
+    "span_hz": 1200000,
+    "bins": 1024,
+    "frames": 150,
+    "seed": 202,
+    "sample_rate_hz": 1200000,
+    "description": "Basic tunnel-sign tuning capture generated from a GNU Radio profile: 2-FSK bursts hop across a small channel plan with a fixed pilot tone.",
+    "protocol_notes": {
+      "modulation": "2-FSK",
+      "symbol_rate": 4800,
+      "channel_spacing_hz": 100000,
+      "expected_recovery": "synthetic tunnel sign maintenance access point"
+    },
+    "access_point": {
+      "bssid": "02:68:41:91:50:01",
+      "service": "TUNNEL-SIGN-915",
+      "vendor_ie_encoding": "base64",
+      "vendor_ie_b64": "Q1RGe1JTVV9BUF9BQ1FVSVJFRH0="
+    },
+    "annotations": [
+      {"label": "pilot", "offset_hz": -420000, "color": "#73f2a6", "row": 0},
+      {"label": "hop set", "offset_hz": -200000, "color": "#59d7e8", "row": 1}
+    ],
+    "sources": [
+      {"label": "Fixed pilot", "kind": "burst", "offset_hz": -420000, "bandwidth_hz": 15000, "period_frames": 24, "duration_frames": 6, "power": 0.72},
+      {"label": "Tunnel sign 2-FSK hopset", "kind": "burst", "hop_offsets_hz": [-200000, -100000, 0, 100000, 200000], "bandwidth_hz": 28000, "period_frames": 18, "duration_frames": 7, "phase_frames": 3, "power": 0.9}
+    ]
+  },
+  {
+    "profile_id": "broadcast_metadata_packet",
+    "challenge_id": "reverse-the-decoder",
+    "output_json": "captures/06-decoder-clock-recovery.json",
+    "output_sigmf_stem": "captures/06-decoder-clock-recovery",
+    "scheme_id": "C06-MANCHESTER-CLOCK-RE",
+    "center_hz": 315000000,
+    "span_hz": 500000,
+    "bins": 1024,
+    "frames": 140,
+    "seed": 606,
+    "sample_rate_hz": 500000,
+    "description": "Basic broadcast-metadata capture generated from a GNU Radio profile: a Manchester-coded ASK frame with timing energy and a compact checksum trailer.",
+    "protocol_notes": {
+      "modulation": "ASK with Manchester coding",
+      "reverse_engineering_goal": "recover field order and checksum boundary",
+      "decoder_artifact": "tools/telemetry_decoder"
+    },
+    "annotations": [
+      {"label": "clock transitions", "offset_hz": -70000, "color": "#59d7e8", "row": 0},
+      {"label": "field trailer", "offset_hz": 85000, "color": "#ffc766", "row": 1}
+    ],
+    "sources": [
+      {"label": "Manchester clocked frame", "kind": "burst", "offset_hz": -70000, "bandwidth_hz": 16000, "period_frames": 14, "duration_frames": 5, "power": 0.82},
+      {"label": "Checksum trailer", "kind": "burst", "offset_hz": 85000, "bandwidth_hz": 12000, "period_frames": 42, "duration_frames": 5, "phase_frames": 31, "power": 0.76}
+    ]
+  },
+  {
+    "profile_id": "council_weather_audio",
+    "challenge_id": "weather-radio-watch",
+    "output_json": "captures/15-air-weather-voice.json",
+    "output_sigmf_stem": "captures/15-council-weather-audio",
+    "scheme_id": "C15-CIVIC-AM-WEATHER",
+    "center_hz": 169650000,
+    "span_hz": 300000,
+    "bins": 1024,
+    "frames": 150,
+    "seed": 169650,
+    "sample_rate_hz": 300000,
+    "description": "Synthetic civilian AM council warning channel generated from a GNU Radio profile for voice protocol inference and local message-injection training.",
+    "protocol_notes": {
+      "modulation": "AM voice",
+      "channel": "169.650 MHz",
+      "content": "randomized council/site exchange with callsign, zone, public-warning action, and authentication fields"
+    },
+    "annotations": [
+      {"label": "council voice channel", "offset_hz": 0, "color": "#73f2a6", "row": 0},
+      {"label": "site reply", "offset_hz": 0, "color": "#59d7e8", "row": 1}
+    ],
+    "sources": [
+      {"label": "public facility check-in", "kind": "burst", "offset_hz": -3500, "bandwidth_hz": 26000, "period_frames": 54, "duration_frames": 25, "power": 0.86},
+      {"label": "council control reply", "kind": "burst", "offset_hz": 2500, "bandwidth_hz": 30000, "period_frames": 54, "duration_frames": 26, "phase_frames": 27, "power": 0.94}
+    ]
+  },
+  {
+    "profile_id": "city_notice_api_pivot",
+    "challenge_id": "backend-recon",
+    "output_json": "captures/04-backend-id-uplink.json",
+    "output_sigmf_stem": "captures/04-backend-id-uplink",
+    "scheme_id": "C04-ID-UPLINK-BACKEND-BRIDGE",
+    "center_hz": 868300000,
+    "span_hz": 700000,
+    "bins": 1024,
+    "frames": 128,
+    "seed": 404,
+    "sample_rate_hz": 700000,
+    "description": "Moderate RF-to-backend capture generated from a GNU Radio profile: a LoRa-like chirp/sweep training uplink carrying a recovered identifier used by the API.",
+    "protocol_notes": {
+      "modulation": "CSS/LoRa-like training chirp",
+      "cyber_bridge": "demodulated vehicle_id enters a local API query",
+      "risk": "SQL injection exists after RF values cross into backend input"
+    },
+    "annotations": [
+      {"label": "up-chirp", "offset_hz": -250000, "color": "#59d7e8", "row": 0},
+      {"label": "ID burst", "offset_hz": 180000, "color": "#73f2a6", "row": 1}
+    ],
+    "sources": [
+      {"label": "CSS sweep uplink", "kind": "sweep", "sweep_start_hz": -300000, "sweep_stop_hz": 300000, "sweep_period_frames": 42, "bandwidth_hz": 14000, "power": 0.7},
+      {"label": "Identifier marker", "kind": "burst", "offset_hz": 180000, "bandwidth_hz": 18000, "period_frames": 42, "duration_frames": 5, "phase_frames": 27, "power": 0.85}
+    ]
+  },
+  {
+    "profile_id": "controlled_interference_replay",
+    "challenge_id": "free-trip-logic-flaw",
+    "output_json": "captures/05-replay-free-trip.json",
+    "output_sigmf_stem": "captures/05-replay-free-trip",
+    "scheme_id": "C05-REPLAY-LOGIC-FLAW",
+    "center_hz": 2437000000,
+    "span_hz": 1000000,
+    "bins": 1024,
+    "frames": 160,
+    "seed": 505,
+    "sample_rate_hz": 1000000,
+    "description": "Jamming side-quest replay capture generated from a GNU Radio profile: two near-identical telemetry bursts where a delayed echo carries a privileged schedule value.",
+    "protocol_notes": {
+      "modulation": "GFSK training burst",
+      "replay_indicator": "delayed echo with carrier offset drift",
+      "logic_flaw": "schedule_code is trusted by the vulnerable quote endpoint"
+    },
+    "annotations": [
+      {"label": "original STANDARD", "offset_hz": -180000, "color": "#73f2a6", "row": 0},
+      {"label": "replay MAINT_FREE", "offset_hz": 260000, "color": "#ffc766", "row": 1}
+    ],
+    "sources": [
+      {"label": "Original service burst", "kind": "burst", "offset_hz": -180000, "bandwidth_hz": 22000, "period_frames": 46, "duration_frames": 9, "power": 0.86},
+      {"label": "Delayed replay echo", "kind": "burst", "offset_hz": 260000, "bandwidth_hz": 22000, "period_frames": 46, "duration_frames": 9, "phase_frames": 21, "drift_hz_per_frame": 85, "power": 0.68}
+    ]
+  },
+  {
+    "profile_id": "operator_radio_note",
+    "challenge_id": "operator-console-xss",
+    "output_json": "captures/11-operator-afsk-xss.json",
+    "output_sigmf_stem": "captures/11-operator-afsk-xss",
+    "scheme_id": "C11-AFSK-OPERATOR-NOTE",
+    "center_hz": 144390000,
+    "span_hz": 260000,
+    "bins": 1024,
+    "frames": 130,
+    "seed": 1101,
+    "sample_rate_hz": 260000,
+    "description": "RF-to-operator trust-boundary capture generated from a GNU Radio profile: an AFSK-like note field is decoded, then rendered by the console.",
+    "protocol_notes": {
+      "modulation": "AFSK note telemetry",
+      "decoded_field": "operator_note",
+      "sink_lesson": "RF-origin text must be output-encoded before browser rendering"
+    },
+    "annotations": [
+      {"label": "operator note field", "offset_hz": 0, "color": "#ffc766", "row": 0},
+      {"label": "sync preamble", "offset_hz": -65000, "color": "#73f2a6", "row": 1}
+    ],
+    "sources": [
+      {"label": "AFSK sync preamble", "kind": "burst", "offset_hz": -65000, "bandwidth_hz": 10000, "period_frames": 32, "duration_frames": 5, "power": 0.75},
+      {"label": "Decoded operator note", "kind": "burst", "offset_hz": 0, "bandwidth_hz": 32000, "period_frames": 32, "duration_frames": 14, "phase_frames": 6, "power": 0.9}
+    ]
+  },
+  {
+    "profile_id": "farm_gate_parser_fault",
+    "challenge_id": "length-field-chaos",
+    "output_json": "captures/10-tlv-malformed-burst.json",
+    "output_sigmf_stem": "captures/10-tlv-malformed-burst",
+    "scheme_id": "C10-TLV-LENGTH-CHAOS",
+    "center_hz": 902300000,
+    "span_hz": 650000,
+    "bins": 1024,
+    "frames": 150,
+    "seed": 1001,
+    "sample_rate_hz": 650000,
+    "description": "Advanced farm-gate parser capture generated from a GNU Radio profile: a burst with repeated length markers and an oversized nested operator note.",
+    "protocol_notes": {
+      "modulation": "4-FSK TLV telemetry training burst",
+      "binary_bug": "declared length exceeds available payload bytes",
+      "fuzzing_goal": "generate malformed nested TLVs"
+    },
+    "annotations": [
+      {"label": "TLV header train", "offset_hz": -140000, "color": "#59d7e8", "row": 0},
+      {"label": "oversized value", "offset_hz": 130000, "color": "#ff6b6b", "row": 1}
+    ],
+    "sources": [
+      {"label": "TLV header train", "kind": "burst", "offset_hz": -140000, "bandwidth_hz": 20000, "period_frames": 21, "duration_frames": 5, "power": 0.76},
+      {"label": "Oversized value block", "kind": "burst", "offset_hz": 130000, "bandwidth_hz": 42000, "period_frames": 63, "duration_frames": 24, "phase_frames": 12, "power": 0.9}
+    ]
+  }
+]

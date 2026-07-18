@@ -1,4 +1,5 @@
 const state = {
+  contexts: [],
   tasks: [],
   selectedTask: null,
   mode: "attack",
@@ -32,9 +33,6 @@ const taskGrid = document.querySelector("#task-grid");
 const filters = document.querySelectorAll(".filter");
 const detailPanel = document.querySelector("#challenge-detail");
 const researchPanel = document.querySelector("#research-panel");
-const apiForm = document.querySelector("#api-form");
-const apiPath = document.querySelector("#api-path");
-const apiOutput = document.querySelector("#api-output");
 const canvas = document.querySelector("#waterfall");
 const ctx = canvas.getContext("2d", { willReadFrequently: true });
 const pauseButton = document.querySelector("#pause-waterfall");
@@ -54,7 +52,7 @@ const consoleSignalLabel = document.querySelector("#console-signal-label");
 
 async function boot() {
   ensureWorkbench();
-  await Promise.all([loadMode(), loadTasks(), loadResearchNotes(), loadWaterfallRows()]);
+  await Promise.all([loadMode(), loadContexts(), loadTasks(), loadResearchNotes(), loadWaterfallRows()]);
   renderTasks();
   updateZoomReadout();
   seedWaterfall();
@@ -73,6 +71,12 @@ async function loadTasks() {
   const response = await fetch("/api/tasks");
   const data = await response.json();
   state.tasks = data.tasks;
+}
+
+async function loadContexts() {
+  const response = await fetch("/api/contexts");
+  const data = await response.json();
+  state.contexts = data.contexts;
 }
 
 async function loadResearchNotes() {
@@ -102,20 +106,27 @@ async function loadWaterfallRows() {
 
 function renderTasks(filter = "all") {
   taskGrid.innerHTML = "";
-  state.tasks
-    .filter((task) => filter === "all" || task.track === filter)
-    .forEach((task) => {
-      const solved = state.solved.has(task.id);
+  state.contexts
+    .filter((context) => filter === "all" || context.tracks.includes(filter))
+    .forEach((context) => {
+      const solvedCount = context.subtasks.filter((task) => state.solved.has(task.id)).length;
+      const trackLabels = context.tracks.map((track) => track.toUpperCase()).join(" / ");
       const card = document.createElement("article");
-      card.className = "task-card";
+      card.className = "task-card situation-card";
       card.innerHTML = `
         <div class="task-topline">
-          <span class="tag">${task.track.replace("-", " ")}</span>
-          <span class="difficulty">${task.difficulty} / ${task.points} pts</span>
+          <span class="tag">${escapeHtml(trackLabels)}</span>
+          <span class="difficulty">${escapeHtml(context.level)} / ${context.total_points} pts</span>
         </div>
-        <h3>${task.title}</h3>
-        <p>${task.scenario}</p>
-        <a class="task-open" href="/challenge/${encodeURIComponent(task.id)}">${solved ? "Review solved challenge" : "Open challenge"}</a>
+        <h3>${escapeHtml(context.title)}</h3>
+        <p class="task-context">${escapeHtml(context.status)} situation</p>
+        <p>${escapeHtml(context.summary)}</p>
+        <div class="context-meta">
+          <span>${context.subtask_count} subtasks</span>
+          <span>${solvedCount}/${context.subtask_count} solved</span>
+          <span>${(context.planned_subtasks || []).length} planned</span>
+        </div>
+        <a class="task-open" href="/context/${encodeURIComponent(context.id)}">Open situation</a>
       `;
       taskGrid.appendChild(card);
     });
@@ -221,25 +232,6 @@ filters.forEach((button) => {
     filters.forEach((candidate) => candidate.classList.remove("active"));
     button.classList.add("active");
     renderTasks(button.dataset.filter);
-  });
-});
-
-apiForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  apiOutput.textContent = "Running request...";
-  try {
-    const response = await fetch(apiPath.value, { headers: signalSessionHeaders });
-    const text = await response.text();
-    apiOutput.textContent = prettyJson(text);
-  } catch (error) {
-    apiOutput.textContent = `Request failed: ${error.message}`;
-  }
-});
-
-document.querySelectorAll("[data-api-example]").forEach((button) => {
-  button.addEventListener("click", () => {
-    apiPath.value = button.dataset.apiExample;
-    apiForm.requestSubmit();
   });
 });
 
@@ -352,16 +344,18 @@ dataMode.addEventListener("change", () => {
   seedWaterfall();
 });
 
-function prettyJson(text) {
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2);
-  } catch {
-    return text;
-  }
-}
-
 function titleCase(value) {
   return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>'"]/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "'": "&#39;",
+    "\"": "&quot;"
+  }[character]));
 }
 
 function ensureWorkbench() {
@@ -532,7 +526,8 @@ function renderWorkbenchWaterfall() {
   const rows = state.workbench.rows;
   if (rows?.length) {
     for (let y = 0; y < wbCanvas.height; y += 1) {
-      const rowIndex = Math.floor(state.workbench.frame + y / state.workbench.zoomTime) % rows.length;
+      const rowIndex = Math.floor(state.workbench.frame + y / state.workbench.zoomTime);
+      if (rowIndex >= rows.length) continue;
       const row = rows[rowIndex];
       for (let x = 0; x < wbCanvas.width; x += 1) {
         const index = Math.floor(viewport.startBin + (x / wbCanvas.width) * viewport.binCount);
@@ -629,7 +624,7 @@ function rowsForArtifact(artifact) {
   if (artifact?.rows) return artifact.rows;
   if (!artifact?.sources) return null;
   const bins = artifact.bins || 96;
-  const frames = artifact.frames || 120;
+  const frames = Math.max(artifact.frames || 120, 720);
   const center = Number(artifact.center_hz || 2437000000);
   const span = Number(artifact.span_hz || 2000000);
   const rows = [];
@@ -637,7 +632,7 @@ function rowsForArtifact(artifact) {
     const row = [];
     for (let bin = 0; bin < bins; bin += 1) {
       const offsetHz = -span / 2 + (bin / Math.max(1, bins - 1)) * span;
-      let power = 0.04 + deterministicNoise(bin, frame, artifact.seed || 6841) * 0.09;
+      let power = backgroundPower(bin, frame, artifact.seed || 6841);
       for (const source of artifact.sources) {
         power = Math.max(power, sourcePower(source, offsetHz, frame, center, span));
       }
@@ -653,23 +648,82 @@ function sourcePower(source, offsetHz, frame) {
   const bandwidth = Number(source.bandwidth_hz || 16000);
   const period = Number(source.period_frames || 40);
   const duration = Number(source.duration_frames || 10);
+  const phase = Number(source.phase_frames || 0);
+  const phasedFrame = frame + phase;
+  const cycleIndex = Math.floor(phasedFrame / Math.max(1, period));
+  const cyclePosition = positiveModulo(phasedFrame, Math.max(1, period));
   const drift = Number(source.drift_hz_per_frame || 0) * frame;
   const hopSet = source.hop_offsets_hz || null;
-  const hop = hopSet ? Number(hopSet[Math.floor(frame / Math.max(1, period)) % hopSet.length]) : offset;
-  const active = source.kind === "noise_band" || (frame + Number(source.phase_frames || 0)) % period < duration;
-  const distance = Math.abs(offsetHz - hop - drift);
+  const hop = hopSet ? Number(hopSet[positiveModulo(cycleIndex, hopSet.length)]) : offset;
+  const jitter = Number(source.jitter_hz || Math.min(3500, bandwidth * 0.04)) *
+    (smoothNoise(cycleIndex * 1.7, frame / 27, hashString(source.label || "source")) - 0.5);
+  const active = source.kind === "noise_band" || cyclePosition < duration;
+  const distance = Math.abs(offsetHz - hop - drift - jitter);
   if (!active && source.kind !== "sweep") return 0;
   if (source.kind === "sweep") {
     const sweepStart = Number(source.sweep_start_hz || -800000);
     const sweepStop = Number(source.sweep_stop_hz || 800000);
     const sweepPeriod = Number(source.sweep_period_frames || 90);
-    const sweepOffset = sweepStart + ((frame % sweepPeriod) / sweepPeriod) * (sweepStop - sweepStart);
-    return Math.abs(offsetHz - sweepOffset) < bandwidth ? Number(source.power || 0.65) : 0;
+    const sweepPosition = positiveModulo(frame, sweepPeriod) / sweepPeriod;
+    const sweepOffset = sweepStart + sweepPosition * (sweepStop - sweepStart);
+    const sweepSigma = Math.max(1, bandwidth / 2.8);
+    return Number(source.power || 0.65) * gaussian(offsetHz - sweepOffset, sweepSigma);
   }
   if (source.kind === "noise_band") {
-    return distance < bandwidth / 2 ? Number(source.power || 0.32) * (0.75 + deterministicNoise(Math.round(offsetHz), frame, 17) * 0.25) : 0;
+    const edge = gaussian(Math.max(0, distance - bandwidth / 2), Math.max(1, bandwidth / 9));
+    const noiseSeed = hashString(source.label || "noise");
+    const texture =
+      0.62 +
+      deterministicNoise(Math.round(offsetHz / 900), frame, noiseSeed) * 0.25 +
+      deterministicNoise(Math.round(offsetHz / 3100), Math.floor(frame / 2), noiseSeed + 41) * 0.13;
+    return Number(source.power || 0.32) * edge * texture;
   }
-  return distance < bandwidth / 2 ? Number(source.power || 0.9) : 0;
+  const temporal = raisedCosineEnvelope(cyclePosition, duration);
+  const spectral = gaussian(distance, Math.max(1, bandwidth / 3.2));
+  return Number(source.power || 0.9) * temporal * spectral;
+}
+
+function backgroundPower(bin, frame, seed) {
+  const coarse = deterministicNoise(Math.floor(bin / 9), Math.floor(frame / 7), seed);
+  const medium = deterministicNoise(Math.floor(bin / 3), Math.floor(frame / 2), seed + 19);
+  const fine = deterministicNoise(bin, frame, seed + 43);
+  return 0.032 + coarse * 0.026 + medium * 0.022 + fine * 0.018;
+}
+
+function raisedCosineEnvelope(position, duration) {
+  if (duration <= 1) return 1;
+  if (position < 0 || position >= duration) return 0;
+  const edge = Math.max(1.5, duration * 0.22);
+  if (position < edge) {
+    return 0.5 - 0.5 * Math.cos(Math.PI * position / edge);
+  }
+  if (position > duration - edge) {
+    return 0.5 - 0.5 * Math.cos(Math.PI * (duration - position) / edge);
+  }
+  return 1;
+}
+
+function gaussian(distance, sigma) {
+  return Math.exp(-0.5 * Math.pow(distance / sigma, 2));
+}
+
+function positiveModulo(value, divisor) {
+  return ((value % divisor) + divisor) % divisor;
+}
+
+function smoothNoise(x, y, seed) {
+  const a = Math.sin(x * 1.71 + y * 2.13 + seed * 0.017);
+  const b = Math.sin(x * 3.11 - y * 1.37 + seed * 0.031);
+  const c = Math.sin(x * 0.73 + y * 4.19 + seed * 0.047);
+  return (a + b * 0.55 + c * 0.3 + 1.85) / 3.7;
+}
+
+function hashString(value) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
 }
 
 function deterministicNoise(x, y, seed) {

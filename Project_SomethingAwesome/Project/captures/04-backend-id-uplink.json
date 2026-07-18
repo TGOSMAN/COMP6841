@@ -5,18 +5,50 @@
   "bins": 1024,
   "frames": 128,
   "seed": 404,
-  "description": "Challenge 4 backend bridge capture: a LoRa-like chirp/sweep training uplink carrying a recovered vehicle identifier used by the API.",
+  "description": "Moderate RF-to-backend capture generated from a GNU Radio profile: a LoRa-like chirp/sweep training uplink carrying a recovered identifier used by the API.",
   "protocol_notes": {
     "modulation": "CSS/LoRa-like training chirp",
-    "cyber_bridge": "demodulated vehicle_id enters a toll API query",
+    "cyber_bridge": "demodulated vehicle_id enters a local API query",
     "risk": "SQL injection exists after RF values cross into backend input"
   },
   "annotations": [
-    {"label": "up-chirp", "offset_hz": -250000, "color": "#59d7e8", "row": 0},
-    {"label": "ID burst", "offset_hz": 180000, "color": "#73f2a6", "row": 1}
+    {
+      "label": "up-chirp",
+      "offset_hz": -250000,
+      "color": "#59d7e8",
+      "row": 0
+    },
+    {
+      "label": "ID burst",
+      "offset_hz": 180000,
+      "color": "#73f2a6",
+      "row": 1
+    }
   ],
   "sources": [
-    {"label": "CSS sweep uplink", "kind": "sweep", "sweep_start_hz": -300000, "sweep_stop_hz": 300000, "sweep_period_frames": 42, "bandwidth_hz": 14000, "power": 0.7},
-    {"label": "Identifier marker", "kind": "burst", "offset_hz": 180000, "bandwidth_hz": 18000, "period_frames": 42, "duration_frames": 5, "phase_frames": 27, "power": 0.85}
-  ]
+    {
+      "label": "CSS sweep uplink",
+      "kind": "sweep",
+      "sweep_start_hz": -300000,
+      "sweep_stop_hz": 300000,
+      "sweep_period_frames": 42,
+      "bandwidth_hz": 14000,
+      "power": 0.7
+    },
+    {
+      "label": "Identifier marker",
+      "kind": "burst",
+      "offset_hz": 180000,
+      "bandwidth_hz": 18000,
+      "period_frames": 42,
+      "duration_frames": 5,
+      "phase_frames": 27,
+      "power": 0.85
+    }
+  ],
+  "generated_by": "radio/generate_gnuradio_artifacts.py",
+  "source_profile": "radio/profiles/training_signals.json#city_notice_api_pivot",
+  "generator_mode": "deterministic-python-fallback",
+  "sample_rate_hz": 700000,
+  "artifact_role": "browser waterfall preview generated from RF profile"
 }

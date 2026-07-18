@@ -1,0 +1,36 @@
+{
+  "global": {
+    "core:datatype": "cf32_le",
+    "core:sample_rate": 700000,
+    "core:description": "Moderate RF-to-backend capture generated from a GNU Radio profile: a LoRa-like chirp/sweep training uplink carrying a recovered identifier used by the API.",
+    "core:version": "1.0.0",
+    "core:author": "Signal Forge CTF GNU Radio profile generator"
+  },
+  "captures": [
+    {
+      "core:sample_start": 0,
+      "core:frequency": 868300000
+    }
+  ],
+  "annotations": [
+    {
+      "core:sample_start": 0,
+      "core:sample_count": 14000,
+      "core:freq_lower_edge": 868293000,
+      "core:freq_upper_edge": 868307000,
+      "core:label": "CSS sweep uplink"
+    },
+    {
+      "core:sample_start": 0,
+      "core:sample_count": 14000,
+      "core:freq_lower_edge": 868471000,
+      "core:freq_upper_edge": 868489000,
+      "core:label": "Identifier marker"
+    }
+  ],
+  "signal_forge": {
+    "generated_by": "radio/generate_gnuradio_artifacts.py",
+    "source_profile": "radio/profiles/training_signals.json#city_notice_api_pivot",
+    "generator_mode": "deterministic-python-fallback"
+  }
+}
