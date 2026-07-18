@@ -10,9 +10,8 @@ CHALLENGES_PATH = ROOT / "data" / "challenges.json"
 
 ARTIFACTS = {
     "tunnel": [
-        {"label": "Tunnel sign OOK capture", "href": "/captures/01-tunnel-ook-sign.json", "type": "application/json", "role": "signal"},
-        {"label": "Generated SigMF metadata", "href": "/captures/01-tunnel-ook-sign.sigmf-meta", "type": "application/json"},
-        {"label": "Live raw IQ export", "href": "/api/rf/raw?challenge_id=tunnel-reading-signals", "type": "application/octet-stream"},
+        {"label": "Your GNU Radio Reading Signals capture", "href": "/api/rf/gnu-radio-capture", "type": "application/json", "role": "signal"},
+        {"label": "Your GNU Radio raw IQ", "href": "/radio/GNURadio/ReadingSignals.sigmf-data", "type": "application/octet-stream", "role": "raw_iq"},
     ],
     "broadcast": [
         {"label": "Clock-recovery metadata capture", "href": "/captures/06-decoder-clock-recovery.json", "type": "application/json", "role": "signal"},

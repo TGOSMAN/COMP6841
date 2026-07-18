@@ -51,7 +51,42 @@ Export generated samples as SigMF:
 The browser can consume:
 
 - generated waterfall/capture JSON from `captures/*.json`, or
-- live FFT rows from a future Python bridge.
+- a local GNU Radio `cf32_le` File Sink capture through the backend importer.
+
+## Local GNU Radio Capture Import
+
+The Reading Signals task is configured to read this File Sink output directly:
+
+```text
+radio/GNURadio/ReadingSignals.sigmf-data
+```
+
+Connect the final complex output of the GNU Radio flowgraph to a normal **File
+Sink** using that filename. GNU Radio's **File Meta Sink** is not required; its
+binary metadata format is intentionally ignored. Signal Forge reads the capture
+settings from `config/range.json`, computes FFT rows on the backend, and loads
+them through `GET /api/rf/gnu-radio-capture`.
+
+The default capture settings are 44,200 samples/second, complex float little
+endian (`cf32_le`), and a notional centre frequency of 915 MHz. Change the
+`gnu_radio_capture` section of `config/range.json` when the flowgraph settings
+change, then reload the challenge page.
+
+The importer never receives the Vector Source text. It measures the carrier
+from the recorded spectrum and recovers an OOK binary stream from IQ amplitude.
+The UI deliberately stops at bit slicing; turning those bits into bytes and
+recovering the flag remains part of the learner task. `samples_per_symbol`
+describes the current Repeat/interleaving result (500 complex samples per bit),
+so update it if the GNU Radio symbol timing changes.
+
+Receiver centre/span, demodulation, gain, and squelch are applied to the same
+IQ frame used by both the tuned time-series and the audio monitor.
+
+Flag verification is deliberately separate from signal processing. Set the
+`flags.tunnel-reading-signals` value in the server-only
+`config/validation.json` file to the answer the task should accept. Requests for
+that file are blocked by the backend. The receiver API never returns this
+value; it exposes only the recovered binary stream for the learner to interpret.
 
 ## Optional Live Bridge
 

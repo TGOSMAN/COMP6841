@@ -15,7 +15,6 @@ from gnuradio import audio
 from gnuradio import blocks
 from gnuradio import channels
 from gnuradio.filter import firdes
-from gnuradio import digital
 from gnuradio import filter
 from gnuradio import gr
 from gnuradio.fft import window
@@ -76,7 +75,7 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
         ##################################################
 
         self.qtgui_waterfall_sink_x_0 = qtgui.waterfall_sink_c(
-            32768, #size
+            1024, #size
             window.WIN_BLACKMAN_hARRIS, #wintype
             0, #fc
             samp_rate, #bw
@@ -84,7 +83,7 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
             1, #number of inputs
             None # parent
         )
-        self.qtgui_waterfall_sink_x_0.set_update_time(0.0001)
+        self.qtgui_waterfall_sink_x_0.set_update_time(0.001)
         self.qtgui_waterfall_sink_x_0.enable_grid(False)
         self.qtgui_waterfall_sink_x_0.enable_axis_labels(True)
 
@@ -170,7 +169,6 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
                 1000,
                 window.WIN_HAMMING,
                 6.76))
-        self.digital_packet_headergenerator_bb_default_0 = digital.packet_headergenerator_bb(4, "packet_len")
         self.channels_channel_model_0 = channels.channel_model(
             noise_voltage=0.2,
             frequency_offset=0.0,
@@ -180,7 +178,7 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
             block_tags=False)
         self.blocks_vector_source_x_0 = blocks.vector_source_b(list(b"FLAG{LIFE_IS LIKE A BOX_OF_CHOCS}"), True, 1, [])
         self.blocks_unpack_k_bits_bb_0 = blocks.unpack_k_bits_bb(8)
-        self.blocks_repeat_0 = blocks.repeat(gr.sizeof_char*1, 100)
+        self.blocks_repeat_0 = blocks.repeat(gr.sizeof_char*1, 1000)
         self.blocks_multiply_xx_0 = blocks.multiply_vcc(1)
         self.blocks_interleaved_char_to_complex_0 = blocks.interleaved_char_to_complex(False,1.0)
         self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, 'C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\ReadingSignals.sigmf-data', False)
@@ -202,13 +200,12 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
         self.connect((self.blocks_multiply_xx_0, 0), (self.channels_channel_model_0, 0))
         self.connect((self.blocks_repeat_0, 0), (self.blocks_interleaved_char_to_complex_0, 0))
         self.connect((self.blocks_unpack_k_bits_bb_0, 0), (self.blocks_repeat_0, 0))
-        self.connect((self.blocks_vector_source_x_0, 0), (self.digital_packet_headergenerator_bb_default_0, 0))
+        self.connect((self.blocks_vector_source_x_0, 0), (self.blocks_unpack_k_bits_bb_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.blocks_complex_to_real_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.blocks_file_meta_sink_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.blocks_file_sink_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_time_sink_x_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_waterfall_sink_x_0, 0))
-        self.connect((self.digital_packet_headergenerator_bb_default_0, 0), (self.blocks_unpack_k_bits_bb_0, 0))
         self.connect((self.low_pass_filter_0, 0), (self.blocks_multiply_xx_0, 0))
 
 

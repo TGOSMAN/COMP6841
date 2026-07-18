@@ -4,6 +4,9 @@ const analysis = {
   task: null,
   meta: null,
   rows: [],
+  timeRows: [],
+  iqRows: [],
+  symbolBits: "",
   frame: 0,
   playing: false,
   timer: null,
@@ -64,6 +67,12 @@ async function bootChallenge() {
     byId("challenge-scenario").textContent = "Return to the challenge list and select an available mission.";
     return;
   }
+  const signalArtifact = analysis.task.artifacts.find((artifact) => artifact.role === "signal");
+  if (signalArtifact?.href === "/api/rf/gnu-radio-capture") {
+    analysis.sourceMode = "artifact";
+    byId("source-live").classList.remove("active");
+    byId("source-artifact").classList.add("active");
+  }
   renderChallenge();
   await loadSignalCapture();
 }
@@ -89,7 +98,8 @@ function renderChallenge() {
     <details><summary>Hint ${hintIndex + 1}</summary><p>${escapeHtml(hint)}</p></details>
   `).join("");
   renderArtifacts();
-  byId("source-raw-download").href = `/api/rf/raw?challenge_id=${encodeURIComponent(task.id)}`;
+  const rawArtifact = task.artifacts.find((artifact) => artifact.role === "raw_iq");
+  byId("source-raw-download").href = rawArtifact?.href || `/api/rf/raw?challenge_id=${encodeURIComponent(task.id)}`;
   renderParserStages();
   updateEffectStage("idle", "Awaiting receiver output");
   renderPagination(index, sequence);
@@ -376,6 +386,9 @@ async function loadArtifactCapture(artifact = analysis.task.artifacts.find((cand
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     analysis.meta = await response.json();
     analysis.rows = rowsForArtifact(analysis.meta) || [];
+    analysis.timeRows = Array.isArray(analysis.meta.time_rows) ? analysis.meta.time_rows : [];
+    analysis.iqRows = Array.isArray(analysis.meta.iq_rows) ? analysis.meta.iq_rows : [];
+    analysis.symbolBits = String(analysis.meta.symbol_bits || "");
     analysis.frame = Math.max(0, analysis.rows.length - 1);
     analysis.captureCenter = Number(analysis.meta.center_hz || 0);
     analysis.captureSpan = Number(analysis.meta.span_hz || 0);
@@ -385,6 +398,7 @@ async function loadArtifactCapture(artifact = analysis.task.artifacts.find((cand
     resetAnalysisView();
     renderCaptureMetadata();
     renderLegend();
+    renderParserEvent(analysis.meta.parser);
     if (!analysis.playing) togglePlayback();
     if (analysis.task.id === "civilian-emergency-intercept") await runRfCommand("tune");
   } catch (error) {
@@ -398,6 +412,9 @@ function startLiveStream() {
   stopLiveStream(false);
   const artifact = analysis.task.artifacts.find((candidate) => candidate.role === "signal");
   analysis.rows = [];
+  analysis.timeRows = [];
+  analysis.iqRows = [];
+  analysis.symbolBits = "";
   analysis.frame = 0;
   analysis.live.events = [];
   analysis.live.lastSamples = [];
@@ -489,6 +506,8 @@ function isIntroductorySignalTask(task) {
 }
 
 function preferredDemodulation() {
+  const selected = byId("receiver-modulation")?.value?.toUpperCase();
+  if (selected && selected !== "AUTO") return selected;
   const modulation = String(analysis.meta?.protocol_notes?.modulation || analysis.task?.signal_scheme || "").toUpperCase();
   if (modulation.includes("4-FSK")) return "4-FSK";
   if (modulation.includes("GFSK")) return "GFSK";
@@ -566,7 +585,46 @@ function renderAnalysis() {
   drawMeasurementCursor(analysis.cursorB, "B", "#ffc766", viewport);
   drawSpectrum(viewport);
   drawTimeSeries(viewport);
+  renderArtifactParserForTuning(viewport);
   updateReadouts(viewport);
+}
+
+function renderArtifactParserForTuning(viewport) {
+  if (analysis.sourceMode !== "artifact" || !analysis.symbolBits) return;
+  const detectedFrequency = Number(analysis.meta?.detected_frequency_hz || 0);
+  const inPassband = detectedFrequency >= viewport.startHz && detectedFrequency <= viewport.endHz;
+  const demodulation = preferredDemodulation();
+  const demodulationValid = ["AUTO", "ASK", "OOK", "MANCHESTER"].includes(demodulation);
+  if (!inPassband || !demodulationValid) {
+    renderParserEvent({
+      stage: "energy_detect",
+      confidence: 0,
+      bit_buffer: "no symbols in tuned passband",
+      fields: {
+        tuned_center_hz: Math.round(viewport.center),
+        tuned_span_hz: Math.round(viewport.span),
+        detected_frequency_hz: Math.round(detectedFrequency),
+        state: inPassband ? `unsupported demodulation ${demodulation}` : "carrier outside selected span"
+      },
+      note: "Bit slicer waiting for an in-band OOK/ASK carrier."
+    });
+    return;
+  }
+  const symbolIndex = Math.max(0, Math.min(analysis.symbolBits.length - 1, analysis.frame));
+  const bufferStart = Math.max(0, symbolIndex - 127);
+  const bitBuffer = analysis.symbolBits.slice(bufferStart, symbolIndex + 1);
+  renderParserEvent({
+    ...analysis.meta.parser,
+    stage: "bit_slice",
+    bit_buffer: bitBuffer,
+    fields: {
+      ...analysis.meta.parser?.fields,
+      symbol_index: symbolIndex,
+      current_symbol: analysis.symbolBits[symbolIndex],
+      buffered_bit_count: bitBuffer.length
+    },
+    note: `Bit slicer following artifact frame ${symbolIndex + 1}.`
+  });
 }
 
 function drawGrid(context, width, height, columns, rows) {
@@ -707,7 +765,7 @@ function drawTimeSeries(viewport) {
   timeSeriesContext.fillStyle = "#020607";
   timeSeriesContext.fillRect(0, 0, timeSeries.width, timeSeries.height);
   drawGrid(timeSeriesContext, timeSeries.width, timeSeries.height, 10, 4);
-  const samples = analysis.live.lastSamples.length ? analysis.live.lastSamples : samplesFromCurrentRow(viewport);
+  const samples = samplesForCurrentFrame(viewport);
   if (!samples.length) {
     timeSeriesContext.fillStyle = "#a8b4ae";
     timeSeriesContext.font = "16px system-ui";
@@ -736,6 +794,80 @@ function drawTimeSeries(viewport) {
   timeSeriesContext.stroke();
   byId("timeseries-readout").textContent = `Samples: ${samples.length}`;
   byId("symbol-readout").textContent = `Symbols: ${byId("parser-bit-buffer").textContent.slice(0, 12) || "--"}`;
+}
+
+function samplesForCurrentFrame(viewport) {
+  if (analysis.live.lastSamples.length) return analysis.live.lastSamples;
+  const iqSamples = analysis.iqRows[analysis.frame];
+  if (Array.isArray(iqSamples) && iqSamples.length) return tunedSamplesFromIq(iqSamples, viewport);
+  const artifactSamples = analysis.timeRows[analysis.frame];
+  if (Array.isArray(artifactSamples) && artifactSamples.length) return artifactSamples;
+  return samplesFromCurrentRow(viewport);
+}
+
+function tunedSamplesFromIq(iqSamples, viewport) {
+  const sampleRate = Number(analysis.meta?.sample_rate_hz || analysis.captureSpan || 1);
+  const tunedCenter = (viewport.startHz + viewport.endHz) / 2;
+  const offsetHz = tunedCenter - analysis.captureCenter;
+  const mixed = iqSamples.map((pair, index) => {
+    const real = Number(pair[0] || 0);
+    const imag = Number(pair[1] || 0);
+    const phase = -2 * Math.PI * offsetHz * index / sampleRate;
+    const cosine = Math.cos(phase);
+    const sine = Math.sin(phase);
+    return [real * cosine - imag * sine, real * sine + imag * cosine];
+  });
+  const filtered = lowPassComplex(mixed, Math.min(viewport.span / 2, sampleRate * 0.475), sampleRate);
+  const demodulation = preferredDemodulation();
+  let demodulated;
+  if (["ASK", "OOK", "MANCHESTER", "AUTO"].includes(demodulation)) {
+    demodulated = filtered.map(([real, imag]) => Math.hypot(real, imag));
+  } else if (demodulation === "AM") {
+    const envelope = filtered.map(([real, imag]) => Math.hypot(real, imag));
+    const mean = envelope.reduce((sum, value) => sum + value, 0) / Math.max(1, envelope.length);
+    demodulated = envelope.map((value) => value - mean);
+  } else if (demodulation.includes("FSK")) {
+    demodulated = filtered.map(([real, imag], index) => {
+      if (!index) return 0;
+      const [previousReal, previousImag] = filtered[index - 1];
+      return Math.atan2(imag * previousReal - real * previousImag, real * previousReal + imag * previousImag) / Math.PI;
+    });
+  } else {
+    demodulated = filtered.map(([real]) => real);
+  }
+
+  const rms = Math.sqrt(demodulated.reduce((sum, value) => sum + value * value, 0) / Math.max(1, demodulated.length));
+  const levelDb = 20 * Math.log10(Math.max(1e-9, rms));
+  const squelchDb = Number(byId("receiver-squelch").value || -80);
+  if (levelDb < squelchDb) return Array(160).fill(0);
+  const gain = Math.pow(10, (Number(byId("receiver-gain").value || 24) - 24) / 20);
+  return Array.from({ length: 160 }, (_, index) => {
+    const sourceIndex = Math.round(index * (demodulated.length - 1) / 159);
+    return Math.max(-1, Math.min(1, demodulated[sourceIndex] * gain));
+  });
+}
+
+function lowPassComplex(samples, cutoffHz, sampleRate) {
+  const halfLength = 16;
+  const normalizedCutoff = Math.max(0.001, Math.min(0.475, cutoffHz / sampleRate));
+  const taps = [];
+  for (let offset = -halfLength; offset <= halfLength; offset += 1) {
+    const sinc = offset === 0 ? 2 * normalizedCutoff : Math.sin(2 * Math.PI * normalizedCutoff * offset) / (Math.PI * offset);
+    const window = 0.54 + 0.46 * Math.cos(Math.PI * offset / halfLength);
+    taps.push(sinc * window);
+  }
+  const tapSum = taps.reduce((sum, value) => sum + value, 0);
+  return samples.map((_, index) => {
+    let real = 0;
+    let imag = 0;
+    taps.forEach((tap, tapIndex) => {
+      const sampleIndex = index + tapIndex - halfLength;
+      if (sampleIndex < 0 || sampleIndex >= samples.length) return;
+      real += samples[sampleIndex][0] * tap / tapSum;
+      imag += samples[sampleIndex][1] * tap / tapSum;
+    });
+    return [real, imag];
+  });
 }
 
 function samplesFromCurrentRow(viewport) {
@@ -1164,6 +1296,7 @@ async function runRfCommand(action, argumentsText = "") {
     byId("receiver-lock").textContent = data.locked ? `LOCKED / ${data.target}` : "Receiver unlocked";
     byId("receiver-lock").classList.toggle("locked", Boolean(data.locked));
     if (data.flag) byId("challenge-flag").value = data.flag;
+    if (data.parser) renderParserEvent(data.parser);
     updateEffectFromRf(action, data);
     return data;
   } catch (error) {
@@ -1196,7 +1329,7 @@ function updateEffectFromRf(action, data) {
   }
   const text = (data.lines || []).join(" / ");
   if (action === "receive") {
-    updateEffectStage("success", data.locked ? "Decoded receiver output buffered" : "Receiver output unavailable");
+    updateEffectStage("success", data.bitstream ? `Receiver bitstream buffered (${data.bitstream.length} bits)` : data.locked ? "Receiver locked; no stable bits recovered" : "Receiver output unavailable");
   } else if (action === "interfere") {
     updateEffectStage("interference", text.includes("FLAG") ? text.match(/FLAG\s+CTF\{[^}]+\}/)?.[0] || "Mismatch produced task output" : "Interference visible in local spectrum");
   } else if (action === "transmit") {
@@ -1339,9 +1472,9 @@ function toggleTunedAudio() {
   byId("analysis-audio").setAttribute("aria-pressed", "true");
   byId("analysis-audio").textContent = "Stop tuned audio";
   analysis.audio.timer = setInterval(() => {
-    const samples = analysis.live.lastSamples.length ? analysis.live.lastSamples : samplesFromCurrentRow(currentViewport());
+    const samples = samplesForCurrentFrame(currentViewport());
     const average = samples.reduce((sum, sample) => sum + Math.abs(Number(sample)), 0) / Math.max(1, samples.length);
-    const targetGain = Math.min(0.08, Math.max(0.006, average * 0.075));
+    const targetGain = average < 0.08 ? 0 : Math.min(0.08, (average - 0.08) * 0.09);
     analysis.audio.gain.gain.setTargetAtTime(targetGain, analysis.audio.context.currentTime, 0.025);
     analysis.audio.oscillator.frequency.setTargetAtTime(preferredDemodulation() === "AM" ? 620 + average * 820 : 880 + average * 540, analysis.audio.context.currentTime, 0.04);
   }, 55);
@@ -1367,7 +1500,8 @@ byId("analysis-rate").addEventListener("change", () => {
 byId("analysis-reset").addEventListener("click", resetAnalysisView);
 byId("analysis-cursors").addEventListener("click", () => { analysis.cursorA = null; analysis.cursorB = null; renderAnalysis(); });
 byId("analysis-frame").addEventListener("input", (event) => { analysis.frame = Number(event.target.value); renderAnalysis(); });
-["analysis-center", "analysis-span", "analysis-floor", "analysis-range", "analysis-palette"].forEach((id) => byId(id).addEventListener("input", renderAnalysis));
+["analysis-center", "analysis-span", "analysis-floor", "analysis-range", "analysis-palette", "receiver-gain", "receiver-squelch"].forEach((id) => byId(id).addEventListener("input", renderAnalysis));
+byId("receiver-modulation").addEventListener("change", renderAnalysis);
 byId("source-live").addEventListener("click", () => {
   analysis.sourceMode = "live";
   byId("source-live").classList.add("active");

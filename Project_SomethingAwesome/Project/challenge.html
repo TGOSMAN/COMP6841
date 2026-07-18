@@ -180,6 +180,7 @@
               </div>
               <canvas id="time-series" width="1100" height="220" aria-label="Live tuned sample time series"></canvas>
             </div>
+            <div class="waterfall-axis-label">Waterfall frequency axis</div>
             <div class="axis-scale analysis-axis" id="analysis-axis"></div>
             <div class="plot-frame">
               <canvas id="analysis-waterfall" width="1100" height="700" aria-label="Configurable signal waterfall"></canvas>
@@ -327,7 +328,7 @@
           <h2>Submit your finding</h2>
         </div>
         <form class="flag-form" id="challenge-flag-form">
-          <input id="challenge-flag" aria-label="Flag input" placeholder="CTF{YOUR_FLAG}" autocomplete="off">
+          <input id="challenge-flag" aria-label="Flag input" placeholder="FLAG{...} or CTF{...}" autocomplete="off">
           <button type="submit">Submit flag</button>
         </form>
         <p class="flag-result" id="challenge-flag-result" aria-live="polite"></p>

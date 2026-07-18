@@ -4,10 +4,12 @@ import json
 import html
 import hmac
 import hashlib
+import math
 import mimetypes
 import os
 import random
 import sqlite3
+import struct
 import time
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -23,6 +25,7 @@ DB_PATH = DATA_DIR / "tolling.db"
 CHALLENGES_PATH = DATA_DIR / "challenges.json"
 CONTEXTS_PATH = DATA_DIR / "contexts.json"
 CONFIG_PATH = ROOT / "config" / "range.json"
+VALIDATION_CONFIG_PATH = ROOT / "config" / "validation.json"
 MODE = {"value": "attack"}
 REPLAY_CACHE: set[str] = set()
 AIR_WEATHER_SESSIONS: dict[str, dict] = {}
@@ -132,6 +135,216 @@ def load_config() -> dict:
         return json.load(handle)
 
 
+def load_validation_config() -> dict:
+    with VALIDATION_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def fft_in_place(values: list[complex]) -> None:
+    """Dependency-free radix-2 FFT used for local GNU Radio capture previews."""
+    size = len(values)
+    target = 0
+    for source in range(1, size):
+        bit = size >> 1
+        while target & bit:
+            target ^= bit
+            bit >>= 1
+        target ^= bit
+        if source < target:
+            values[source], values[target] = values[target], values[source]
+
+    length = 2
+    while length <= size:
+        angle = -2.0 * math.pi / length
+        step = complex(math.cos(angle), math.sin(angle))
+        half = length // 2
+        for start in range(0, size, length):
+            phase = 1.0 + 0.0j
+            for index in range(start, start + half):
+                even = values[index]
+                odd = values[index + half] * phase
+                values[index] = even + odd
+                values[index + half] = even - odd
+                phase *= step
+        length <<= 1
+
+
+def configured_gnu_radio_path(settings: dict | None = None) -> tuple[Path, Path]:
+    settings = settings or load_config().get("gnu_radio_capture", {})
+    relative_path = Path(str(settings.get("path", "radio/GNURadio/ReadingSignals.sigmf-data")))
+    capture_path = (ROOT / relative_path).resolve()
+    try:
+        capture_path.relative_to(ROOT)
+    except ValueError as error:
+        raise ValueError("GNU Radio capture path must remain inside the project") from error
+    return capture_path, relative_path
+
+
+def decode_gnu_radio_ook(settings: dict | None = None) -> dict:
+    """Recover OOK bits from IQ amplitude without assuming byte or payload content."""
+    settings = settings or load_config().get("gnu_radio_capture", {})
+    capture_path, _ = configured_gnu_radio_path(settings)
+    if not capture_path.is_file():
+        raise FileNotFoundError(f"GNU Radio capture not found: {capture_path.name}")
+    samples_per_symbol = max(8, int(settings.get("samples_per_symbol", 500)))
+    max_samples = max(samples_per_symbol * 32, min(1_000_000, int(settings.get("decode_max_samples", 500000))))
+    with capture_path.open("rb") as handle:
+        raw = handle.read(max_samples * 8)
+    complete_bytes = len(raw) - len(raw) % 8
+    magnitudes = [math.hypot(real, imag) for real, imag in struct.iter_unpack("<ff", raw[:complete_bytes])]
+    if len(magnitudes) < samples_per_symbol * 16:
+        return {"ok": False, "note": "Not enough IQ samples for symbol recovery."}
+
+    prefix = [0.0]
+    for magnitude in magnitudes:
+        prefix.append(prefix[-1] + magnitude)
+
+    best: dict = {"score": -1.0, "bits": "", "confidence": 0.0}
+    phase_step = max(1, samples_per_symbol // 50)
+    for phase in range(0, samples_per_symbol, phase_step):
+        symbol_count = (len(magnitudes) - phase) // samples_per_symbol
+        if symbol_count < 16:
+            continue
+        means = [
+            (prefix[phase + (index + 1) * samples_per_symbol] - prefix[phase + index * samples_per_symbol]) / samples_per_symbol
+            for index in range(symbol_count)
+        ]
+        ordered = sorted(means)
+        low_seed = ordered[max(0, len(ordered) // 8)]
+        high_seed = ordered[min(len(ordered) - 1, len(ordered) * 7 // 8)]
+        threshold = (low_seed + high_seed) / 2.0
+        low_values = [value for value in means if value < threshold]
+        high_values = [value for value in means if value >= threshold]
+        if not low_values or not high_values:
+            continue
+        low_mean = sum(low_values) / len(low_values)
+        high_mean = sum(high_values) / len(high_values)
+        low_variance = sum((value - low_mean) ** 2 for value in low_values) / len(low_values)
+        high_variance = sum((value - high_mean) ** 2 for value in high_values) / len(high_values)
+        contrast = (high_mean - low_mean) / max(1e-9, high_mean)
+        spread = (math.sqrt(low_variance) + math.sqrt(high_variance)) / max(1e-9, high_mean - low_mean)
+        score = contrast / max(0.02, spread)
+        bits = [1 if value >= threshold else 0 for value in means]
+        if score > best["score"]:
+            best = {
+                "score": score,
+                "bits": "".join(str(bit) for bit in bits[:512]),
+                "confidence": max(0.0, min(0.99, contrast * (1.0 - min(0.8, spread)))),
+                "samples_per_symbol": samples_per_symbol,
+                "phase": phase,
+                "threshold": threshold,
+            }
+    return {"ok": bool(best["bits"]), **best, "note": "Recovered from IQ amplitude without byte or payload assumptions."}
+
+
+def gnu_radio_capture_preview() -> dict:
+    """Convert the configured raw GNU Radio complex-float capture to web FFT rows."""
+    settings = load_config().get("gnu_radio_capture", {})
+    capture_path, relative_path = configured_gnu_radio_path(settings)
+    if not capture_path.is_file():
+        raise FileNotFoundError(f"GNU Radio capture not found: {relative_path.as_posix()}")
+
+    datatype = str(settings.get("datatype", "cf32_le"))
+    if datatype != "cf32_le":
+        raise ValueError(f"Unsupported GNU Radio datatype: {datatype}; expected cf32_le")
+    sample_rate = float(settings.get("sample_rate", 44200))
+    center_hz = float(settings.get("center_hz", 915000000))
+    fft_bins = int(settings.get("fft_bins", 512))
+    max_frames = int(settings.get("max_frames", 120))
+    if fft_bins < 64 or fft_bins > 2048 or fft_bins & (fft_bins - 1):
+        raise ValueError("fft_bins must be a power of two between 64 and 2048")
+    max_frames = max(1, min(512, max_frames))
+
+    bytes_per_sample = 8
+    sample_count = capture_path.stat().st_size // bytes_per_sample
+    if sample_count < fft_bins:
+        raise ValueError(f"Capture needs at least {fft_bins} complete complex-float samples")
+    decoder = decode_gnu_radio_ook(settings)
+    symbol_phase = int(decoder.get("phase", 0))
+    samples_per_symbol = int(decoder.get("samples_per_symbol", settings.get("samples_per_symbol", 500)))
+    if decoder.get("ok") and symbol_phase + fft_bins <= sample_count:
+        available_frames = 1 + max(0, (sample_count - symbol_phase - fft_bins) // samples_per_symbol)
+        frame_count = min(max_frames, available_frames, len(str(decoder.get("bits", ""))))
+        starts = [symbol_phase + index * samples_per_symbol for index in range(frame_count)]
+    else:
+        frame_count = min(max_frames, max(1, sample_count // fft_bins))
+        last_start = max(0, sample_count - fft_bins)
+        starts = [round(index * last_start / max(1, frame_count - 1)) for index in range(frame_count)]
+    window = [0.5 - 0.5 * math.cos(2.0 * math.pi * index / max(1, fft_bins - 1)) for index in range(fft_bins)]
+    power_rows: list[list[float]] = []
+    time_rows_raw: list[list[float]] = []
+    iq_rows_raw: list[list[complex]] = []
+
+    with capture_path.open("rb") as handle:
+        for start in starts:
+            handle.seek(start * bytes_per_sample)
+            raw = handle.read(fft_bins * bytes_per_sample)
+            if len(raw) != fft_bins * bytes_per_sample:
+                continue
+            unpacked = struct.iter_unpack("<ff", raw)
+            unwindowed = [complex(real, imag) for real, imag in unpacked]
+            iq_rows_raw.append(unwindowed[:256])
+            time_rows_raw.append([unwindowed[round(index * (fft_bins - 1) / 159)].real for index in range(160)])
+            samples = [value * window[index] for index, value in enumerate(unwindowed)]
+            fft_in_place(samples)
+            shifted = samples[fft_bins // 2 :] + samples[: fft_bins // 2]
+            power_rows.append([20.0 * math.log10(max(1e-12, abs(value))) for value in shifted])
+
+    if not power_rows:
+        raise ValueError("Capture changed while it was being read; stop GNU Radio briefly and reload")
+    floor_db = min(min(row) for row in power_rows)
+    peak_db = max(max(row) for row in power_rows)
+    display_floor = max(floor_db, peak_db - 80.0)
+    dynamic_range = max(1.0, peak_db - display_floor)
+    rows = [[max(0.0, min(1.0, (value - display_floor) / dynamic_range)) for value in row] for row in power_rows]
+    time_peak = max(1e-9, max(abs(value) for row in time_rows_raw for value in row))
+    time_rows = [[max(-1.0, min(1.0, value / time_peak)) for value in row] for row in time_rows_raw]
+    iq_peak = max(1e-9, max(abs(value) for row in iq_rows_raw for value in row))
+    iq_rows = [[[value.real / iq_peak, value.imag / iq_peak] for value in row] for row in iq_rows_raw]
+    average_power = [sum(row[index] for row in power_rows) / len(power_rows) for index in range(fft_bins)]
+    peak_bin = max(range(fft_bins), key=average_power.__getitem__)
+    detected_frequency_hz = center_hz + (peak_bin - fft_bins / 2) * sample_rate / fft_bins
+    recovered_bits = decoder.get("bits", "")
+    parser = {
+        "stage": "bit_slice",
+        "confidence": decoder.get("confidence", 0.0),
+        "bit_buffer": recovered_bits or "no stable symbols recovered",
+        "fields": {
+            "detected_frequency_hz": round(detected_frequency_hz, 3),
+            "modulation": "OOK/ASK amplitude",
+            "samples_per_symbol": decoder.get("samples_per_symbol", settings.get("samples_per_symbol", 500)),
+            "recovered_bit_count": len(recovered_bits),
+            "integrity": "no CRC or framing field present in the GNU Radio generator",
+        },
+        "note": "Binary symbols recovered from IQ amplitude; byte/payload decoding is left to the learner.",
+    }
+    return {
+        "scheme_id": "GNU-RADIO-LOCAL-CAPTURE",
+        "center_hz": center_hz,
+        "span_hz": sample_rate,
+        "sample_rate_hz": sample_rate,
+        "bins": fft_bins,
+        "frames": len(rows),
+        "rows": rows,
+        "time_rows": time_rows,
+        "iq_rows": iq_rows,
+        "symbol_bits": recovered_bits[:len(rows)],
+        "symbol_phase_samples": symbol_phase,
+        "time_component": "normalized real (I) samples aligned with each FFT frame",
+        "detected_frequency_hz": detected_frequency_hz,
+        "parser": parser,
+        "description": "Waterfall generated by the Signal Forge backend from a local GNU Radio cf32_le File Sink capture.",
+        "source_file": relative_path.as_posix(),
+        "sample_count": sample_count,
+        "duration_seconds": sample_count / sample_rate,
+        "protocol_notes": {
+            "datatype": datatype,
+            "metadata": "Configured server-side; GNU Radio File Meta Sink output is not required."
+        },
+        "annotations": [],
+    }
+
+
 def public_task(task: dict) -> dict:
     return {key: value for key, value in task.items() if key != "flag"}
 
@@ -170,6 +383,20 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
     if not target:
         return {"ok": False, "lines": ["No RF target is assigned to this subtask."]}, HTTPStatus.NOT_FOUND
 
+    imported_capture = None
+    if challenge_id == "tunnel-reading-signals":
+        try:
+            imported_capture = gnu_radio_capture_preview()
+            target = {
+                **target,
+                "center_mhz": float(imported_capture["detected_frequency_hz"]) / 1e6,
+                "span_khz": float(imported_capture["sample_rate_hz"]) / 1e3,
+                "modulations": {"AUTO", "OOK", "ASK"},
+                "label": "GNU-RADIO-READING-SIGNALS",
+            }
+        except (FileNotFoundError, OSError, ValueError, struct.error):
+            imported_capture = None
+
     try:
         center_mhz = float(receiver.get("center_mhz", target["center_mhz"]))
         span_khz = max(1.0, float(receiver.get("span_khz", target.get("span_khz", 500))))
@@ -181,7 +408,7 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
     modulation = str(receiver.get("modulation", "AUTO")).upper()
     offset_khz = abs(center_mhz - target["center_mhz"]) * 1000
     in_view = offset_khz <= span_khz / 2
-    tuned = offset_khz <= max(8.0, min(40.0, span_khz / 16))
+    tuned = offset_khz <= (span_khz * 0.48 if imported_capture else max(8.0, min(40.0, span_khz / 16)))
     demod_ok = modulation in target["modulations"]
     level_db = -72 + min(28, gain_db * 0.7)
     above_squelch = level_db >= squelch_db
@@ -231,6 +458,23 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
         return base, HTTPStatus.BAD_REQUEST
 
     if action == "receive":
+        if imported_capture:
+            parser = imported_capture.get("parser", {})
+            bitstream = str(parser.get("bit_buffer", ""))
+            base["parser"] = parser
+            lines = [
+                f"LOCK {target['label']} / measured carrier {target['center_mhz']:.6f} MHz",
+                "OOK amplitude clock recovered / no CRC or framing field present",
+            ]
+            if bitstream and set(bitstream) <= {"0", "1"}:
+                base["bitstream"] = bitstream
+                lines += [f"BITSTREAM RECOVERED / {len(bitstream)} bits", bitstream]
+            else:
+                base["ok"] = False
+                lines.append("Carrier is locked, but no stable binary symbols were recovered from the IQ samples.")
+            base["lines"] = lines
+            return base, HTTPStatus.OK if base["ok"] else HTTPStatus.UNPROCESSABLE_ENTITY
+
         lines = [f"LOCK {target['label']} / sync acquired / CRC usable"]
         if challenge_id in RECEIVE_FLAG_TASKS:
             base["flag"] = flag_for(session_id, challenge_id)
@@ -283,7 +527,7 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
 def script_interface_description() -> dict:
     return {
         "name": "Signal Forge Script Terminal",
-        "base_url": "http://localhost:8002",
+        "base_url": "http://localhost:8000",
         "endpoints": {
             "GET /api/script/interface": "Describe this script-facing interface.",
             "POST /api/script/terminal": "Run one terminal command against a selected subtask.",
@@ -291,6 +535,7 @@ def script_interface_description() -> dict:
             "GET /api/tasks": "List all subtasks.",
             "GET /api/rf/live": "Stream live Python-generated FFT rows, time slices, and parser events.",
             "GET /api/rf/raw": "Download raw complex16 IQ samples generated from the same Python signal profile.",
+            "GET /api/rf/gnu-radio-capture": "Analyse the configured local GNU Radio cf32_le capture and return measured FFT, tuned IQ, and recovered bits.",
         },
         "terminal_payload": {
             "session_id": "stable id chosen by your script",
@@ -549,6 +794,9 @@ class CTFHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/tasks":
             self.write_json({"tasks": [public_task(task) for task in load_challenges()]})
             return
+        if parsed.path == "/config/validation.json":
+            self.write_json({"error": "server-only configuration"}, HTTPStatus.NOT_FOUND)
+            return
         if parsed.path == "/api/contexts":
             self.write_json({"contexts": public_contexts()})
             return
@@ -582,6 +830,9 @@ class CTFHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/rf/raw":
             self.handle_rf_raw(parsed.query)
+            return
+        if parsed.path == "/api/rf/gnu-radio-capture":
+            self.handle_gnu_radio_capture()
             return
         if parsed.path == "/api/script/interface":
             self.write_json(script_interface_description())
@@ -641,6 +892,8 @@ class CTFHandler(SimpleHTTPRequestHandler):
         parsed = urlparse(path)
         clean_path = unquote(parsed.path).lstrip("/")
         target = (ROOT / clean_path).resolve()
+        if target == VALIDATION_CONFIG_PATH.resolve():
+            return str(ROOT / "__server_private__")
         if not str(target).startswith(str(ROOT)):
             return str(ROOT / "index.html")
         if target.is_dir():
@@ -704,6 +957,14 @@ class CTFHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def handle_gnu_radio_capture(self) -> None:
+        try:
+            self.write_json(gnu_radio_capture_preview())
+        except FileNotFoundError as error:
+            self.write_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
+        except (OSError, ValueError, struct.error) as error:
+            self.write_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+
     def handle_flag(self) -> None:
         try:
             body = read_json_body(self)
@@ -719,8 +980,11 @@ class CTFHandler(SimpleHTTPRequestHandler):
             return
 
         session_id = session_id_from(self, body)
-        expected = flag_for(session_id, task_id).upper()
-        if submitted == expected:
+        if task_id == "tunnel-reading-signals":
+            expected = str(load_validation_config().get("flags", {}).get(task_id, "")).strip().upper()
+        else:
+            expected = flag_for(session_id, task_id).upper()
+        if expected and submitted == expected:
             self.write_json({"ok": True, "message": "Correct. Task solved.", "points": task["points"]})
         else:
             self.write_json({"ok": False, "message": "Not quite. Re-check the signal evidence and hints."})

@@ -1648,13 +1648,22 @@ dialog::backdrop {
 #analysis-waterfall { height: clamp(360px, 42vw, 560px); cursor: crosshair; }
 #spectrum-trace { height: clamp(150px, 17vw, 210px); }
 
+.waterfall-axis-label {
+  padding: 8px 10px 5px;
+  border-top: 1px solid rgba(255,255,255,.16);
+  background: #020607;
+  color: var(--cyan);
+  font: 700 10px ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
 .analysis-axis {
   position: relative;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   min-height: 43px;
   padding: 0 10px 8px;
-  border-top: 1px solid rgba(255,255,255,.16);
   background: #020607;
   color: var(--muted);
   font: 11px ui-monospace, SFMono-Regular, Consolas, monospace;

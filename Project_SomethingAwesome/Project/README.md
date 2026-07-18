@@ -172,6 +172,12 @@ gnuradio-companion
 
 Use GNU Radio Companion to generate local IQ files, then describe them with SigMF metadata. Do not require live transmission for the assessed build.
 
+For the Reading Signals task, the backend can also ingest the normal GNU Radio
+File Sink output at `radio/GNURadio/ReadingSignals.sigmf-data` directly. Its
+datatype, sample rate, centre frequency, and FFT preview settings live under
+`gnu_radio_capture` in `config/range.json`; a GNU Radio File Meta Sink is not
+needed.
+
 See `docs/gnu-radio-workflow.md` for the detailed path.
 
 ## Security Notes

@@ -22,7 +22,7 @@ options:
     run_options: prompt
     sizing_mode: fixed
     thread_safe_setters: ''
-    title: Not titled yet
+    title: ReadingSignals
     window_size: (1000,1000)
   states:
     bus_sink: false
@@ -194,7 +194,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    interp: '100'
+    interp: '1000'
     maxoutbuf: '0'
     minoutbuf: '0'
     type: byte
@@ -239,7 +239,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [72, 784.0]
+    coordinate: [168, 776.0]
     rotation: 0
     state: enabled
 - name: channels_channel_model_0
@@ -413,7 +413,7 @@ blocks:
     color9: '0'
     comment: ''
     fc: '0'
-    fftsize: '32768'
+    fftsize: '1024'
     freqhalf: 'True'
     grid: 'False'
     gui_hint: ''
@@ -436,7 +436,7 @@ blocks:
     nconnections: '1'
     showports: 'False'
     type: complex
-    update_time: '0.0001'
+    update_time: '0.001'
     wintype: window.WIN_BLACKMAN_hARRIS
   states:
     bus_sink: false
