@@ -117,7 +117,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [312, 668.0]
+    coordinate: [312, 652.0]
     rotation: 0
     state: enabled
 - name: blocks_wavfile_source_1
