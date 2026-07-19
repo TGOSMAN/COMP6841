@@ -14,7 +14,7 @@
     "details": "Ask learners to inspect the waveform and signalling, extract packets, and recover plain-text content using a simple OOK-style scheme. Provide a live waterfall view and a time-series viewer for closer analysis.",
     "flag_location": "Within plain text packets.",
     "developer_comments": "There should be a little interactive sign showing the text that gets displayed. The signal should already be tuned in.",
-    "signal_scheme": "OOK-style tunnel sign beacon in the 915 MHz training band.",
+    "signal_scheme": "GNU Radio ReadingSignals cf32 capture: repeated byte payload, unpacked to OOK/ASK amplitude on a 10 kHz training tone.",
     "concepts": [
       "waterfall reading",
       "OOK",
@@ -33,15 +33,28 @@
     ],
     "artifacts": [
       {
-        "label": "Your GNU Radio Reading Signals capture",
-        "href": "/api/rf/gnu-radio-capture",
-        "type": "application/json",
-        "role": "signal"
+        "label": " ReadingSignals live GNU Radio capture",
+        "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-reading-signals",
+        "type": "live GNU Radio cf32",
+        "role": "signal",
+        "source": "raw_gnuradio_cf32"
       },
       {
-        "label": "Your GNU Radio raw IQ",
-        "href": "/radio/GNURadio/ReadingSignals.sigmf-data",
-        "type": "application/octet-stream",
+        "label": "ReadingSignals.grc flowgraph",
+        "href": "/radio/GNURadio/Tunnel_Task/ReadingSignals.grc",
+        "type": "text/plain",
+        "role": "flowgraph"
+      },
+      {
+        "label": "ReadingSignals.py generated GNU Radio script",
+        "href": "/radio/GNURadio/Tunnel_Task/ReadingSignals.py",
+        "type": "text/plain",
+        "role": "source"
+      },
+      {
+        "label": "ReadingSignals raw IQ sample",
+        "href": "/api/rf/raw?challenge_id=tunnel-reading-signals&bytes=2097152",
+        "type": "bounded cf32 IQ sample",
         "role": "raw_iq"
       }
     ],
@@ -64,7 +77,7 @@
     "details": "Introduce why no hardware has infinite bandwidth and why the user must focus on a band of interest. Learners tune the radio, export the tuned output as a waveform, decode the packet, and recover the plain-text flag.",
     "flag_location": "Within the plain text packet radio signal.",
     "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-    "signal_scheme": "The same tunnel sign OOK packet, but acquisition requires centre/span correction.",
+    "signal_scheme": "GNU Radio TuningSignals cf32 capture: OOK/ASK amplitude on a 10 kHz tone; the useful carrier is present but the receiver starts off-centre.",
     "concepts": [
       "receiver bandwidth",
       "centre frequency",
@@ -83,20 +96,29 @@
     ],
     "artifacts": [
       {
-        "label": "Tunnel sign OOK capture",
-        "href": "/captures/01-tunnel-ook-sign.json",
-        "type": "application/json",
-        "role": "signal"
+        "label": " TuningSignals live GNU Radio capture",
+        "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-tuning",
+        "type": "live GNU Radio cf32",
+        "role": "signal",
+        "source": "raw_gnuradio_cf32"
       },
       {
-        "label": "Generated SigMF metadata",
-        "href": "/captures/01-tunnel-ook-sign.sigmf-meta",
-        "type": "application/json"
+        "label": "TuningSignals.grc flowgraph",
+        "href": "/radio/GNURadio/Tunnel_Task/TuningSignals.grc",
+        "type": "text/plain",
+        "role": "flowgraph"
       },
       {
-        "label": "Live raw IQ export",
-        "href": "/api/rf/raw?challenge_id=tunnel-reading-signals",
-        "type": "application/octet-stream"
+        "label": "TuningSignals.py generated GNU Radio script",
+        "href": "/radio/GNURadio/Tunnel_Task/TuningSignals.py",
+        "type": "text/plain",
+        "role": "source"
+      },
+      {
+        "label": "TuningSignals raw IQ sample",
+        "href": "/api/rf/raw?challenge_id=tunnel-tuning&bytes=2097152",
+        "type": "bounded cf32 IQ sample",
+        "role": "raw_iq"
       }
     ],
     "script_commands": [
@@ -120,7 +142,7 @@
     "details": "Introduce basic signal interference so learners can observe when the backend can no longer decode the expected string. The user gets a flag when the sign can no longer show the true message.",
     "flag_location": "Printed on the interactive sign when the decoded string does not match what was sent.",
     "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-    "signal_scheme": "Tunnel OOK packet plus a local simulated noise/interference action.",
+    "signal_scheme": "GNU Radio DoSAttackMe cf32 capture: tunnel OOK packet used as the reference receiver signal, then a local interference action corrupts the displayed sign state.",
     "concepts": [
       "interference",
       "availability",
@@ -139,20 +161,29 @@
     ],
     "artifacts": [
       {
-        "label": "Tunnel sign OOK capture",
-        "href": "/captures/01-tunnel-ook-sign.json",
-        "type": "application/json",
-        "role": "signal"
+        "label": " DoSAttackMe live GNU Radio capture",
+        "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-basic-dos",
+        "type": "live GNU Radio cf32",
+        "role": "signal",
+        "source": "raw_gnuradio_cf32"
       },
       {
-        "label": "Generated SigMF metadata",
-        "href": "/captures/01-tunnel-ook-sign.sigmf-meta",
-        "type": "application/json"
+        "label": "DoSAttackMe.grc flowgraph",
+        "href": "/radio/GNURadio/Tunnel_Task/DoSAttackMe.grc",
+        "type": "text/plain",
+        "role": "flowgraph"
       },
       {
-        "label": "Live raw IQ export",
-        "href": "/api/rf/raw?challenge_id=tunnel-reading-signals",
-        "type": "application/octet-stream"
+        "label": "DoSAttackMe.py generated GNU Radio script",
+        "href": "/radio/GNURadio/Tunnel_Task/DoSAttackMe.py",
+        "type": "text/plain",
+        "role": "source"
+      },
+      {
+        "label": "DoSAttackMe raw IQ sample",
+        "href": "/api/rf/raw?challenge_id=tunnel-basic-dos&bytes=2097152",
+        "type": "bounded cf32 IQ sample",
+        "role": "raw_iq"
       }
     ],
     "script_commands": [
@@ -176,7 +207,7 @@
     "details": "Provide a tutorial on configuring the transmitter interface. The learner prepares a packet to be sent and accepted by the tunnelling sign board.",
     "flag_location": "Revealed when a user-written message is transmitted; the flag is appended on the end.",
     "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-    "signal_scheme": "OOK-style sign-board packet generated through the local TX chain.",
+    "signal_scheme": "GNU Radio InjectionTime cf32 capture: tunnel sign packet profile used as the target waveform for local packet-injection practice.",
     "concepts": [
       "packet injection",
       "TX chain",
@@ -195,20 +226,29 @@
     ],
     "artifacts": [
       {
-        "label": "Tunnel sign OOK capture",
-        "href": "/captures/01-tunnel-ook-sign.json",
-        "type": "application/json",
-        "role": "signal"
+        "label": " InjectionTime live GNU Radio capture",
+        "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-packet-injection",
+        "type": "live GNU Radio cf32",
+        "role": "signal",
+        "source": "raw_gnuradio_cf32"
       },
       {
-        "label": "Generated SigMF metadata",
-        "href": "/captures/01-tunnel-ook-sign.sigmf-meta",
-        "type": "application/json"
+        "label": "InjectionTime.grc flowgraph",
+        "href": "/radio/GNURadio/Tunnel_Task/InjectionTime.grc",
+        "type": "text/plain",
+        "role": "flowgraph"
       },
       {
-        "label": "Live raw IQ export",
-        "href": "/api/rf/raw?challenge_id=tunnel-reading-signals",
-        "type": "application/octet-stream"
+        "label": "InjectionTime.py generated GNU Radio script",
+        "href": "/radio/GNURadio/Tunnel_Task/InjectionTime.py",
+        "type": "text/plain",
+        "role": "source"
+      },
+      {
+        "label": "InjectionTime raw IQ sample",
+        "href": "/api/rf/raw?challenge_id=tunnel-packet-injection&bytes=2097152",
+        "type": "bounded cf32 IQ sample",
+        "role": "raw_iq"
       }
     ],
     "script_commands": [
@@ -231,10 +271,10 @@
     "details": "Ask learners to inspect the waveform and signalling, extract packets, and recover plain-text content using an accessible FSK or ASK scheme. Provide live waterfall and time-series views.",
     "flag_location": "Within plain text packets.",
     "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-    "signal_scheme": "ASK/Manchester metadata side channel centred near 315 MHz.",
+    "signal_scheme": "GNU Radio Song_Meta ReadingSignals cf32 capture: 4-level ASK where each amplitude symbol carries 2 bits on a 10 kHz metadata tone.",
     "concepts": [
-      "ASK",
-      "Manchester timing",
+      "4-level ASK",
+      "2-bit symbols",
       "metadata",
       "console output"
     ],
@@ -250,15 +290,29 @@
     ],
     "artifacts": [
       {
-        "label": "Clock-recovery metadata capture",
-        "href": "/captures/06-decoder-clock-recovery.json",
-        "type": "application/json",
-        "role": "signal"
+        "label": "Song metadata ReadingSignals live GNU Radio capture",
+        "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-reading-signals",
+        "type": "live GNU Radio cf32",
+        "role": "signal",
+        "source": "raw_gnuradio_cf32"
       },
       {
-        "label": "Frame format reference",
-        "href": "/artifacts/telemetry-frame.txt",
-        "type": "text/plain"
+        "label": "ReadingSignals.grc flowgraph",
+        "href": "/radio/GNURadio/Song_Meta/ReadingSignals.grc",
+        "type": "text/plain",
+        "role": "flowgraph"
+      },
+      {
+        "label": "ReadingSignals.py generated GNU Radio script",
+        "href": "/radio/GNURadio/Song_Meta/ReadingSignals.py",
+        "type": "text/plain",
+        "role": "source"
+      },
+      {
+        "label": "ReadingSignals raw IQ sample",
+        "href": "/api/rf/raw?challenge_id=broadcast-reading-signals&bytes=2097152",
+        "type": "bounded cf32 IQ sample",
+        "role": "raw_iq"
       }
     ],
     "script_commands": [
@@ -280,11 +334,11 @@
     "details": "Introduce why no hardware has infinite bandwidth and why the user must focus on a band of interest. Learners tune the radio, export the tuned output, decode the packet, and recover the flag.",
     "flag_location": "Within the plain text packet radio signal.",
     "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-    "signal_scheme": "Manchester-timed ASK traffic near 315 MHz.",
+    "signal_scheme": "GNU Radio Song_Meta TuningSignals cf32 capture: 4-level ASK/2-bit metadata symbols; useful carrier is present but the receiver starts off-centre.",
     "concepts": [
       "bandwidth",
       "tuning",
-      "ASK",
+      "4-level ASK",
       "packet decode"
     ],
     "steps": [
@@ -299,15 +353,29 @@
     ],
     "artifacts": [
       {
-        "label": "Clock-recovery metadata capture",
-        "href": "/captures/06-decoder-clock-recovery.json",
-        "type": "application/json",
-        "role": "signal"
+        "label": "Song metadata TuningSignals live GNU Radio capture",
+        "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-tuning",
+        "type": "live GNU Radio cf32",
+        "role": "signal",
+        "source": "raw_gnuradio_cf32"
       },
       {
-        "label": "Frame format reference",
-        "href": "/artifacts/telemetry-frame.txt",
-        "type": "text/plain"
+        "label": "TuningSignals.grc flowgraph",
+        "href": "/radio/GNURadio/Song_Meta/TuningSignals.grc",
+        "type": "text/plain",
+        "role": "flowgraph"
+      },
+      {
+        "label": "TuningSignals.py generated GNU Radio script",
+        "href": "/radio/GNURadio/Song_Meta/TuningSignals.py",
+        "type": "text/plain",
+        "role": "source"
+      },
+      {
+        "label": "TuningSignals raw IQ sample",
+        "href": "/api/rf/raw?challenge_id=broadcast-tuning&bytes=2097152",
+        "type": "bounded cf32 IQ sample",
+        "role": "raw_iq"
       }
     ],
     "script_commands": [
@@ -331,7 +399,7 @@
     "details": "Introduce basic signal interference so learners can observe when the backend can no longer decode the expected string.",
     "flag_location": "Printed on the interactive receiver display when the decoded string does not match what was sent.",
     "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-    "signal_scheme": "ASK metadata frame plus local simulated interference.",
+    "signal_scheme": "GNU Radio Song_Meta DoSAttackMe cf32 capture: 4-level ASK metadata reference signal plus local simulated interference.",
     "concepts": [
       "DoS",
       "interference",
@@ -350,15 +418,29 @@
     ],
     "artifacts": [
       {
-        "label": "Clock-recovery metadata capture",
-        "href": "/captures/06-decoder-clock-recovery.json",
-        "type": "application/json",
-        "role": "signal"
+        "label": "Song metadata DoSAttackMe live GNU Radio capture",
+        "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-basic-dos",
+        "type": "live GNU Radio cf32",
+        "role": "signal",
+        "source": "raw_gnuradio_cf32"
       },
       {
-        "label": "Frame format reference",
-        "href": "/artifacts/telemetry-frame.txt",
-        "type": "text/plain"
+        "label": "DoSAttackMe.grc flowgraph",
+        "href": "/radio/GNURadio/Song_Meta/DoSAttackMe.grc",
+        "type": "text/plain",
+        "role": "flowgraph"
+      },
+      {
+        "label": "DoSAttackMe.py generated GNU Radio script",
+        "href": "/radio/GNURadio/Song_Meta/DoSAttackMe.py",
+        "type": "text/plain",
+        "role": "source"
+      },
+      {
+        "label": "DoSAttackMe raw IQ sample",
+        "href": "/api/rf/raw?challenge_id=broadcast-basic-dos&bytes=2097152",
+        "type": "bounded cf32 IQ sample",
+        "role": "raw_iq"
       }
     ],
     "script_commands": [
@@ -382,11 +464,11 @@
     "details": "Provide a tutorial on configuring the transmitter interface. The learner prepares a packet to be sent and accepted by the receiver.",
     "flag_location": "Revealed when a user-written metadata message is transmitted; the flag is appended on the end.",
     "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-    "signal_scheme": "Manchester/ASK metadata injection through the local TX chain.",
+    "signal_scheme": "GNU Radio Song_Meta InjectionTime cf32 capture: 4-level ASK metadata target waveform for local packet-injection practice.",
     "concepts": [
       "packet injection",
       "metadata trust",
-      "framing",
+      "4-level ASK framing",
       "operator console"
     ],
     "steps": [
@@ -401,15 +483,29 @@
     ],
     "artifacts": [
       {
-        "label": "Clock-recovery metadata capture",
-        "href": "/captures/06-decoder-clock-recovery.json",
-        "type": "application/json",
-        "role": "signal"
+        "label": "Song metadata InjectionTime live GNU Radio capture",
+        "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-packet-injection",
+        "type": "live GNU Radio cf32",
+        "role": "signal",
+        "source": "raw_gnuradio_cf32"
       },
       {
-        "label": "Frame format reference",
-        "href": "/artifacts/telemetry-frame.txt",
-        "type": "text/plain"
+        "label": "InjectionTime.grc flowgraph",
+        "href": "/radio/GNURadio/Song_Meta/InjectionTime.grc",
+        "type": "text/plain",
+        "role": "flowgraph"
+      },
+      {
+        "label": "InjectionTime.py generated GNU Radio script",
+        "href": "/radio/GNURadio/Song_Meta/InjectionTime.py",
+        "type": "text/plain",
+        "role": "source"
+      },
+      {
+        "label": "InjectionTime raw IQ sample",
+        "href": "/api/rf/raw?challenge_id=broadcast-packet-injection&bytes=2097152",
+        "type": "bounded cf32 IQ sample",
+        "role": "raw_iq"
       }
     ],
     "script_commands": [

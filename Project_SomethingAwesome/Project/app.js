@@ -487,6 +487,17 @@ function summarizeArtifact(artifact, parsed, text) {
   if (parsed?.rows || parsed?.sources) {
     const rows = rowsForArtifact(parsed);
     const sources = parsed.sources || [];
+    const fields = parsed.parser?.fields || {};
+    const decoderFields = [
+      ["modulation", fields.modulation],
+      ["symbol bits", fields.bits_per_symbol ? `${fields.bits_per_symbol} bits per ASK symbol` : null],
+      ["bit order", fields.bit_order ? String(fields.bit_order).toUpperCase() : null],
+      ["samples/symbol", fields.samples_per_symbol],
+      ["symbol encoding", fields.symbol_encoding],
+      ["ASK levels", Array.isArray(fields.level_centers) && fields.level_centers.length ? fields.level_centers.join(", ") : null],
+      ["confidence", parsed.parser?.confidence ? Number(parsed.parser.confidence).toFixed(3) : null],
+      ["payload state", fields.payload_state],
+    ].filter(([, value]) => value !== null && value !== undefined && value !== "");
     return `
       <p>${parsed.description || "Waterfall frame artifact."}</p>
       <dl>
@@ -494,6 +505,7 @@ function summarizeArtifact(artifact, parsed, text) {
         <dt>span</dt><dd>${formatHz(parsed.span_hz || 0)}</dd>
         <dt>rows</dt><dd>${rows.length}</dd>
         <dt>sources</dt><dd>${sources.map((source) => source.label).join(", ") || "precomputed rows"}</dd>
+        ${decoderFields.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}
       </dl>
     `;
   }

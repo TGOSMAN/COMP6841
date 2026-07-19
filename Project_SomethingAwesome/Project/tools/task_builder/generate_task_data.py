@@ -8,11 +8,59 @@ ROOT = Path(__file__).resolve().parents[2]
 CHALLENGES_PATH = ROOT / "data" / "challenges.json"
 
 
+TUNNEL_CAPTURE_STEMS = {
+    "tunnel-reading-signals": "ReadingSignals",
+    "tunnel-tuning": "TuningSignals",
+    "tunnel-basic-dos": "DoSAttackMe",
+    "tunnel-packet-injection": "InjectionTime",
+}
+SONG_META_CAPTURE_STEMS = {
+    "broadcast-reading-signals": "ReadingSignals",
+    "broadcast-tuning": "TuningSignals",
+    "broadcast-basic-dos": "DoSAttackMe",
+    "broadcast-packet-injection": "InjectionTime",
+}
+
+
+def gnu_radio_artifacts(task_id: str, stem: str, folder: str, label_prefix: str) -> list[dict]:
+    return [
+        {
+            "label": f"{label_prefix} {stem} live GNU Radio capture",
+            "href": f"/api/rf/gnu-radio-capture?challenge_id={task_id}",
+            "type": "live GNU Radio cf32",
+            "role": "signal",
+            "source": "raw_gnuradio_cf32",
+        },
+        {
+            "label": f"{stem}.grc flowgraph",
+            "href": f"/radio/GNURadio/{folder}/{stem}.grc",
+            "type": "text/plain",
+            "role": "flowgraph",
+        },
+        {
+            "label": f"{stem}.py generated GNU Radio script",
+            "href": f"/radio/GNURadio/{folder}/{stem}.py",
+            "type": "text/plain",
+            "role": "source",
+        },
+        {
+            "label": f"{stem} raw IQ sample",
+            "href": f"/api/rf/raw?challenge_id={task_id}&bytes=2097152",
+            "type": "bounded cf32 IQ sample",
+            "role": "raw_iq",
+        },
+    ]
+
+
+def tunnel_artifacts(task_id: str) -> list[dict]:
+    return gnu_radio_artifacts(task_id, TUNNEL_CAPTURE_STEMS[task_id], "Tunnel_Task", "")
+
+
+def song_meta_artifacts(task_id: str) -> list[dict]:
+    return gnu_radio_artifacts(task_id, SONG_META_CAPTURE_STEMS[task_id], "Song_Meta", "Song metadata")
+
+
 ARTIFACTS = {
-    "tunnel": [
-        {"label": "Your GNU Radio Reading Signals capture", "href": "/api/rf/gnu-radio-capture", "type": "application/json", "role": "signal"},
-        {"label": "Your GNU Radio raw IQ", "href": "/radio/GNURadio/ReadingSignals.sigmf-data", "type": "application/octet-stream", "role": "raw_iq"},
-    ],
     "broadcast": [
         {"label": "Clock-recovery metadata capture", "href": "/captures/06-decoder-clock-recovery.json", "type": "application/json", "role": "signal"},
         {"label": "Frame format reference", "href": "/artifacts/telemetry-frame.txt", "type": "text/plain"},
@@ -54,11 +102,11 @@ TASKS = [
         "details": "Ask learners to inspect the waveform and signalling, extract packets, and recover plain-text content using a simple OOK-style scheme. Provide a live waterfall view and a time-series viewer for closer analysis.",
         "flag_location": "Within plain text packets.",
         "developer_comments": "There should be a little interactive sign showing the text that gets displayed. The signal should already be tuned in.",
-        "signal_scheme": "OOK-style tunnel sign beacon in the 915 MHz training band.",
+        "signal_scheme": "GNU Radio ReadingSignals cf32 capture: repeated byte payload, unpacked to OOK/ASK amplitude on a 10 kHz training tone.",
         "concepts": ["waterfall reading", "OOK", "packet extraction", "plain-text RF"],
         "steps": ["Open the tuned signal capture.", "Use the waterfall and time-series view to identify packet boundaries.", "Receive the already tuned sign message.", "Submit the flag contained in the plain-text packet."],
         "hints": ["The first tunnel task is tuned for the learner; focus on reading the signal shape.", "Use `receive` from the terminal or script interface after lock."],
-        "artifacts": ARTIFACTS["tunnel"],
+        "artifacts": tunnel_artifacts("tunnel-reading-signals"),
         "script_commands": ["receive"],
     },
     {
@@ -76,11 +124,11 @@ TASKS = [
         "details": "Introduce why no hardware has infinite bandwidth and why the user must focus on a band of interest. Learners tune the radio, export the tuned output as a waveform, decode the packet, and recover the plain-text flag.",
         "flag_location": "Within the plain text packet radio signal.",
         "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-        "signal_scheme": "The same tunnel sign OOK packet, but acquisition requires centre/span correction.",
+        "signal_scheme": "GNU Radio TuningSignals cf32 capture: OOK/ASK amplitude on a 10 kHz tone; the useful carrier is present but the receiver starts off-centre.",
         "concepts": ["receiver bandwidth", "centre frequency", "tuning", "plain-text decode"],
         "steps": ["Start with a wide span around 915 MHz.", "Scan until tunnel sign energy appears.", "Tune centre frequency and demodulation until the receiver locks.", "Receive and submit the packet flag."],
         "hints": ["Try `scan`, then `tune 915.000`.", "AUTO demodulation is acceptable for this beginner task."],
-        "artifacts": ARTIFACTS["tunnel"],
+        "artifacts": tunnel_artifacts("tunnel-tuning"),
         "script_commands": ["scan", "tune 915.000", "receive"],
     },
     {
@@ -98,11 +146,11 @@ TASKS = [
         "details": "Introduce basic signal interference so learners can observe when the backend can no longer decode the expected string. The user gets a flag when the sign can no longer show the true message.",
         "flag_location": "Printed on the interactive sign when the decoded string does not match what was sent.",
         "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-        "signal_scheme": "Tunnel OOK packet plus a local simulated noise/interference action.",
+        "signal_scheme": "GNU Radio DoSAttackMe cf32 capture: tunnel OOK packet used as the reference receiver signal, then a local interference action corrupts the displayed sign state.",
         "concepts": ["interference", "availability", "decode failure", "CEMA"],
         "steps": ["Lock onto the tunnel sign signal.", "Apply a local interference effect.", "Observe the displayed message mismatch.", "Submit the sign's failure flag."],
         "hints": ["The action is local simulation only.", "Use `interfere noise` or `interfere mismatch` after receiver lock."],
-        "artifacts": ARTIFACTS["tunnel"],
+        "artifacts": tunnel_artifacts("tunnel-basic-dos"),
         "script_commands": ["tune 915.000", "receive", "interfere mismatch"],
     },
     {
@@ -120,11 +168,11 @@ TASKS = [
         "details": "Provide a tutorial on configuring the transmitter interface. The learner prepares a packet to be sent and accepted by the tunnelling sign board.",
         "flag_location": "Revealed when a user-written message is transmitted; the flag is appended on the end.",
         "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-        "signal_scheme": "OOK-style sign-board packet generated through the local TX chain.",
+        "signal_scheme": "GNU Radio InjectionTime cf32 capture: tunnel sign packet profile used as the target waveform for local packet-injection practice.",
         "concepts": ["packet injection", "TX chain", "framing", "local simulation"],
         "steps": ["Lock onto the sign signal.", "Prepare a short sign message.", "Transmit the packet with the local TX chain.", "Read the appended flag from the accepted sign output."],
         "hints": ["Include the word `sign` or `message` in your transmitted packet.", "Script users can call `/api/script/terminal` with `transmit sign MESSAGE`."],
-        "artifacts": ARTIFACTS["tunnel"],
+        "artifacts": tunnel_artifacts("tunnel-packet-injection"),
         "script_commands": ["tune 915.000", "transmit sign TEST MESSAGE"],
     },
     {
@@ -142,11 +190,11 @@ TASKS = [
         "details": "Ask learners to inspect the waveform and signalling, extract packets, and recover plain-text content using an accessible FSK or ASK scheme. Provide live waterfall and time-series views.",
         "flag_location": "Within plain text packets.",
         "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-        "signal_scheme": "ASK/Manchester metadata side channel centred near 315 MHz.",
-        "concepts": ["ASK", "Manchester timing", "metadata", "console output"],
+        "signal_scheme": "GNU Radio Song_Meta ReadingSignals cf32 capture: 4-level ASK where each amplitude symbol carries 2 bits on a 10 kHz metadata tone.",
+        "concepts": ["4-level ASK", "2-bit symbols", "metadata", "console output"],
         "steps": ["Open the metadata capture.", "Identify repeated metadata frames.", "Receive the broadcast metadata.", "Submit the plain-text packet flag."],
         "hints": ["The visible side channel is deliberately low rate.", "Use `receive` after lock."],
-        "artifacts": ARTIFACTS["broadcast"],
+        "artifacts": song_meta_artifacts("broadcast-reading-signals"),
         "script_commands": ["receive"],
     },
     {
@@ -164,11 +212,11 @@ TASKS = [
         "details": "Introduce why no hardware has infinite bandwidth and why the user must focus on a band of interest. Learners tune the radio, export the tuned output, decode the packet, and recover the flag.",
         "flag_location": "Within the plain text packet radio signal.",
         "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-        "signal_scheme": "Manchester-timed ASK traffic near 315 MHz.",
-        "concepts": ["bandwidth", "tuning", "ASK", "packet decode"],
+        "signal_scheme": "GNU Radio Song_Meta TuningSignals cf32 capture: 4-level ASK/2-bit metadata symbols; useful carrier is present but the receiver starts off-centre.",
+        "concepts": ["bandwidth", "tuning", "4-level ASK", "packet decode"],
         "steps": ["Scan around 315 MHz.", "Tune until the metadata side channel locks.", "Decode the buffered frame.", "Submit the flag."],
         "hints": ["Try `tune 315.000` with AUTO or ASK demodulation.", "The useful packet begins with a recognizable metadata header."],
-        "artifacts": ARTIFACTS["broadcast"],
+        "artifacts": song_meta_artifacts("broadcast-tuning"),
         "script_commands": ["scan", "tune 315.000", "decode"],
     },
     {
@@ -186,11 +234,11 @@ TASKS = [
         "details": "Introduce basic signal interference so learners can observe when the backend can no longer decode the expected string.",
         "flag_location": "Printed on the interactive receiver display when the decoded string does not match what was sent.",
         "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-        "signal_scheme": "ASK metadata frame plus local simulated interference.",
+        "signal_scheme": "GNU Radio Song_Meta DoSAttackMe cf32 capture: 4-level ASK metadata reference signal plus local simulated interference.",
         "concepts": ["DoS", "interference", "metadata integrity", "operator display"],
         "steps": ["Lock the metadata receiver.", "Apply local interference.", "Observe the console printout mismatch.", "Submit the displayed flag."],
         "hints": ["Try `interfere metadata mismatch`.", "The flag appears when the console detects the mismatch."],
-        "artifacts": ARTIFACTS["broadcast"],
+        "artifacts": song_meta_artifacts("broadcast-basic-dos"),
         "script_commands": ["tune 315.000", "receive", "interfere metadata mismatch"],
     },
     {
@@ -208,11 +256,11 @@ TASKS = [
         "details": "Provide a tutorial on configuring the transmitter interface. The learner prepares a packet to be sent and accepted by the receiver.",
         "flag_location": "Revealed when a user-written metadata message is transmitted; the flag is appended on the end.",
         "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-        "signal_scheme": "Manchester/ASK metadata injection through the local TX chain.",
-        "concepts": ["packet injection", "metadata trust", "framing", "operator console"],
+        "signal_scheme": "GNU Radio Song_Meta InjectionTime cf32 capture: 4-level ASK metadata target waveform for local packet-injection practice.",
+        "concepts": ["packet injection", "metadata trust", "4-level ASK framing", "operator console"],
         "steps": ["Lock the metadata receiver.", "Prepare a metadata message.", "Transmit the message locally.", "Read the appended flag from the console printout."],
         "hints": ["Include `metadata` in the transmitted payload.", "This does not transmit over real RF."],
-        "artifacts": ARTIFACTS["broadcast"],
+        "artifacts": song_meta_artifacts("broadcast-packet-injection"),
         "script_commands": ["tune 315.000", "transmit metadata NOW PLAYING"],
     },
     {

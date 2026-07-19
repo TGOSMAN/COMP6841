@@ -6,6 +6,7 @@
 #
 # GNU Radio Python Flow Graph
 # Title: ReadingSignals
+# Author: User
 # GNU Radio version: 3.10.12.0
 
 from PyQt5 import Qt
@@ -66,7 +67,6 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
         ##################################################
         # Variables
         ##################################################
-        self.samp_rate_0 = samp_rate_0 = 44200
         self.samp_rate = samp_rate = 44200
 
         ##################################################
@@ -109,7 +109,7 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
 
         self.top_layout.addWidget(self._qtgui_waterfall_sink_x_0_win)
         self.qtgui_time_sink_x_0 = qtgui.time_sink_c(
-            1024, #size
+            8192, #size
             samp_rate, #samp_rate
             "", #name
             2, #number of inputs
@@ -122,7 +122,7 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
 
         self.qtgui_time_sink_x_0.enable_tags(True)
         self.qtgui_time_sink_x_0.set_trigger_mode(qtgui.TRIG_MODE_FREE, qtgui.TRIG_SLOPE_POS, 0.0, 0, 0, "")
-        self.qtgui_time_sink_x_0.enable_autoscale(False)
+        self.qtgui_time_sink_x_0.enable_autoscale(True)
         self.qtgui_time_sink_x_0.enable_grid(False)
         self.qtgui_time_sink_x_0.enable_axis_labels(True)
         self.qtgui_time_sink_x_0.enable_control_panel(False)
@@ -175,14 +175,15 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
             taps=[1.0],
             noise_seed=0,
             block_tags=False)
-        self.blocks_vector_source_x_0 = blocks.vector_source_b(list(b"FLAG{LIFE_IS LIKE A BOX_OF_CHOCS}"), True, 1, [])
+        self.blocks_vector_source_x_0 = blocks.vector_source_b(list(b"FLAG{SOMEBODY_ONCE_TOLD_ME THE WORLD_IS}"), True, 1, [])
         self.blocks_unpack_k_bits_bb_0 = blocks.unpack_k_bits_bb(8)
-        self.blocks_repeat_0 = blocks.repeat(gr.sizeof_char*1, 1000)
+        self.blocks_repeat_0 = blocks.repeat(gr.sizeof_char*1, 100)
+        self.blocks_repack_bits_bb_0 = blocks.repack_bits_bb(1, 2, "", False, gr.GR_MSB_FIRST)
         self.blocks_multiply_xx_0 = blocks.multiply_vcc(1)
-        self.blocks_interleaved_char_to_complex_0 = blocks.interleaved_char_to_complex(False,1.0)
-        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, 'C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\Tunnel_Task\\ReadingSignals.sigmf-data', False)
+        self.blocks_interleaved_char_to_complex_0 = blocks.interleaved_char_to_complex(False,1)
+        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, 'C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\Song_Meta\\ReadingSignals.sigmf-data', False)
         self.blocks_file_sink_0.set_unbuffered(False)
-        self.blocks_file_meta_sink_0 = blocks.file_meta_sink(gr.sizeof_gr_complex*1, 'C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\Tunnel_Task\\ReadingSignals.sigmf-meta', samp_rate, 1, blocks.GR_FILE_FLOAT, True, 1000000, pmt.make_dict(), False)
+        self.blocks_file_meta_sink_0 = blocks.file_meta_sink(gr.sizeof_gr_complex*1, 'C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\Song_Meta\\ReadingSignals.sigmf-meta', samp_rate, 1, blocks.GR_FILE_FLOAT, True, 1000000, pmt.make_dict(), False)
         self.blocks_file_meta_sink_0.set_unbuffered(False)
         self.analog_sig_source_x_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 10000, 1, 0, 0)
 
@@ -194,8 +195,9 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
         self.connect((self.blocks_interleaved_char_to_complex_0, 0), (self.low_pass_filter_0, 0))
         self.connect((self.blocks_interleaved_char_to_complex_0, 0), (self.qtgui_time_sink_x_0, 1))
         self.connect((self.blocks_multiply_xx_0, 0), (self.channels_channel_model_0, 0))
+        self.connect((self.blocks_repack_bits_bb_0, 0), (self.blocks_repeat_0, 0))
         self.connect((self.blocks_repeat_0, 0), (self.blocks_interleaved_char_to_complex_0, 0))
-        self.connect((self.blocks_unpack_k_bits_bb_0, 0), (self.blocks_repeat_0, 0))
+        self.connect((self.blocks_unpack_k_bits_bb_0, 0), (self.blocks_repack_bits_bb_0, 0))
         self.connect((self.blocks_vector_source_x_0, 0), (self.blocks_unpack_k_bits_bb_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.blocks_file_meta_sink_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.blocks_file_sink_0, 0))
@@ -211,12 +213,6 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
         self.wait()
 
         event.accept()
-
-    def get_samp_rate_0(self):
-        return self.samp_rate_0
-
-    def set_samp_rate_0(self, samp_rate_0):
-        self.samp_rate_0 = samp_rate_0
 
     def get_samp_rate(self):
         return self.samp_rate

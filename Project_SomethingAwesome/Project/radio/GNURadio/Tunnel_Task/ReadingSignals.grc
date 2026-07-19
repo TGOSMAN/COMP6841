@@ -88,7 +88,7 @@ blocks:
     comment: ''
     detached: 'False'
     extra_dict: pmt.make_dict()
-    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\Tunnel_Task\ReadingSignals.sigmf-meta
+    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\ReadingSignals.sigmf-meta
     max_seg_size: '1000000'
     rel_rate: '1'
     samp_rate: samp_rate
@@ -109,7 +109,7 @@ blocks:
     alias: ''
     append: 'False'
     comment: ''
-    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\Tunnel_Task\ReadingSignals.sigmf-data
+    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\ReadingSignals.sigmf-data
     type: complex
     unbuffered: 'False'
     vlen: '1'

@@ -8,7 +8,10 @@
   </head>
   <body class="challenge-page">
     <header class="challenge-topbar">
-      <a class="back-link" href="/#tasks">&larr; All situations</a>
+      <div class="challenge-nav-links">
+        <a class="back-link" href="/#tasks">&larr; All situations</a>
+        <a href="/guide.html">Setup Guide</a>
+      </div>
       <div class="challenge-progress" id="challenge-progress" aria-label="Challenge navigation"></div>
       <div class="mode-switch compact" aria-label="Security mode">
         <button id="attack-mode" class="active" type="button">Attack</button>
@@ -63,6 +66,7 @@
             <div>
               <button id="source-live" class="active" type="button">Live parser</button>
               <button id="source-artifact" type="button">Artifact replay</button>
+              <button id="source-external" type="button">External feed</button>
               <a id="source-raw-download" href="/api/rf/raw" download>Raw IQ</a>
             </div>
           </div>

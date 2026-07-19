@@ -90,15 +90,50 @@ value; it exposes only the recovered binary stream for the learner to interpret.
 
 ## Optional Live Bridge
 
-Later, add a GNU Radio ZeroMQ sink or file/socket sink that emits FFT rows. A small Python bridge can normalize those rows and publish:
+The live bridge now accepts both normalized FFT rows and raw GNU Radio
+`cf32_le` samples. Start the site, open a challenge, switch the workbench to
+**External feed**, then stream to the ingest socket. The default endpoint is:
 
-```json
-{
-  "center_hz": 2437000000,
-  "span_hz": 2000000,
-  "timestamp": 1783857600.25,
-  "bins": [0.05, 0.08, 0.15, 0.91]
-}
+```text
+127.0.0.1:9100
 ```
 
-The front end already has a waterfall renderer and can be extended to read these frames with WebSocket or Server-Sent Events.
+Quick file-sink bridge:
+
+```powershell
+python tools/script_clients/external_signal_sender.py --challenge-id tunnel-basic-dos --mode file --file radio/GNURadio/Tunnel_Task/DoSAttackMe.sigmf-data --loop
+```
+
+For direct streaming from GNU Radio, have an Embedded Python Block or a small
+standalone bridge send this header once:
+
+```text
+SFORGE RAWIQ challenge_id=tunnel-basic-dos center_hz=915000000 sample_rate_hz=44200 span_hz=44200 bins=384 scheme_id=MY-GR-FLOWGRAPH block_samples=2048
+```
+
+Then write repeated `block_samples * 8` byte blocks of interleaved little-endian
+float32 IQ. See `docs/external-signal-ingest.md` for the JSON-lines FFT variant
+and the one-shot IQ frame format.
+
+## GNU Radio ZMQ Bridge
+
+For a more natural GNU Radio workflow, use a ZMQ sink in the flowgraph and let
+`tools/script_clients/zmq_signal_bridge.py` forward the stream to Signal Forge.
+
+Recommended GRC setup:
+
+- Add a **ZMQ PUSH Sink** after the final complex baseband signal.
+- Set the item type to complex.
+- Set the address to `tcp://127.0.0.1:5555`.
+- Set the GNU Radio block to bind.
+- Disable tag passing for the training bridge.
+
+Then run:
+
+```powershell
+python tools/script_clients/zmq_signal_bridge.py --challenge-id tunnel-packet-injection --endpoint tcp://127.0.0.1:5555 --pattern pull --dtype cf32 --center-hz 915000000 --sample-rate-hz 44200 --span-hz 44200
+```
+
+Use `--pattern sub` for a GNU Radio ZMQ PUB Sink when multiple receivers should
+observe the same signal. Use `--dtype f32fft --bins 384` only when the flowgraph
+already emits normalized or magnitude FFT rows.

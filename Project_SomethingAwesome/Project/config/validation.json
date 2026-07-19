@@ -1,5 +1,17 @@
 {
   "flags": {
-    "tunnel-reading-signals": "FLAG{LIFE_IS LIKE A BOX_OF_CHOCS}"
+    "tunnel-reading-signals": "FLAG{LIFE_IS_LIKE_A_BOX_OF_CHOCS}",
+    "tunnel-tuning": "FLAG{HELLO_WORLD_I_DID_IT}",
+    "tunnel-basic-dos": "FLAG{OH_NO_YOU_DIDNT}",
+    "tunnel-packet-injection": "FLAG{GET_VAXED_BABY}",
+    "broadcast-reading-signals": "FLAG{SOMEBODY_ONCE_TOLD_ME THE WORLD_IS}",
+    "broadcast-tuning": "FLAG{FOR_THOSE_OF_YOU_WHO_JUST_TUNED_IN}",
+    "broadcast-basic-dos": "FLAG{HI_THERE_IM_DORY}",
+    "broadcast-packet-injection": "FLAG{THERES_NO_INJECTION_THAT_MAKES_YOU_SMARTER}"
+  },
+  "aliases": {
+    "tunnel-reading-signals": [
+      "FLAG{LIFE_IS LIKE A BOX_OF_CHOCS}"
+    ]
   }
 }

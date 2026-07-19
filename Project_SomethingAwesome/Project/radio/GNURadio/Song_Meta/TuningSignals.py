@@ -5,7 +5,8 @@
 # SPDX-License-Identifier: GPL-3.0
 #
 # GNU Radio Python Flow Graph
-# Title: ReadingSignals
+# Title: TuningSignals
+# Author: User
 # GNU Radio version: 3.10.12.0
 
 from PyQt5 import Qt
@@ -30,12 +31,12 @@ import threading
 
 
 
-class ReadingSignals(gr.top_block, Qt.QWidget):
+class TuningSignals(gr.top_block, Qt.QWidget):
 
     def __init__(self):
-        gr.top_block.__init__(self, "ReadingSignals", catch_exceptions=True)
+        gr.top_block.__init__(self, "TuningSignals", catch_exceptions=True)
         Qt.QWidget.__init__(self)
-        self.setWindowTitle("ReadingSignals")
+        self.setWindowTitle("TuningSignals")
         qtgui.util.check_set_qss()
         try:
             self.setWindowIcon(Qt.QIcon.fromTheme('gnuradio-grc'))
@@ -53,7 +54,7 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
         self.top_grid_layout = Qt.QGridLayout()
         self.top_layout.addLayout(self.top_grid_layout)
 
-        self.settings = Qt.QSettings("gnuradio/flowgraphs", "ReadingSignals")
+        self.settings = Qt.QSettings("gnuradio/flowgraphs", "TuningSignals")
 
         try:
             geometry = self.settings.value("geometry")
@@ -66,7 +67,6 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
         ##################################################
         # Variables
         ##################################################
-        self.samp_rate_0 = samp_rate_0 = 44200
         self.samp_rate = samp_rate = 44200
 
         ##################################################
@@ -175,14 +175,15 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
             taps=[1.0],
             noise_seed=0,
             block_tags=False)
-        self.blocks_vector_source_x_0 = blocks.vector_source_b(list(b"FLAG{LIFE_IS LIKE A BOX_OF_CHOCS}"), True, 1, [])
+        self.blocks_vector_source_x_0 = blocks.vector_source_b(list(b"FLAG{FOR_THOSE_OF_YOU_WHO_JUST_TUNED_IN}"), True, 1, [])
         self.blocks_unpack_k_bits_bb_0 = blocks.unpack_k_bits_bb(8)
-        self.blocks_repeat_0 = blocks.repeat(gr.sizeof_char*1, 1000)
+        self.blocks_repeat_0 = blocks.repeat(gr.sizeof_char*1, 100)
+        self.blocks_repack_bits_bb_0 = blocks.repack_bits_bb(1, 2, "", False, gr.GR_MSB_FIRST)
         self.blocks_multiply_xx_0 = blocks.multiply_vcc(1)
         self.blocks_interleaved_char_to_complex_0 = blocks.interleaved_char_to_complex(False,1.0)
-        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, 'C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\Tunnel_Task\\ReadingSignals.sigmf-data', False)
+        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, 'C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\Song_Meta\\TuningSignals.sigmf-data', False)
         self.blocks_file_sink_0.set_unbuffered(False)
-        self.blocks_file_meta_sink_0 = blocks.file_meta_sink(gr.sizeof_gr_complex*1, 'C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\Tunnel_Task\\ReadingSignals.sigmf-meta', samp_rate, 1, blocks.GR_FILE_FLOAT, True, 1000000, pmt.make_dict(), False)
+        self.blocks_file_meta_sink_0 = blocks.file_meta_sink(gr.sizeof_gr_complex*1, 'C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\Song_Meta\\TuningSignals.sigmf-meta', samp_rate, 1, blocks.GR_FILE_FLOAT, True, 1000000, pmt.make_dict(), False)
         self.blocks_file_meta_sink_0.set_unbuffered(False)
         self.analog_sig_source_x_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 10000, 1, 0, 0)
 
@@ -194,8 +195,9 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
         self.connect((self.blocks_interleaved_char_to_complex_0, 0), (self.low_pass_filter_0, 0))
         self.connect((self.blocks_interleaved_char_to_complex_0, 0), (self.qtgui_time_sink_x_0, 1))
         self.connect((self.blocks_multiply_xx_0, 0), (self.channels_channel_model_0, 0))
+        self.connect((self.blocks_repack_bits_bb_0, 0), (self.blocks_repeat_0, 0))
         self.connect((self.blocks_repeat_0, 0), (self.blocks_interleaved_char_to_complex_0, 0))
-        self.connect((self.blocks_unpack_k_bits_bb_0, 0), (self.blocks_repeat_0, 0))
+        self.connect((self.blocks_unpack_k_bits_bb_0, 0), (self.blocks_repack_bits_bb_0, 0))
         self.connect((self.blocks_vector_source_x_0, 0), (self.blocks_unpack_k_bits_bb_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.blocks_file_meta_sink_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.blocks_file_sink_0, 0))
@@ -205,18 +207,12 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
 
 
     def closeEvent(self, event):
-        self.settings = Qt.QSettings("gnuradio/flowgraphs", "ReadingSignals")
+        self.settings = Qt.QSettings("gnuradio/flowgraphs", "TuningSignals")
         self.settings.setValue("geometry", self.saveGeometry())
         self.stop()
         self.wait()
 
         event.accept()
-
-    def get_samp_rate_0(self):
-        return self.samp_rate_0
-
-    def set_samp_rate_0(self, samp_rate_0):
-        self.samp_rate_0 = samp_rate_0
 
     def get_samp_rate(self):
         return self.samp_rate
@@ -231,7 +227,7 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
 
 
 
-def main(top_block_cls=ReadingSignals, options=None):
+def main(top_block_cls=TuningSignals, options=None):
 
     qapp = Qt.QApplication(sys.argv)
 
