@@ -99,8 +99,12 @@ sudo apt update
 sudo apt install gnuradio python3-numpy python3-scipy python3-zmq
 gnuradio-companion</code></pre>
             <p>
-              If WSL graphics are not working, generate `.py` flowgraphs or file
-              sinks in WSL and inspect the output through the website on Windows.
+              The default challenge replay now uses the generated `.py`
+              flowgraph as the editable source. The backend reads the vector
+              source, repeat rate, bit packing, sample rate, and carrier tone
+              from that script and synthesizes the waterfall stream on demand.
+              File sink recordings are useful snapshots, but they are no longer
+              required for the browser view.
             </p>
           </section>
 
@@ -115,7 +119,7 @@ gnuradio-companion</code></pre>
             <pre><code>python tools/script_clients/external_signal_sender.py --challenge-id tunnel-packet-injection --mode fft</code></pre>
             <p>Raw IQ test:</p>
             <pre><code>python tools/script_clients/external_signal_sender.py --challenge-id tunnel-packet-injection --mode iq --block-samples 2048</code></pre>
-            <p>Stream an existing GNU Radio file sink output:</p>
+            <p>Optional: stream an existing GNU Radio file sink output:</p>
             <pre><code>python tools/script_clients/external_signal_sender.py --challenge-id tunnel-basic-dos --mode file --file radio/GNURadio/Tunnel_Task/DoSAttackMe.sigmf-data --loop</code></pre>
           </section>
 
@@ -163,6 +167,13 @@ gnuradio-companion</code></pre>
             <p>
               For most challenge development, stream `cf32` IQ. If the flowgraph
               already computes FFT rows, use `--dtype f32fft --bins 384`.
+            </p>
+            <p>
+              For the built-in tasks, editing the generated Python flowgraph is
+              enough: update the vector payload, repeat block, repack block, or
+              signal source frequency in `radio/GNURadio`, then reload the task.
+              The backend-generated replay will follow the script without
+              needing a new recording.
             </p>
           </section>
 

@@ -23,31 +23,21 @@ SONG_META_CAPTURE_STEMS = {
 
 
 def gnu_radio_artifacts(task_id: str, stem: str, folder: str, label_prefix: str) -> list[dict]:
+    label = f"{label_prefix} {stem}".strip()
     return [
         {
-            "label": f"{label_prefix} {stem} live GNU Radio capture",
+            "label": f"{label} generated GNU Radio replay",
             "href": f"/api/rf/gnu-radio-capture?challenge_id={task_id}",
-            "type": "live GNU Radio cf32",
+            "type": "generated GNU Radio Python cf32",
             "role": "signal",
-            "source": "raw_gnuradio_cf32",
+            "source": "generated_gnuradio_python",
         },
         {
-            "label": f"{stem}.grc flowgraph",
-            "href": f"/radio/GNURadio/{folder}/{stem}.grc",
-            "type": "text/plain",
-            "role": "flowgraph",
-        },
-        {
-            "label": f"{stem}.py generated GNU Radio script",
-            "href": f"/radio/GNURadio/{folder}/{stem}.py",
-            "type": "text/plain",
-            "role": "source",
-        },
-        {
-            "label": f"{stem} raw IQ sample",
+            "label": f"{label} generated raw IQ sample",
             "href": f"/api/rf/raw?challenge_id={task_id}&bytes=2097152",
-            "type": "bounded cf32 IQ sample",
+            "type": "bounded generated cf32 IQ sample",
             "role": "raw_iq",
+            "source": "generated_gnuradio_python",
         },
     ]
 

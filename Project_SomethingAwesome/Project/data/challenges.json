@@ -33,29 +33,18 @@
     ],
     "artifacts": [
       {
-        "label": " ReadingSignals live GNU Radio capture",
+        "label": "ReadingSignals generated GNU Radio replay",
         "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-reading-signals",
-        "type": "live GNU Radio cf32",
+        "type": "generated GNU Radio Python cf32",
         "role": "signal",
-        "source": "raw_gnuradio_cf32"
+        "source": "generated_gnuradio_python"
       },
       {
-        "label": "ReadingSignals.grc flowgraph",
-        "href": "/radio/GNURadio/Tunnel_Task/ReadingSignals.grc",
-        "type": "text/plain",
-        "role": "flowgraph"
-      },
-      {
-        "label": "ReadingSignals.py generated GNU Radio script",
-        "href": "/radio/GNURadio/Tunnel_Task/ReadingSignals.py",
-        "type": "text/plain",
-        "role": "source"
-      },
-      {
-        "label": "ReadingSignals raw IQ sample",
+        "label": "ReadingSignals generated raw IQ sample",
         "href": "/api/rf/raw?challenge_id=tunnel-reading-signals&bytes=2097152",
-        "type": "bounded cf32 IQ sample",
-        "role": "raw_iq"
+        "type": "bounded generated cf32 IQ sample",
+        "role": "raw_iq",
+        "source": "generated_gnuradio_python"
       }
     ],
     "script_commands": [
@@ -96,29 +85,18 @@
     ],
     "artifacts": [
       {
-        "label": " TuningSignals live GNU Radio capture",
+        "label": "TuningSignals generated GNU Radio replay",
         "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-tuning",
-        "type": "live GNU Radio cf32",
+        "type": "generated GNU Radio Python cf32",
         "role": "signal",
-        "source": "raw_gnuradio_cf32"
+        "source": "generated_gnuradio_python"
       },
       {
-        "label": "TuningSignals.grc flowgraph",
-        "href": "/radio/GNURadio/Tunnel_Task/TuningSignals.grc",
-        "type": "text/plain",
-        "role": "flowgraph"
-      },
-      {
-        "label": "TuningSignals.py generated GNU Radio script",
-        "href": "/radio/GNURadio/Tunnel_Task/TuningSignals.py",
-        "type": "text/plain",
-        "role": "source"
-      },
-      {
-        "label": "TuningSignals raw IQ sample",
+        "label": "TuningSignals generated raw IQ sample",
         "href": "/api/rf/raw?challenge_id=tunnel-tuning&bytes=2097152",
-        "type": "bounded cf32 IQ sample",
-        "role": "raw_iq"
+        "type": "bounded generated cf32 IQ sample",
+        "role": "raw_iq",
+        "source": "generated_gnuradio_python"
       }
     ],
     "script_commands": [
@@ -161,29 +139,18 @@
     ],
     "artifacts": [
       {
-        "label": " DoSAttackMe live GNU Radio capture",
+        "label": "DoSAttackMe generated GNU Radio replay",
         "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-basic-dos",
-        "type": "live GNU Radio cf32",
+        "type": "generated GNU Radio Python cf32",
         "role": "signal",
-        "source": "raw_gnuradio_cf32"
+        "source": "generated_gnuradio_python"
       },
       {
-        "label": "DoSAttackMe.grc flowgraph",
-        "href": "/radio/GNURadio/Tunnel_Task/DoSAttackMe.grc",
-        "type": "text/plain",
-        "role": "flowgraph"
-      },
-      {
-        "label": "DoSAttackMe.py generated GNU Radio script",
-        "href": "/radio/GNURadio/Tunnel_Task/DoSAttackMe.py",
-        "type": "text/plain",
-        "role": "source"
-      },
-      {
-        "label": "DoSAttackMe raw IQ sample",
+        "label": "DoSAttackMe generated raw IQ sample",
         "href": "/api/rf/raw?challenge_id=tunnel-basic-dos&bytes=2097152",
-        "type": "bounded cf32 IQ sample",
-        "role": "raw_iq"
+        "type": "bounded generated cf32 IQ sample",
+        "role": "raw_iq",
+        "source": "generated_gnuradio_python"
       }
     ],
     "script_commands": [
@@ -226,29 +193,18 @@
     ],
     "artifacts": [
       {
-        "label": " InjectionTime live GNU Radio capture",
+        "label": "InjectionTime generated GNU Radio replay",
         "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-packet-injection",
-        "type": "live GNU Radio cf32",
+        "type": "generated GNU Radio Python cf32",
         "role": "signal",
-        "source": "raw_gnuradio_cf32"
+        "source": "generated_gnuradio_python"
       },
       {
-        "label": "InjectionTime.grc flowgraph",
-        "href": "/radio/GNURadio/Tunnel_Task/InjectionTime.grc",
-        "type": "text/plain",
-        "role": "flowgraph"
-      },
-      {
-        "label": "InjectionTime.py generated GNU Radio script",
-        "href": "/radio/GNURadio/Tunnel_Task/InjectionTime.py",
-        "type": "text/plain",
-        "role": "source"
-      },
-      {
-        "label": "InjectionTime raw IQ sample",
+        "label": "InjectionTime generated raw IQ sample",
         "href": "/api/rf/raw?challenge_id=tunnel-packet-injection&bytes=2097152",
-        "type": "bounded cf32 IQ sample",
-        "role": "raw_iq"
+        "type": "bounded generated cf32 IQ sample",
+        "role": "raw_iq",
+        "source": "generated_gnuradio_python"
       }
     ],
     "script_commands": [
@@ -290,29 +246,18 @@
     ],
     "artifacts": [
       {
-        "label": "Song metadata ReadingSignals live GNU Radio capture",
+        "label": "Song metadata ReadingSignals generated GNU Radio replay",
         "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-reading-signals",
-        "type": "live GNU Radio cf32",
+        "type": "generated GNU Radio Python cf32",
         "role": "signal",
-        "source": "raw_gnuradio_cf32"
+        "source": "generated_gnuradio_python"
       },
       {
-        "label": "ReadingSignals.grc flowgraph",
-        "href": "/radio/GNURadio/Song_Meta/ReadingSignals.grc",
-        "type": "text/plain",
-        "role": "flowgraph"
-      },
-      {
-        "label": "ReadingSignals.py generated GNU Radio script",
-        "href": "/radio/GNURadio/Song_Meta/ReadingSignals.py",
-        "type": "text/plain",
-        "role": "source"
-      },
-      {
-        "label": "ReadingSignals raw IQ sample",
+        "label": "Song metadata ReadingSignals generated raw IQ sample",
         "href": "/api/rf/raw?challenge_id=broadcast-reading-signals&bytes=2097152",
-        "type": "bounded cf32 IQ sample",
-        "role": "raw_iq"
+        "type": "bounded generated cf32 IQ sample",
+        "role": "raw_iq",
+        "source": "generated_gnuradio_python"
       }
     ],
     "script_commands": [
@@ -353,29 +298,18 @@
     ],
     "artifacts": [
       {
-        "label": "Song metadata TuningSignals live GNU Radio capture",
+        "label": "Song metadata TuningSignals generated GNU Radio replay",
         "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-tuning",
-        "type": "live GNU Radio cf32",
+        "type": "generated GNU Radio Python cf32",
         "role": "signal",
-        "source": "raw_gnuradio_cf32"
+        "source": "generated_gnuradio_python"
       },
       {
-        "label": "TuningSignals.grc flowgraph",
-        "href": "/radio/GNURadio/Song_Meta/TuningSignals.grc",
-        "type": "text/plain",
-        "role": "flowgraph"
-      },
-      {
-        "label": "TuningSignals.py generated GNU Radio script",
-        "href": "/radio/GNURadio/Song_Meta/TuningSignals.py",
-        "type": "text/plain",
-        "role": "source"
-      },
-      {
-        "label": "TuningSignals raw IQ sample",
+        "label": "Song metadata TuningSignals generated raw IQ sample",
         "href": "/api/rf/raw?challenge_id=broadcast-tuning&bytes=2097152",
-        "type": "bounded cf32 IQ sample",
-        "role": "raw_iq"
+        "type": "bounded generated cf32 IQ sample",
+        "role": "raw_iq",
+        "source": "generated_gnuradio_python"
       }
     ],
     "script_commands": [
@@ -418,29 +352,18 @@
     ],
     "artifacts": [
       {
-        "label": "Song metadata DoSAttackMe live GNU Radio capture",
+        "label": "Song metadata DoSAttackMe generated GNU Radio replay",
         "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-basic-dos",
-        "type": "live GNU Radio cf32",
+        "type": "generated GNU Radio Python cf32",
         "role": "signal",
-        "source": "raw_gnuradio_cf32"
+        "source": "generated_gnuradio_python"
       },
       {
-        "label": "DoSAttackMe.grc flowgraph",
-        "href": "/radio/GNURadio/Song_Meta/DoSAttackMe.grc",
-        "type": "text/plain",
-        "role": "flowgraph"
-      },
-      {
-        "label": "DoSAttackMe.py generated GNU Radio script",
-        "href": "/radio/GNURadio/Song_Meta/DoSAttackMe.py",
-        "type": "text/plain",
-        "role": "source"
-      },
-      {
-        "label": "DoSAttackMe raw IQ sample",
+        "label": "Song metadata DoSAttackMe generated raw IQ sample",
         "href": "/api/rf/raw?challenge_id=broadcast-basic-dos&bytes=2097152",
-        "type": "bounded cf32 IQ sample",
-        "role": "raw_iq"
+        "type": "bounded generated cf32 IQ sample",
+        "role": "raw_iq",
+        "source": "generated_gnuradio_python"
       }
     ],
     "script_commands": [
@@ -483,29 +406,18 @@
     ],
     "artifacts": [
       {
-        "label": "Song metadata InjectionTime live GNU Radio capture",
+        "label": "Song metadata InjectionTime generated GNU Radio replay",
         "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-packet-injection",
-        "type": "live GNU Radio cf32",
+        "type": "generated GNU Radio Python cf32",
         "role": "signal",
-        "source": "raw_gnuradio_cf32"
+        "source": "generated_gnuradio_python"
       },
       {
-        "label": "InjectionTime.grc flowgraph",
-        "href": "/radio/GNURadio/Song_Meta/InjectionTime.grc",
-        "type": "text/plain",
-        "role": "flowgraph"
-      },
-      {
-        "label": "InjectionTime.py generated GNU Radio script",
-        "href": "/radio/GNURadio/Song_Meta/InjectionTime.py",
-        "type": "text/plain",
-        "role": "source"
-      },
-      {
-        "label": "InjectionTime raw IQ sample",
+        "label": "Song metadata InjectionTime generated raw IQ sample",
         "href": "/api/rf/raw?challenge_id=broadcast-packet-injection&bytes=2097152",
-        "type": "bounded cf32 IQ sample",
-        "role": "raw_iq"
+        "type": "bounded generated cf32 IQ sample",
+        "role": "raw_iq",
+        "source": "generated_gnuradio_python"
       }
     ],
     "script_commands": [

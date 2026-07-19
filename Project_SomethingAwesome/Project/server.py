@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import html
 import base64
@@ -9,12 +10,14 @@ import math
 import mimetypes
 import os
 import random
+import re
 import sqlite3
 import socketserver
 import struct
 import threading
 import time
 from collections import deque
+from contextlib import nullcontext
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -202,6 +205,7 @@ SONG_META_GNU_RADIO_CAPTURES = {
     },
 }
 GNU_RADIO_CAPTURE_GROUPS = (TUNNEL_GNU_RADIO_CAPTURES, SONG_META_GNU_RADIO_CAPTURES)
+FLOWGRAPH_CONFIG_CACHE: dict[tuple[str, int], dict] = {}
 SCRIPT_TERMINALS: dict[str, dict] = {}
 EXTERNAL_FEED_LOCK = threading.Lock()
 EXTERNAL_FEEDS: dict[str, dict] = {}
@@ -390,6 +394,7 @@ def gnu_radio_settings(challenge_id: str | None) -> dict | None:
         "samples_per_symbol": capture["samples_per_symbol"],
         "bits_per_symbol": capture.get("bits_per_symbol", 1),
         "decode_max_samples": 500_000,
+        "source_mode": capture.get("source_mode", "generated_python_flowgraph"),
         "capture": capture,
     }
 
@@ -724,6 +729,166 @@ def configured_gnu_radio_path(settings: dict | None = None) -> tuple[Path, Path]
     return capture_path, relative_path
 
 
+def parse_number_literal(value: str, fallback: float = 0.0) -> float:
+    try:
+        return float(value.replace("_", ""))
+    except (AttributeError, ValueError):
+        return fallback
+
+
+def payload_bits_msb(payload: bytes) -> str:
+    return "".join(f"{byte:08b}" for byte in payload)
+
+
+def symbols_from_bits(bits: str, bits_per_symbol: int) -> list[int]:
+    bits_per_symbol = max(1, bits_per_symbol)
+    if bits_per_symbol == 1:
+        return [1 if bit == "1" else 0 for bit in bits]
+    return [
+        int(bits[index : index + bits_per_symbol].ljust(bits_per_symbol, "0"), 2)
+        for index in range(0, len(bits), bits_per_symbol)
+    ]
+
+
+def generated_flowgraph_config(settings: dict) -> dict:
+    capture_info = settings.get("capture", {})
+    relative = capture_info.get("python_path")
+    if not relative:
+        raise FileNotFoundError("No generated GNU Radio Python script is mapped for this challenge")
+    script_path = bounded_project_path(relative)
+    if not script_path.is_file():
+        raise FileNotFoundError(f"Generated GNU Radio Python script not found: {relative}")
+    cache_key = (str(script_path), script_path.stat().st_mtime_ns)
+    cached = FLOWGRAPH_CONFIG_CACHE.get(cache_key)
+    if cached:
+        return cached
+
+    source = script_path.read_text(encoding="utf-8", errors="replace")
+    payload_match = re.search(r"vector_source_b\(list\((b(?:\"(?:\\.|[^\"])*\"|'(?:\\.|[^'])*'))\)", source)
+    if not payload_match:
+        raise ValueError(f"Could not find vector_source_b byte payload in {relative}")
+    payload = ast.literal_eval(payload_match.group(1))
+    if not isinstance(payload, (bytes, bytearray)):
+        raise ValueError(f"GNU Radio vector payload in {relative} is not a bytes literal")
+    payload = bytes(payload)
+
+    sample_rate_match = re.search(r"self\.samp_rate\s*=\s*samp_rate\s*=\s*([0-9_]+(?:\.[0-9_]+)?)", source)
+    repeat_match = re.search(r"blocks\.repeat\(gr\.sizeof_char\*1,\s*([0-9_]+)\)", source)
+    carrier_match = re.search(r"analog\.sig_source_c\([^,]+,\s*analog\.GR_COS_WAVE,\s*([0-9_]+(?:\.[0-9_]+)?)", source)
+    noise_match = re.search(r"noise_voltage\s*=\s*([0-9_]+(?:\.[0-9_]+)?)", source)
+    repack_match = re.search(r"repack_bits_bb\(\s*([0-9_]+)\s*,\s*([0-9_]+)", source)
+
+    repeat = int(parse_number_literal(repeat_match.group(1), settings.get("samples_per_symbol", 500) * 2)) if repeat_match else int(settings.get("samples_per_symbol", 500)) * 2
+    bits_per_symbol = int(parse_number_literal(repack_match.group(2), 1)) if repack_match else int(settings.get("bits_per_symbol", 1))
+    bits = payload_bits_msb(payload)
+    symbols = symbols_from_bits(bits, bits_per_symbol)
+    samples_per_symbol = max(1, repeat // 2)
+    script_hash_seed = int(hashlib.sha256(str(script_path).encode("utf-8")).hexdigest()[:8], 16)
+    config = {
+        "source_mode": "generated_python_flowgraph",
+        "source_script": str(relative).replace("\\", "/"),
+        "script_size_bytes": script_path.stat().st_size,
+        "sample_rate": parse_number_literal(sample_rate_match.group(1), float(settings.get("sample_rate", 44_200))) if sample_rate_match else float(settings.get("sample_rate", 44_200)),
+        "carrier_offset_hz": parse_number_literal(carrier_match.group(1), float(capture_info.get("carrier_offset_hz", 10_000))) if carrier_match else float(capture_info.get("carrier_offset_hz", 10_000)),
+        "repeat": repeat,
+        "samples_per_symbol": samples_per_symbol,
+        "bits_per_symbol": bits_per_symbol,
+        "bit_order": "msb" if "GR_MSB_FIRST" in source or str(settings.get("bit_order", "msb")).lower() == "msb" else "lsb",
+        "payload": payload,
+        "payload_text": payload.decode("latin-1", errors="replace"),
+        "bits": bits,
+        "symbols": symbols or [0],
+        "period_samples": max(1, len(symbols) * samples_per_symbol),
+        "noise_voltage": parse_number_literal(noise_match.group(1), 0.0) if noise_match else 0.0,
+        "seed": script_hash_seed,
+        "has_repack_bits": bool(repack_match),
+    }
+    FLOWGRAPH_CONFIG_CACHE.clear()
+    FLOWGRAPH_CONFIG_CACHE[cache_key] = config
+    return config
+
+
+def gnu_radio_runtime_settings(settings: dict) -> dict:
+    runtime = dict(settings)
+    if runtime.get("source_mode") != "generated_python_flowgraph":
+        return runtime
+    flowgraph = generated_flowgraph_config(runtime)
+    runtime.update(
+        {
+            "flowgraph": flowgraph,
+            "sample_rate": flowgraph["sample_rate"],
+            "samples_per_symbol": flowgraph["samples_per_symbol"],
+            "bits_per_symbol": flowgraph["bits_per_symbol"],
+            "bit_order": flowgraph["bit_order"],
+        }
+    )
+    capture = dict(runtime.get("capture", {}))
+    capture["carrier_offset_hz"] = flowgraph["carrier_offset_hz"]
+    capture["source_mode"] = flowgraph["source_mode"]
+    runtime["capture"] = capture
+    return runtime
+
+
+def deterministic_noise(seed: int, value: int) -> float:
+    mixed = (value ^ seed) & 0xFFFFFFFF
+    mixed ^= (mixed << 13) & 0xFFFFFFFF
+    mixed ^= mixed >> 17
+    mixed ^= (mixed << 5) & 0xFFFFFFFF
+    return (mixed & 0xFFFFFFFF) / 0xFFFFFFFF - 0.5
+
+
+def generated_flowgraph_iq_samples(settings: dict, start_sample: int, sample_count: int) -> list[complex]:
+    flowgraph = settings.get("flowgraph") or generated_flowgraph_config(settings)
+    sample_rate = max(1.0, float(flowgraph["sample_rate"]))
+    carrier_offset = float(flowgraph["carrier_offset_hz"])
+    samples_per_symbol = max(1, int(flowgraph["samples_per_symbol"]))
+    symbols = flowgraph["symbols"] or [0]
+    phase_step = 2.0 * math.pi * carrier_offset / sample_rate
+    carrier = complex(math.cos(phase_step * start_sample), math.sin(phase_step * start_sample))
+    rotation = complex(math.cos(phase_step), math.sin(phase_step))
+    noise_scale = min(0.025, max(0.0, float(flowgraph.get("noise_voltage", 0.0))) * 0.025)
+    seed = int(flowgraph.get("seed", 0))
+    samples: list[complex] = []
+    for offset in range(sample_count):
+        sample_index = start_sample + offset
+        symbol = symbols[(sample_index // samples_per_symbol) % len(symbols)]
+        value = float(symbol)
+        sample = carrier * value
+        if noise_scale:
+            sample += complex(
+                deterministic_noise(seed, sample_index * 2) * noise_scale,
+                deterministic_noise(seed, sample_index * 2 + 1) * noise_scale,
+            )
+        samples.append(sample)
+        carrier *= rotation
+    return samples
+
+
+def gnu_radio_iq_samples(settings: dict, start_sample: int, sample_count: int) -> list[complex]:
+    runtime = gnu_radio_runtime_settings(settings)
+    if runtime.get("source_mode") == "generated_python_flowgraph":
+        return generated_flowgraph_iq_samples(runtime, start_sample, sample_count)
+    capture_path, _ = configured_gnu_radio_path(runtime)
+    if not capture_path.is_file():
+        raise FileNotFoundError(f"GNU Radio capture not found: {capture_path.name}")
+    with capture_path.open("rb") as handle:
+        handle.seek(max(0, start_sample) * 8)
+        raw = handle.read(max(0, sample_count) * 8)
+    complete_bytes = len(raw) - len(raw) % 8
+    return [complex(real, imag) for real, imag in struct.iter_unpack("<ff", raw[:complete_bytes])]
+
+
+def gnu_radio_magnitudes(settings: dict, max_samples: int) -> list[float]:
+    return [abs(sample) for sample in gnu_radio_iq_samples(settings, 0, max_samples)]
+
+
+def pack_cf32_le(samples: list[complex]) -> bytes:
+    data = bytearray(len(samples) * 8)
+    for index, sample in enumerate(samples):
+        struct.pack_into("<ff", data, index * 8, float(sample.real), float(sample.imag))
+    return bytes(data)
+
+
 def decode_bits_to_ascii(bits: str, bit_orders: tuple[str, ...] = ("msb", "lsb")) -> dict:
     best = {"text": "", "flag": "", "score": -1.0, "bit_offset": 0, "bit_order": "msb"}
     if len(bits) < 8:
@@ -799,16 +964,11 @@ def cluster_amplitude_levels(values: list[float], level_count: int = 4) -> tuple
 
 
 def decode_gnu_radio_ask2(settings: dict) -> dict:
-    """Recover 2-bit ASK symbols from GNU Radio complex-float captures."""
-    capture_path, _ = configured_gnu_radio_path(settings)
-    if not capture_path.is_file():
-        raise FileNotFoundError(f"GNU Radio capture not found: {capture_path.name}")
+    """Recover 2-bit ASK symbols from GNU Radio complex-float samples."""
+    settings = gnu_radio_runtime_settings(settings)
     samples_per_symbol = max(8, int(settings.get("samples_per_symbol", 500)))
     max_samples = max(samples_per_symbol * 32, min(1_000_000, int(settings.get("decode_max_samples", 500000))))
-    with capture_path.open("rb") as handle:
-        raw = handle.read(max_samples * 8)
-    complete_bytes = len(raw) - len(raw) % 8
-    magnitudes = [math.hypot(real, imag) for real, imag in struct.iter_unpack("<ff", raw[:complete_bytes])]
+    magnitudes = gnu_radio_magnitudes(settings, max_samples)
     if len(magnitudes) < samples_per_symbol * 16:
         return {"ok": False, "note": "Not enough IQ samples for 2-bit ASK symbol recovery."}
 
@@ -858,17 +1018,12 @@ def decode_gnu_radio_ask2(settings: dict) -> dict:
 def decode_gnu_radio_ook(settings: dict | None = None) -> dict:
     """Recover OOK bits from IQ amplitude without assuming byte or payload content."""
     settings = settings or load_config().get("gnu_radio_capture", {})
+    settings = gnu_radio_runtime_settings(settings)
     if int(settings.get("bits_per_symbol", 1)) == 2:
         return decode_gnu_radio_ask2(settings)
-    capture_path, _ = configured_gnu_radio_path(settings)
-    if not capture_path.is_file():
-        raise FileNotFoundError(f"GNU Radio capture not found: {capture_path.name}")
     samples_per_symbol = max(8, int(settings.get("samples_per_symbol", 500)))
     max_samples = max(samples_per_symbol * 32, min(1_000_000, int(settings.get("decode_max_samples", 500000))))
-    with capture_path.open("rb") as handle:
-        raw = handle.read(max_samples * 8)
-    complete_bytes = len(raw) - len(raw) % 8
-    magnitudes = [math.hypot(real, imag) for real, imag in struct.iter_unpack("<ff", raw[:complete_bytes])]
+    magnitudes = gnu_radio_magnitudes(settings, max_samples)
     if len(magnitudes) < samples_per_symbol * 16:
         return {"ok": False, "note": "Not enough IQ samples for symbol recovery."}
 
@@ -922,11 +1077,15 @@ def decode_gnu_radio_ook(settings: dict | None = None) -> dict:
 
 
 def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: bool = False) -> dict:
-    """Convert the configured raw GNU Radio complex-float capture to web FFT rows."""
+    """Convert a GNU Radio Python flowgraph stream or cf32 capture to web FFT rows."""
     settings = tunnel_gnu_radio_settings(challenge_id) or load_config().get("gnu_radio_capture", {})
+    settings = gnu_radio_runtime_settings(settings)
     capture_info = settings.get("capture", {})
+    generated_source = settings.get("source_mode") == "generated_python_flowgraph"
     capture_path, relative_path = configured_gnu_radio_path(settings)
-    if not capture_path.is_file():
+    flowgraph = settings.get("flowgraph", {})
+    source_relative_path = Path(str(flowgraph.get("source_script") or relative_path.as_posix()))
+    if not generated_source and not capture_path.is_file():
         raise FileNotFoundError(f"GNU Radio capture not found: {relative_path.as_posix()}")
 
     datatype = str(settings.get("datatype", "cf32_le"))
@@ -942,15 +1101,17 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
     max_frames = max(1, min(512, max_frames))
 
     bytes_per_sample = 8
-    sample_count = capture_path.stat().st_size // bytes_per_sample
+    sample_count = int(flowgraph.get("period_samples", 0)) if generated_source else capture_path.stat().st_size // bytes_per_sample
+    if sample_count < fft_bins:
+        sample_count = fft_bins if generated_source else sample_count
     if sample_count < fft_bins:
         raise ValueError(f"Capture needs at least {fft_bins} complete complex-float samples")
     decoder = decode_gnu_radio_ook(settings)
     symbol_phase = int(decoder.get("phase", 0))
     samples_per_symbol = int(decoder.get("samples_per_symbol", settings.get("samples_per_symbol", 500)))
     if decoder.get("ok") and symbol_phase + fft_bins <= sample_count:
-        available_frames = 1 + max(0, (sample_count - symbol_phase - fft_bins) // samples_per_symbol)
-        frame_count = min(max_frames, available_frames, len(str(decoder.get("bits", ""))))
+        available_frames = max_frames if generated_source else 1 + max(0, (sample_count - symbol_phase - fft_bins) // samples_per_symbol)
+        frame_count = max(1, min(max_frames, available_frames, max(1, len(str(decoder.get("bits", ""))))))
         starts = [symbol_phase + index * samples_per_symbol for index in range(frame_count)]
     else:
         frame_count = min(max_frames, max(1, sample_count // fft_bins))
@@ -961,14 +1122,17 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
     time_rows_raw: list[list[float]] = []
     iq_rows_raw: list[list[complex]] = []
 
-    with capture_path.open("rb") as handle:
+    with capture_path.open("rb") if not generated_source else nullcontext() as handle:
         for start in starts:
-            handle.seek(start * bytes_per_sample)
-            raw = handle.read(fft_bins * bytes_per_sample)
-            if len(raw) != fft_bins * bytes_per_sample:
-                continue
-            unpacked = struct.iter_unpack("<ff", raw)
-            unwindowed = [complex(real, imag) for real, imag in unpacked]
+            if generated_source:
+                unwindowed = gnu_radio_iq_samples(settings, start, fft_bins)
+            else:
+                handle.seek(start * bytes_per_sample)
+                raw = handle.read(fft_bins * bytes_per_sample)
+                if len(raw) != fft_bins * bytes_per_sample:
+                    continue
+                unpacked = struct.iter_unpack("<ff", raw)
+                unwindowed = [complex(real, imag) for real, imag in unpacked]
             iq_rows_raw.append(unwindowed[:256])
             time_rows_raw.append([unwindowed[round(index * (fft_bins - 1) / 159)].real for index in range(160)])
             samples = [value * window[index] for index, value in enumerate(unwindowed)]
@@ -1031,6 +1195,14 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
             "path": str(relative).replace("\\", "/"),
             "size_bytes": source_path.stat().st_size if source_path.exists() else 0,
         }
+    if generated_source and flowgraph:
+        source_files["generated_python"] = {
+            "path": str(flowgraph.get("source_script", "")).replace("\\", "/"),
+            "size_bytes": int(flowgraph.get("script_size_bytes", 0)),
+        }
+        source_files.pop("raw_iq", None)
+        source_files.pop("file_meta", None)
+    source_mode_label = "generated GNU Radio Python flowgraph" if generated_source else "raw GNU Radio cf32 File Sink capture"
     return {
         "challenge_id": challenge_id or "configured-gnu-radio-capture",
         "scheme_id": f"GNU-RADIO-{str(capture_info.get('stem', 'LOCAL-CAPTURE')).upper()}",
@@ -1047,8 +1219,9 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         "time_component": "normalized real (I) samples aligned with each FFT frame",
         "detected_frequency_hz": detected_frequency_hz,
         "parser": parser,
-        "description": f"Waterfall generated live by the backend from {capture_info.get('title', 'a local GNU Radio')} cf32_le File Sink capture.",
-        "source_file": relative_path.as_posix(),
+        "description": f"Waterfall generated live by the backend from {capture_info.get('title', 'a local GNU Radio')} using a {source_mode_label}.",
+        "source_file": source_relative_path.as_posix(),
+        "source_mode": settings.get("source_mode", "recorded_cf32"),
         "source_files": source_files,
         "sample_count": sample_count,
         "duration_seconds": sample_count / sample_rate,
@@ -1070,10 +1243,10 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         ],
         "protocol_notes": {
             "datatype": datatype,
-            "modulation": f"{modulation_label} from GNU Radio cf32 File Sink",
-            "source": "Python backend parses the raw GNU Radio capture on request; no precomputed JSON capture is required.",
+            "modulation": f"{modulation_label} from GNU Radio generated Python flowgraph",
+            "source": "Python backend reads the generated GNU Radio .py flowgraph parameters and synthesizes a looping cf32 stream on request; no recorded .sigmf-data is required.",
             "raw_path": f"/api/rf/raw?challenge_id={challenge_id or 'tunnel-reading-signals'}&bytes=2097152",
-            "metadata": "The .sigmf-meta files in this GNU Radio folder are File Meta Sink binary streams, not compact JSON metadata.",
+            "metadata": "The challenge signal source is the editable generated Python flowgraph; recordings are optional developer snapshots.",
         },
         "annotations": [
             {"label": "detected ASK carrier", "offset_hz": round(detected_frequency_hz - center_hz, 3), "color": "#73f2a6"},
@@ -1106,11 +1279,28 @@ def read_gnu_radio_raw_sample(challenge_id: str, byte_count: int = 2_097_152, by
     settings = tunnel_gnu_radio_settings(challenge_id)
     if not settings:
         raise FileNotFoundError(f"No GNU Radio capture is mapped for {challenge_id}")
+    settings = gnu_radio_runtime_settings(settings)
+    generated_source = settings.get("source_mode") == "generated_python_flowgraph"
+    byte_count = max(1024, min(8_388_608, byte_count))
+    byte_offset = max(0, byte_offset)
+    byte_offset -= byte_offset % 8
+    if generated_source:
+        flowgraph = settings.get("flowgraph", {})
+        sample_count = max(1, byte_count // 8)
+        sample_offset = byte_offset // 8
+        body = pack_cf32_le(gnu_radio_iq_samples(settings, sample_offset, sample_count))
+        return body, {
+            "source_file": str(flowgraph.get("source_script", "")).replace("\\", "/"),
+            "source_size": int(flowgraph.get("period_samples", sample_count)) * 8,
+            "offset": byte_offset,
+            "bytes": len(body),
+            "stem": settings.get("capture", {}).get("stem", challenge_id),
+            "source_mode": "generated_python_flowgraph",
+        }
     capture_path, relative_path = configured_gnu_radio_path(settings)
     if not capture_path.is_file():
         raise FileNotFoundError(f"GNU Radio capture not found: {relative_path.as_posix()}")
     file_size = capture_path.stat().st_size
-    byte_count = max(1024, min(8_388_608, byte_count))
     byte_offset = max(0, min(max(0, file_size - 1), byte_offset))
     byte_offset -= byte_offset % 8
     with capture_path.open("rb") as handle:
@@ -1369,9 +1559,9 @@ def script_interface_description() -> dict:
             "POST /api/script/terminal": "Run one terminal command against a selected subtask.",
             "GET /api/contexts": "List situations and nested subtasks.",
             "GET /api/tasks": "List all subtasks.",
-            "GET /api/rf/live": "Stream live SSE parser events. Tunnel subtasks are parsed from raw GNU Radio cf32 captures; other subtasks use Python-generated profiles.",
-            "GET /api/rf/raw": "Download bounded raw IQ samples. Tunnel subtasks sample the matching GNU Radio capture; use bytes and offset query params.",
-            "GET /api/rf/gnu-radio-capture": "Analyse a selected GNU Radio cf32_le tunnel capture with challenge_id and return measured FFT, tuned IQ, and recovered bits.",
+            "GET /api/rf/live": "Stream live SSE parser events. Mapped GNU Radio subtasks synthesize cf32 IQ from their generated Python flowgraph scripts.",
+            "GET /api/rf/raw": "Download bounded generated cf32 IQ samples; use bytes and offset query params.",
+            "GET /api/rf/gnu-radio-capture": "Analyse a selected generated GNU Radio Python flowgraph with challenge_id and return measured FFT, tuned IQ, and recovered bits.",
             "TCP signal ingest": f"Send JSON-lines or raw cf32_le framed IQ to {EXTERNAL_INGEST['host']}:{EXTERNAL_INGEST['port']}. Use SIGNAL_INGEST_HOST/SIGNAL_INGEST_PORT to change it.",
             "GNU Radio ZMQ bridge": "Run tools/script_clients/zmq_signal_bridge.py against a GNU Radio ZMQ PUSH/PUB Sink, then view it with External feed.",
             "GET /api/rf/external/status": "Describe the currently buffered external signal feed for a challenge.",
@@ -1605,6 +1795,9 @@ class CTFHandler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path in {"/data/challenges.json", "/data/contexts.json", "/data/tolling.db", "/config/range.json", "/server.py"} or parsed.path.startswith("/."):
+            self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+            return
+        if parsed.path.startswith("/radio/GNURadio/") and parsed.path.endswith((".py", ".grc")):
             self.send_error(HTTPStatus.NOT_FOUND, "Not found")
             return
         if parsed.path.startswith("/context/"):

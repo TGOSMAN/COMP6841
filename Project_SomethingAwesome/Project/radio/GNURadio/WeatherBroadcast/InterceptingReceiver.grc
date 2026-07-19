@@ -65,64 +65,23 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1832, 840.0]
+    coordinate: [840, 936.0]
     rotation: 0
     state: enabled
-- name: blocks_file_meta_sink_0
-  id: blocks_file_meta_sink
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    detached: 'False'
-    extra_dict: pmt.make_dict()
-    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\Tunnel_Task\ReadingSignals.sigmf-meta
-    max_seg_size: '1000000'
-    rel_rate: '1'
-    samp_rate: samp_rate
-    type: complex
-    unbuffered: 'False'
-    vlen: '1'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [2768, 108.0]
-    rotation: 0
-    state: enabled
-- name: blocks_file_sink_0
-  id: blocks_file_sink
-  parameters:
-    affinity: ''
-    alias: ''
-    append: 'False'
-    comment: ''
-    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\Tunnel_Task\ReadingSignals.sigmf-data
-    type: complex
-    unbuffered: 'False'
-    vlen: '1'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [2760, 360.0]
-    rotation: 0
-    state: enabled
-- name: blocks_interleaved_char_to_complex_0
-  id: blocks_interleaved_char_to_complex
+- name: blocks_float_to_complex_0
+  id: blocks_float_to_complex
   parameters:
     affinity: ''
     alias: ''
     comment: ''
     maxoutbuf: '0'
     minoutbuf: '0'
-    scale_factor: '1.0'
-    vector_input: 'False'
+    vlen: '1'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1176, 772.0]
+    coordinate: [872, 780.0]
     rotation: 0
     state: enabled
 - name: blocks_multiply_xx_0
@@ -140,61 +99,43 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1968, 716.0]
+    coordinate: [1320, 860.0]
     rotation: 0
     state: enabled
-- name: blocks_repeat_0
-  id: blocks_repeat
+- name: blocks_wavfile_source_0
+  id: blocks_wavfile_source
   parameters:
     affinity: ''
     alias: ''
     comment: ''
-    interp: '1000'
+    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\WeatherBroadcast\Weatheradio_Canada_XLF322_Broadcast_Cycle_on_April_19th,_2022.wav
     maxoutbuf: '0'
     minoutbuf: '0'
-    type: byte
-    vlen: '1'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [896, 776.0]
-    rotation: 0
-    state: enabled
-- name: blocks_unpack_k_bits_bb_0
-  id: blocks_unpack_k_bits_bb
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    k: '8'
-    maxoutbuf: '0'
-    minoutbuf: '0'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [584, 776.0]
-    rotation: 0
-    state: enabled
-- name: blocks_vector_source_x_0
-  id: blocks_vector_source_x
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    maxoutbuf: '0'
-    minoutbuf: '0'
+    nchan: '1'
     repeat: 'True'
-    tags: '[]'
-    type: byte
-    vector: list(b"FLAG{LIFE_IS LIKE A BOX_OF_CHOCS}")
-    vlen: '1'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [216, 752.0]
+    coordinate: [312, 668.0]
+    rotation: 0
+    state: enabled
+- name: blocks_wavfile_source_1
+  id: blocks_wavfile_source
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\WeatherBroadcast\Required_Weekly_Test_NOAA.ogg
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    nchan: '1'
+    repeat: 'True'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [312, 852.0]
     rotation: 0
     state: enabled
 - name: channels_channel_model_0
@@ -215,31 +156,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [2256, 632.0]
-    rotation: 0
-    state: enabled
-- name: low_pass_filter_0
-  id: low_pass_filter
-  parameters:
-    affinity: ''
-    alias: ''
-    beta: '6.76'
-    comment: ''
-    cutoff_freq: '1000'
-    decim: '1'
-    gain: '1'
-    interp: '1'
-    maxoutbuf: '0'
-    minoutbuf: '0'
-    samp_rate: samp_rate
-    type: fir_filter_ccf
-    width: '1000'
-    win: window.WIN_HAMMING
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [1464, 616.0]
+    coordinate: [1840, 480.0]
     rotation: 0
     state: enabled
 - name: qtgui_time_sink_x_0
@@ -336,7 +253,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [2552, 1288.0]
+    coordinate: [2400, 1024.0]
     rotation: 0
     state: enabled
 - name: qtgui_waterfall_sink_x_0
@@ -397,23 +314,19 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [2800, 664.0]
+    coordinate: [2392, 824.0]
     rotation: 0
     state: enabled
 
 connections:
 - [analog_sig_source_x_0, '0', blocks_multiply_xx_0, '1']
-- [blocks_interleaved_char_to_complex_0, '0', low_pass_filter_0, '0']
-- [blocks_interleaved_char_to_complex_0, '0', qtgui_time_sink_x_0, '1']
+- [blocks_float_to_complex_0, '0', blocks_multiply_xx_0, '0']
 - [blocks_multiply_xx_0, '0', channels_channel_model_0, '0']
-- [blocks_repeat_0, '0', blocks_interleaved_char_to_complex_0, '0']
-- [blocks_unpack_k_bits_bb_0, '0', blocks_repeat_0, '0']
-- [blocks_vector_source_x_0, '0', blocks_unpack_k_bits_bb_0, '0']
-- [channels_channel_model_0, '0', blocks_file_meta_sink_0, '0']
-- [channels_channel_model_0, '0', blocks_file_sink_0, '0']
+- [blocks_multiply_xx_0, '0', qtgui_time_sink_x_0, '1']
+- [blocks_wavfile_source_0, '0', blocks_float_to_complex_0, '0']
+- [blocks_wavfile_source_1, '0', blocks_float_to_complex_0, '1']
 - [channels_channel_model_0, '0', qtgui_time_sink_x_0, '0']
 - [channels_channel_model_0, '0', qtgui_waterfall_sink_x_0, '0']
-- [low_pass_filter_0, '0', blocks_multiply_xx_0, '0']
 
 metadata:
   file_format: 1
