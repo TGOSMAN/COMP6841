@@ -22,7 +22,7 @@ options:
     run_options: prompt
     sizing_mode: fixed
     thread_safe_setters: ''
-    title: Not titled yet
+    title: InterceptingReceiver
     window_size: (1000,1000)
   states:
     bus_sink: false
@@ -65,7 +65,63 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [840, 936.0]
+    coordinate: [2640, 1400.0]
+    rotation: 0
+    state: enabled
+- name: analog_sig_source_x_0_0
+  id: analog_sig_source_x
+  parameters:
+    affinity: ''
+    alias: ''
+    amp: '1'
+    comment: ''
+    freq: '15000'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    offset: '0'
+    phase: '0'
+    samp_rate: samp_rate
+    showports: 'False'
+    type: complex
+    waveform: analog.GR_COS_WAVE
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [2632, 1744.0]
+    rotation: 0
+    state: enabled
+- name: audio_sink_0
+  id: audio_sink
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    device_name: ''
+    num_inputs: '1'
+    ok_to_block: 'True'
+    samp_rate: samp_rate
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [2680, 1976.0]
+    rotation: 0
+    state: enabled
+- name: blocks_complex_to_imag_1
+  id: blocks_complex_to_imag
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [2280, 1988.0]
     rotation: 0
     state: enabled
 - name: blocks_float_to_complex_0
@@ -81,7 +137,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [872, 780.0]
+    coordinate: [1904, 1492.0]
     rotation: 0
     state: enabled
 - name: blocks_multiply_xx_0
@@ -99,7 +155,26 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1320, 860.0]
+    coordinate: [3264, 1164.0]
+    rotation: 0
+    state: enabled
+- name: blocks_stream_mux_0
+  id: blocks_stream_mux
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    lengths: (1000, 1000)
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    num_inputs: '2'
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [2952, 1672.0]
     rotation: 0
     state: enabled
 - name: blocks_wavfile_source_0
@@ -108,7 +183,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\WeatherBroadcast\Weatheradio_Canada_XLF322_Broadcast_Cycle_on_April_19th,_2022.wav
+    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\WeatherBroadcast\WeatherRadio_Broadcast_Re.wav
     maxoutbuf: '0'
     minoutbuf: '0'
     nchan: '1'
@@ -117,7 +192,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [312, 652.0]
+    coordinate: [1440, 1396.0]
     rotation: 0
     state: enabled
 - name: blocks_wavfile_source_1
@@ -126,7 +201,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\WeatherBroadcast\Required_Weekly_Test_NOAA.ogg
+    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\WeatherBroadcast\WeatherRadio_2_IM.wav
     maxoutbuf: '0'
     minoutbuf: '0'
     nchan: '1'
@@ -135,7 +210,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [312, 852.0]
+    coordinate: [1432, 1548.0]
     rotation: 0
     state: enabled
 - name: channels_channel_model_0
@@ -156,7 +231,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1840, 480.0]
+    coordinate: [3848, 1144.0]
     rotation: 0
     state: enabled
 - name: qtgui_time_sink_x_0
@@ -253,7 +328,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [2400, 1024.0]
+    coordinate: [4408, 1688.0]
     rotation: 0
     state: enabled
 - name: qtgui_waterfall_sink_x_0
@@ -314,15 +389,19 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [2392, 824.0]
+    coordinate: [4400, 1488.0]
     rotation: 0
     state: enabled
 
 connections:
-- [analog_sig_source_x_0, '0', blocks_multiply_xx_0, '1']
+- [analog_sig_source_x_0, '0', blocks_stream_mux_0, '0']
+- [analog_sig_source_x_0_0, '0', blocks_stream_mux_0, '1']
+- [blocks_complex_to_imag_1, '0', audio_sink_0, '0']
+- [blocks_float_to_complex_0, '0', blocks_complex_to_imag_1, '0']
 - [blocks_float_to_complex_0, '0', blocks_multiply_xx_0, '0']
 - [blocks_multiply_xx_0, '0', channels_channel_model_0, '0']
 - [blocks_multiply_xx_0, '0', qtgui_time_sink_x_0, '1']
+- [blocks_stream_mux_0, '0', blocks_multiply_xx_0, '1']
 - [blocks_wavfile_source_0, '0', blocks_float_to_complex_0, '0']
 - [blocks_wavfile_source_1, '0', blocks_float_to_complex_0, '1']
 - [channels_channel_model_0, '0', qtgui_time_sink_x_0, '0']
