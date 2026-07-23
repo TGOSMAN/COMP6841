@@ -224,6 +224,31 @@
             <div class="effect-meter" id="effect-meter"><i></i><i></i><i></i><i></i></div>
           </section>
 
+          <section class="alarm-packet-lab" id="alarm-packet-lab" hidden aria-labelledby="alarm-packet-title">
+            <header>
+              <div>
+                <p class="eyebrow">Embedded receiver target</p>
+                <h2 id="alarm-packet-title">Emergency warning-light controller</h2>
+              </div>
+              <span id="alarm-controller-state">ALARM_CHECK / STANDBY</span>
+            </header>
+            <div class="alarm-lab-body">
+              <div class="alarm-beacon" id="alarm-beacon" aria-label="Warning light off">
+                <i></i>
+                <strong>WARNING</strong>
+                <span id="alarm-beacon-label">LIGHT OFF</span>
+              </div>
+              <form id="alarm-packet-form">
+                <label for="alarm-packet-input">Forged receiver packet (`uint32_t`)</label>
+                <div>
+                  <input id="alarm-packet-input" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x........">
+                  <button type="submit">Send packet</button>
+                </div>
+                <output id="alarm-packet-result" aria-live="polite">Reverse the supplied C decoder, then submit a packet that activates AlarmCheck.</output>
+              </form>
+            </div>
+          </section>
+
           <section class="weather-radio" id="weather-radio" hidden aria-labelledby="weather-radio-title">
             <header>
               <div>

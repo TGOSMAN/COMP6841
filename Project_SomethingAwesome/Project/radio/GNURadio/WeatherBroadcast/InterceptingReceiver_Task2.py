@@ -24,8 +24,12 @@ from argparse import ArgumentParser
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio import eng_notation
 import InterceptingReceiver_Task2_epy_block_0 as epy_block_0  # embedded python block
+from pathlib import Path
 import sip
 import threading
+
+
+RESOURCE_DIR = Path(__file__).resolve().parent
 
 
 
@@ -165,8 +169,8 @@ class InterceptingReceiver_Task2(gr.top_block, Qt.QWidget):
             taps=[1.0],
             noise_seed=0,
             block_tags=False)
-        self.blocks_wavfile_source_1 = blocks.wavfile_source('C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\WeatherBroadcast\\WeatherRadio_T2_IM.wav', True)
-        self.blocks_wavfile_source_0 = blocks.wavfile_source('C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\WeatherBroadcast\\WeatherRadio_T2_RE.wav', True)
+        self.blocks_wavfile_source_1 = blocks.wavfile_source(str(RESOURCE_DIR / 'WeatherRadio_T2_IM.wav'), True)
+        self.blocks_wavfile_source_0 = blocks.wavfile_source(str(RESOURCE_DIR / 'WeatherRadio_T2_RE.wav'), True)
         self.blocks_stream_mux_0 = blocks.stream_mux(gr.sizeof_gr_complex*1, (1000, 1000))
         self.blocks_multiply_xx_0_0 = blocks.multiply_vcc(1)
         self.blocks_multiply_xx_0 = blocks.multiply_vcc(1)

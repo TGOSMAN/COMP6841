@@ -459,15 +459,47 @@
     ],
     "artifacts": [
       {
-        "label": "Weather voice allocation",
-        "href": "/captures/15-air-weather-voice.json",
-        "type": "application/json",
-        "role": "signal"
+        "label": "Weather report InterceptingReceiver generated GNU Radio replay",
+        "href": "/api/rf/gnu-radio-capture?challenge_id=weather-boring-intercept",
+        "type": "generated GNU Radio Python cf32",
+        "role": "signal",
+        "source": "generated_gnuradio_python"
       },
       {
-        "label": "Generated SigMF metadata",
-        "href": "/captures/15-council-weather-audio.sigmf-meta",
-        "type": "application/json"
+        "label": "Weather report InterceptingReceiver generated raw IQ sample",
+        "href": "/api/rf/raw?challenge_id=weather-boring-intercept&bytes=2097152",
+        "type": "bounded generated cf32 IQ sample",
+        "role": "raw_iq",
+        "source": "generated_gnuradio_python"
+      },
+      {
+        "label": "InterceptingReceiver GNU Radio flowgraph",
+        "href": "/radio/GNURadio/WeatherBroadcast/InterceptingReceiver.grc",
+        "type": "application/x-gnuradio-grc"
+      },
+      {
+        "label": "InterceptingReceiver generated Python",
+        "href": "/radio/GNURadio/WeatherBroadcast/InterceptingReceiver.py",
+        "type": "text/x-python"
+      },
+      {
+        "label": "Weather GNU Radio resource guide",
+        "href": "/radio/GNURadio/WeatherBroadcast/README.md",
+        "type": "text/markdown"
+      },
+      {
+        "label": "InterceptingReceiver real-channel WAV source",
+        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_Broadcast_Re.wav",
+        "type": "audio/wav",
+        "role": "source_audio",
+        "download_only": true
+      },
+      {
+        "label": "InterceptingReceiver imaginary-channel WAV source",
+        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_2_IM.wav",
+        "type": "audio/wav",
+        "role": "source_audio",
+        "download_only": true
       }
     ],
     "script_commands": [
@@ -509,15 +541,52 @@
     ],
     "artifacts": [
       {
-        "label": "Weather voice allocation",
-        "href": "/captures/15-air-weather-voice.json",
-        "type": "application/json",
-        "role": "signal"
+        "label": "Weather report InterceptingReceiver_Task2 generated GNU Radio replay",
+        "href": "/api/rf/gnu-radio-capture?challenge_id=weather-boring-obscured",
+        "type": "generated GNU Radio Python cf32",
+        "role": "signal",
+        "source": "generated_gnuradio_python"
       },
       {
-        "label": "Generated SigMF metadata",
-        "href": "/captures/15-council-weather-audio.sigmf-meta",
-        "type": "application/json"
+        "label": "Weather report InterceptingReceiver_Task2 generated raw IQ sample",
+        "href": "/api/rf/raw?challenge_id=weather-boring-obscured&bytes=2097152",
+        "type": "bounded generated cf32 IQ sample",
+        "role": "raw_iq",
+        "source": "generated_gnuradio_python"
+      },
+      {
+        "label": "InterceptingReceiver_Task2 GNU Radio flowgraph",
+        "href": "/radio/GNURadio/WeatherBroadcast/IThinkItsSecure.grc",
+        "type": "application/x-gnuradio-grc"
+      },
+      {
+        "label": "InterceptingReceiver_Task2 generated Python",
+        "href": "/radio/GNURadio/WeatherBroadcast/InterceptingReceiver_Task2.py",
+        "type": "text/x-python"
+      },
+      {
+        "label": "InterceptingReceiver_Task2 embedded Python block",
+        "href": "/radio/GNURadio/WeatherBroadcast/InterceptingReceiver_Task2_epy_block_0.py",
+        "type": "text/x-python"
+      },
+      {
+        "label": "Weather GNU Radio resource guide",
+        "href": "/radio/GNURadio/WeatherBroadcast/README.md",
+        "type": "text/markdown"
+      },
+      {
+        "label": "InterceptingReceiver_Task2 real-channel WAV source",
+        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T2_RE.wav",
+        "type": "audio/wav",
+        "role": "source_audio",
+        "download_only": true
+      },
+      {
+        "label": "InterceptingReceiver_Task2 imaginary-channel WAV source",
+        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T2_IM.wav",
+        "type": "audio/wav",
+        "role": "source_audio",
+        "download_only": true
       }
     ],
     "script_commands": [
@@ -555,25 +624,82 @@
       "Activate the light without breaking the receiver checks."
     ],
     "hints": [
-      "Look for warning or priority metadata in the receiver source.",
-      "Try `send warning light auth` after lock."
+      "Trace the C decoder's bit order and the condition in AlarmCheck.",
+      "After receiver lock, submit the forged uint32 as `send 0x........` or use the warning-light packet panel."
     ],
     "artifacts": [
       {
-        "label": "Weather voice allocation",
-        "href": "/captures/15-air-weather-voice.json",
-        "type": "application/json",
-        "role": "signal"
+        "label": "Weather report EmergencyWarningLight generated GNU Radio replay",
+        "href": "/api/rf/gnu-radio-capture?challenge_id=weather-boring-active-re",
+        "type": "generated GNU Radio Python cf32",
+        "role": "signal",
+        "source": "generated_gnuradio_python"
       },
       {
-        "label": "Generated SigMF metadata",
-        "href": "/captures/15-council-weather-audio.sigmf-meta",
-        "type": "application/json"
+        "label": "Weather report EmergencyWarningLight generated raw IQ sample",
+        "href": "/api/rf/raw?challenge_id=weather-boring-active-re&bytes=2097152",
+        "type": "bounded generated cf32 IQ sample",
+        "role": "raw_iq",
+        "source": "generated_gnuradio_python"
+      },
+      {
+        "label": "EmergencyWarningLight GNU Radio flowgraph",
+        "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight.grc",
+        "type": "application/x-gnuradio-grc"
+      },
+      {
+        "label": "EmergencyWarningLight generated Python",
+        "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight.py",
+        "type": "text/x-python"
+      },
+      {
+        "label": "EmergencyWarningLight hopping block",
+        "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight_epy_block_0.py",
+        "type": "text/x-python"
+      },
+      {
+        "label": "EmergencyWarningLight real-channel packet block",
+        "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight_epy_block_1.py",
+        "type": "text/x-python"
+      },
+      {
+        "label": "EmergencyWarningLight imaginary-channel packet block",
+        "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight_epy_block_1_0.py",
+        "type": "text/x-python"
+      },
+      {
+        "label": "Extracted alarm receiver C logic",
+        "href": "/radio/GNURadio/WeatherBroadcast/MyEmbeddedAlarmSystem.c",
+        "type": "text/x-c"
+      },
+      {
+        "label": "Extracted alarm receiver header",
+        "href": "/radio/GNURadio/WeatherBroadcast/MyEmbeddedAlarmSystem.h",
+        "type": "text/x-c"
+      },
+      {
+        "label": "Weather GNU Radio resource guide",
+        "href": "/radio/GNURadio/WeatherBroadcast/README.md",
+        "type": "text/markdown"
+      },
+      {
+        "label": "EmergencyWarningLight real-channel WAV source",
+        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T3_RE.wav",
+        "type": "audio/wav",
+        "role": "source_audio",
+        "download_only": true
+      },
+      {
+        "label": "EmergencyWarningLight imaginary-channel WAV source",
+        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T3_IM.wav",
+        "type": "audio/wav",
+        "role": "source_audio",
+        "download_only": true
       }
     ],
     "script_commands": [
       "tune 169.650",
-      "send warning light auth"
+      "send 0x........"
     ]
   },
   {

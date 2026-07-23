@@ -23,8 +23,12 @@ from PyQt5 import Qt
 from argparse import ArgumentParser
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio import eng_notation
+from pathlib import Path
 import sip
 import threading
+
+
+RESOURCE_DIR = Path(__file__).resolve().parent
 
 
 
@@ -163,8 +167,8 @@ class InterceptingReceiver(gr.top_block, Qt.QWidget):
             taps=[1.0],
             noise_seed=0,
             block_tags=False)
-        self.blocks_wavfile_source_1 = blocks.wavfile_source('C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\WeatherBroadcast\\WeatherRadio_2_IM.wav', True)
-        self.blocks_wavfile_source_0 = blocks.wavfile_source('C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\WeatherBroadcast\\WeatherRadio_Broadcast_Re.wav', True)
+        self.blocks_wavfile_source_1 = blocks.wavfile_source(str(RESOURCE_DIR / 'WeatherRadio_2_IM.wav'), True)
+        self.blocks_wavfile_source_0 = blocks.wavfile_source(str(RESOURCE_DIR / 'WeatherRadio_Broadcast_Re.wav'), True)
         self.blocks_stream_mux_0 = blocks.stream_mux(gr.sizeof_gr_complex*1, (1000, 1000))
         self.blocks_multiply_xx_0 = blocks.multiply_vcc(1)
         self.blocks_float_to_complex_0 = blocks.float_to_complex(1)

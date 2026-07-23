@@ -31,6 +31,9 @@ const weatherRadio = {
   noiseGain: null,
   initialised: false
 };
+const alarmPacketLab = {
+  initialised: false
+};
 sessionStorage.setItem("signalForgeSession", analysis.sessionId);
 
 const byId = (id) => document.getElementById(id);
@@ -125,6 +128,9 @@ function renderChallenge() {
   const isWeatherRadio = task.id === "civilian-emergency-intercept";
   byId("weather-radio").hidden = !isWeatherRadio;
   if (isWeatherRadio) initialiseWeatherRadio();
+  const isAlarmPacketTask = task.id === "weather-boring-active-re";
+  byId("alarm-packet-lab").hidden = !isAlarmPacketTask;
+  if (isAlarmPacketTask) initialiseAlarmPacketLab();
 }
 
 function renderScriptCommands(task) {
@@ -149,6 +155,61 @@ function initialiseWeatherRadio() {
   });
   byId("weather-report-form").addEventListener("submit", submitWeatherInjection);
   generateWeatherIntercept();
+}
+
+function initialiseAlarmPacketLab() {
+  if (alarmPacketLab.initialised) return;
+  alarmPacketLab.initialised = true;
+  byId("alarm-packet-form").addEventListener("submit", submitAlarmPacket);
+}
+
+async function submitAlarmPacket(event) {
+  event.preventDefault();
+  const packetInput = byId("alarm-packet-input");
+  const result = byId("alarm-packet-result");
+  const packet = packetInput.value.trim();
+  if (!packet) {
+    result.textContent = "Enter one unsigned 32-bit packet in hexadecimal or decimal.";
+    packetInput.focus();
+    return;
+  }
+
+  const submit = event.currentTarget.querySelector("button");
+  submit.disabled = true;
+  result.textContent = "Clocking forged packet into the embedded AlarmCheck path...";
+  try {
+    const response = await fetch("/api/weather/alarm", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Signal-Session": analysis.sessionId
+      },
+      body: JSON.stringify({
+        session_id: analysis.sessionId,
+        challenge_id: analysis.task.id,
+        packet
+      })
+    });
+    const data = await response.json();
+    result.textContent = `${data.packet || packet} → emergency ${data.decoded_emergency || "unknown"}. ${data.message || ""}`;
+    byId("alarm-controller-state").textContent = data.alarm_active ? "ALARM_CHECK / ACTIVE" : "ALARM_CHECK / REJECTED";
+    byId("alarm-beacon").classList.toggle("active", Boolean(data.alarm_active));
+    byId("alarm-beacon").setAttribute("aria-label", data.alarm_active ? "Warning light active" : "Warning light off");
+    byId("alarm-beacon-label").textContent = data.alarm_active ? "LIGHT ACTIVE" : "LIGHT OFF";
+    if (data.alarm_active) {
+      updateEffectStage("warning", data.flag || "Forged alarm packet accepted");
+      terminalWrite(`FORGED WEATHER PACKET ACCEPTED ${data.packet} / emergency=${data.decoded_emergency}`, "system");
+    } else {
+      updateEffectStage("idle", "Forged packet did not activate AlarmCheck");
+      terminalWrite(`WEATHER PACKET REJECTED ${data.packet || packet} / emergency=${data.decoded_emergency || "invalid"}`, "error");
+    }
+    if (data.flag) byId("challenge-flag").value = data.flag;
+  } catch (error) {
+    result.textContent = `Packet link failed: ${error.message}`;
+    updateEffectStage("idle", "Warning-light controller unavailable");
+  } finally {
+    submit.disabled = false;
+  }
 }
 
 async function generateWeatherIntercept() {
@@ -341,11 +402,11 @@ function renderArtifacts() {
       : artifact.href;
     const item = document.createElement("div");
     item.className = "resource-item";
-    item.innerHTML = `
-      <button type="button"><span><strong>${escapeHtml(artifact.label)}</strong><small>${escapeHtml(artifact.type || "artifact")}</small></span><i>Inspect</i></button>
-      <a href="${escapeHtml(href)}" download>Download</a>
-    `;
-    item.querySelector("button").addEventListener("click", () => inspectArtifact({ ...artifact, href }));
+    const resourceSummary = `<span><strong>${escapeHtml(artifact.label)}</strong><small>${escapeHtml(artifact.type || "artifact")}</small></span>`;
+    item.innerHTML = artifact.download_only
+      ? `<div class="resource-file">${resourceSummary}<i>Source file</i></div><a href="${escapeHtml(href)}" download>Download</a>`
+      : `<button type="button">${resourceSummary}<i>Inspect</i></button><a href="${escapeHtml(href)}" download>Download</a>`;
+    item.querySelector("button")?.addEventListener("click", () => inspectArtifact({ ...artifact, href }));
     list.appendChild(item);
   });
 }

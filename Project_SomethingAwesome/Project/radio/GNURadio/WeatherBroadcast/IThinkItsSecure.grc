@@ -201,7 +201,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\WeatherBroadcast\WeatherRadio_T2_RE.wav
+    file: WeatherRadio_T2_RE.wav
     maxoutbuf: '0'
     minoutbuf: '0'
     nchan: '1'
@@ -219,7 +219,7 @@ blocks:
     affinity: ''
     alias: ''
     comment: ''
-    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\WeatherBroadcast\WeatherRadio_T2_IM.wav
+    file: WeatherRadio_T2_IM.wav
     maxoutbuf: '0'
     minoutbuf: '0'
     nchan: '1'

@@ -20,6 +20,11 @@ SONG_META_CAPTURE_STEMS = {
     "broadcast-basic-dos": "DoSAttackMe",
     "broadcast-packet-injection": "InjectionTime",
 }
+WEATHER_CAPTURE_STEMS = {
+    "weather-boring-intercept": ("InterceptingReceiver", "InterceptingReceiver.grc", "InterceptingReceiver.py"),
+    "weather-boring-obscured": ("InterceptingReceiver_Task2", "IThinkItsSecure.grc", "InterceptingReceiver_Task2.py"),
+    "weather-boring-active-re": ("EmergencyWarningLight", "EmergencyWarningLight.grc", "EmergencyWarningLight.py"),
+}
 
 
 def gnu_radio_artifacts(task_id: str, stem: str, folder: str, label_prefix: str) -> list[dict]:
@@ -48,6 +53,41 @@ def tunnel_artifacts(task_id: str) -> list[dict]:
 
 def song_meta_artifacts(task_id: str) -> list[dict]:
     return gnu_radio_artifacts(task_id, SONG_META_CAPTURE_STEMS[task_id], "Song_Meta", "Song metadata")
+
+
+def weather_artifacts(task_id: str) -> list[dict]:
+    stem, grc_name, python_name = WEATHER_CAPTURE_STEMS[task_id]
+    artifacts = gnu_radio_artifacts(task_id, stem, "WeatherBroadcast", "Weather report")
+    artifacts.extend(
+        [
+            {
+                "label": f"{stem} GNU Radio flowgraph",
+                "href": f"/radio/GNURadio/WeatherBroadcast/{grc_name}",
+                "type": "application/x-gnuradio-grc",
+            },
+            {
+                "label": f"{stem} generated Python",
+                "href": f"/radio/GNURadio/WeatherBroadcast/{python_name}",
+                "type": "text/x-python",
+            },
+        ]
+    )
+    if task_id == "weather-boring-active-re":
+        artifacts.extend(
+            [
+                {
+                    "label": "Extracted alarm receiver C logic",
+                    "href": "/radio/GNURadio/WeatherBroadcast/MyEmbeddedAlarmSystem.c",
+                    "type": "text/x-c",
+                },
+                {
+                    "label": "Extracted alarm receiver header",
+                    "href": "/radio/GNURadio/WeatherBroadcast/MyEmbeddedAlarmSystem.h",
+                    "type": "text/x-c",
+                },
+            ]
+        )
+    return artifacts
 
 
 ARTIFACTS = {
@@ -272,7 +312,7 @@ TASKS = [
         "concepts": ["frequency hopping", "audio intercept", "callsign recovery", "offline scripting"],
         "steps": ["Inspect hop timing across the waterfall.", "Predict the next frequency in the clear pattern.", "Reassemble or listen to the voice bursts.", "Submit the callsign codeword."],
         "hints": ["The first hopping pattern is intentionally clear.", "Use the script interface to automate tune/receive cycles."],
-        "artifacts": ARTIFACTS["weather"],
+        "artifacts": weather_artifacts("weather-boring-intercept"),
         "script_commands": ["tune 169.650", "receive"],
     },
     {
@@ -294,7 +334,7 @@ TASKS = [
         "concepts": ["weak PRNG", "hop prediction", "audio recovery", "scripting"],
         "steps": ["Collect enough observed hop offsets.", "Compare them with the provided weak-generator candidates.", "Predict remaining hops.", "Recover and submit the callsign codeword."],
         "hints": ["The sequence is weak by design; treat it as a research exercise.", "Script command: `receive` reports candidate hop-state evidence after lock."],
-        "artifacts": ARTIFACTS["weather"],
+        "artifacts": weather_artifacts("weather-boring-obscured"),
         "script_commands": ["tune 169.650", "receive", "decode weak-prng"],
     },
     {
@@ -315,9 +355,9 @@ TASKS = [
         "signal_scheme": "Digital audio metadata over a keyed weather channel.",
         "concepts": ["reverse engineering", "C receiver logic", "metadata control", "warning activation"],
         "steps": ["Inspect the extracted receiver C logic.", "Identify the metadata field that controls warning priority.", "Craft a valid metadata/audio frame.", "Activate the light without breaking the receiver checks."],
-        "hints": ["Look for warning or priority metadata in the receiver source.", "Try `send warning light auth` after lock."],
-        "artifacts": ARTIFACTS["weather"],
-        "script_commands": ["tune 169.650", "send warning light auth"],
+        "hints": ["Trace the C decoder's bit order and the condition in AlarmCheck.", "After receiver lock, submit the forged uint32 as `send 0x........` or use the warning-light packet panel."],
+        "artifacts": weather_artifacts("weather-boring-active-re"),
+        "script_commands": ["tune 169.650", "send 0x........"],
     },
     {
         "id": "civilian-emergency-intercept",
