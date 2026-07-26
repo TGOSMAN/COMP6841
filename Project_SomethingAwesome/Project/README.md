@@ -6,9 +6,8 @@ Signal Forge is a sim-first contested-spectrum operator CTF about a synthetic ro
 2. Receive and decode an operator telemetry frame.
 3. Pivot from recovered user data into the local toll API.
 4. Inject a replay waveform that produces a zero-price toll.
-5. Forward an RF-origin note across the operator-console boundary.
-6. Transmit a malformed TLV that reaches RSU diagnostic mode.
-7. Decipher a randomized UHF AM voice protocol and inject a synthetic diversion message.
+5. Transmit a malformed TLV that reaches RSU diagnostic mode.
+6. Decipher a randomized UHF AM voice protocol and inject a synthetic emergency message.
 
 All RF artifacts use 1024 FFT bins. The Python backend derives flags from a random server secret, the browser session, and the challenge ID. Two browser sessions therefore receive different valid flags. Flags appear only in successful receiver, target, service, effects, or console output.
 
@@ -105,18 +104,6 @@ GET /api/telemetry/example
 POST /api/telemetry/verify
 POST /api/toll/secure-quote
 ```
-
-Operator-console XSS training:
-
-```text
-GET /operator/events
-POST /operator/comment
-GET /api/radio/intercept
-```
-
-Attack Mode intentionally renders operator comments as HTML in the browser. Secure Mode renders them as text.
-
-The XSS task exists to teach a specific contested-spectrum trust boundary: decoded RF strings are still attacker-controlled input. In this CTF the `operator_note` field is received from `/api/radio/intercept`, posted to the operator console, and then rendered differently in Attack versus Secure Mode.
 
 ## Cyber Tools
 

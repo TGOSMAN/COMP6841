@@ -161,7 +161,13 @@ class InterceptingReceiver_Task2(gr.top_block, Qt.QWidget):
 
         self._qtgui_time_sink_x_0_win = sip.wrapinstance(self.qtgui_time_sink_x_0.qwidget(), Qt.QWidget)
         self.top_layout.addWidget(self._qtgui_time_sink_x_0_win)
-        self.epy_block_0 = epy_block_0.blk(samples_per_chip=10, seed=1)
+        self.epy_block_0 = epy_block_0.blk(
+            sample_rate=samp_rate,
+            samples_per_hop=4410,
+            samples_per_phase_symbol=10,
+            phase_seed=1,
+            hop_key="weather-task-3.01-hop-v1",
+        )
         self.channels_channel_model_0 = channels.channel_model(
             noise_voltage=0.2,
             frequency_offset=0.0,
@@ -171,34 +177,23 @@ class InterceptingReceiver_Task2(gr.top_block, Qt.QWidget):
             block_tags=False)
         self.blocks_wavfile_source_1 = blocks.wavfile_source(str(RESOURCE_DIR / 'WeatherRadio_T2_IM.wav'), True)
         self.blocks_wavfile_source_0 = blocks.wavfile_source(str(RESOURCE_DIR / 'WeatherRadio_T2_RE.wav'), True)
-        self.blocks_stream_mux_0 = blocks.stream_mux(gr.sizeof_gr_complex*1, (1000, 1000))
-        self.blocks_multiply_xx_0_0 = blocks.multiply_vcc(1)
-        self.blocks_multiply_xx_0 = blocks.multiply_vcc(1)
         self.blocks_float_to_complex_0 = blocks.float_to_complex(1)
         self.blocks_complex_to_imag_1 = blocks.complex_to_imag(1)
         self.audio_sink_0 = audio.sink(samp_rate, '', True)
-        self.analog_sig_source_x_0_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 15000, 1, 0, 0)
-        self.analog_sig_source_x_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 10000, 1, 0, 0)
 
 
         ##################################################
         # Connections
         ##################################################
-        self.connect((self.analog_sig_source_x_0, 0), (self.blocks_stream_mux_0, 0))
-        self.connect((self.analog_sig_source_x_0_0, 0), (self.blocks_stream_mux_0, 1))
         self.connect((self.blocks_complex_to_imag_1, 0), (self.audio_sink_0, 0))
         self.connect((self.blocks_float_to_complex_0, 0), (self.blocks_complex_to_imag_1, 0))
-        self.connect((self.blocks_float_to_complex_0, 0), (self.blocks_multiply_xx_0_0, 1))
         self.connect((self.blocks_float_to_complex_0, 0), (self.epy_block_0, 0))
-        self.connect((self.blocks_multiply_xx_0, 0), (self.channels_channel_model_0, 0))
-        self.connect((self.blocks_multiply_xx_0, 0), (self.qtgui_time_sink_x_0, 1))
-        self.connect((self.blocks_multiply_xx_0_0, 0), (self.blocks_multiply_xx_0, 0))
-        self.connect((self.blocks_stream_mux_0, 0), (self.blocks_multiply_xx_0, 1))
         self.connect((self.blocks_wavfile_source_0, 0), (self.blocks_float_to_complex_0, 0))
         self.connect((self.blocks_wavfile_source_1, 0), (self.blocks_float_to_complex_0, 1))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_time_sink_x_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_waterfall_sink_x_0, 0))
-        self.connect((self.epy_block_0, 0), (self.blocks_multiply_xx_0_0, 0))
+        self.connect((self.epy_block_0, 0), (self.channels_channel_model_0, 0))
+        self.connect((self.epy_block_0, 0), (self.qtgui_time_sink_x_0, 1))
 
 
     def closeEvent(self, event):
@@ -214,8 +209,7 @@ class InterceptingReceiver_Task2(gr.top_block, Qt.QWidget):
 
     def set_samp_rate(self, samp_rate):
         self.samp_rate = samp_rate
-        self.analog_sig_source_x_0.set_sampling_freq(self.samp_rate)
-        self.analog_sig_source_x_0_0.set_sampling_freq(self.samp_rate)
+        self.epy_block_0.set_sample_rate(self.samp_rate)
         self.qtgui_time_sink_x_0.set_samp_rate(self.samp_rate)
         self.qtgui_waterfall_sink_x_0.set_frequency_range(0, self.samp_rate)
 

@@ -42,9 +42,7 @@
     "situation": "This context bridges audio radio operations and reverse engineering: the learner must reassemble enough of the RF/audio path to make a simulated receiver act on warning metadata.",
     "subtask_ids": ["weather-boring-intercept", "weather-boring-obscured", "weather-boring-active-re"],
     "planned_subtasks": [
-      "Add downloadable IQ recordings for every hop segment.",
-      "Add a Python hopping-receiver template with TODO sections.",
-      "Add a visible warning light and siren widget for the metadata trigger."
+      "Add a Python hopping-receiver template with TODO sections."
     ]
   },
   {
@@ -59,8 +57,7 @@
     "subtask_ids": ["civilian-emergency-intercept", "civilian-emergency-obscured", "civilian-emergency-active-re"],
     "planned_subtasks": [
       "Add a second callsign on Q and I for optional bonus analysis.",
-      "Add an exported sample file from the tuned receiver for offline scripting.",
-      "Add a receiver-side C integrity check exercise."
+      "Add a receiver-side C integrity check exercise with a compiled binary target."
     ]
   },
   {
@@ -75,7 +72,6 @@
     "subtask_ids": ["bushfire-re-embedded", "bushfire-hdl-flaw", "bushfire-rce", "bushfire-fuzz-spoof"],
     "planned_subtasks": [
       "Add a compiled stripped firmware target and a safe source build.",
-      "Add a HDL testbench runner with waveform output.",
       "Add a propagation/null-steering visualiser for receiver trust decisions."
     ]
   },

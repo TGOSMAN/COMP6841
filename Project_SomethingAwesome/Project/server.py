@@ -234,17 +234,20 @@ WEATHER_GNU_RADIO_CAPTURES = {
         "grc_path": "radio/GNURadio/WeatherBroadcast/IThinkItsSecure.grc",
         "python_path": "radio/GNURadio/WeatherBroadcast/InterceptingReceiver_Task2.py",
         "sample_rate": 44_100,
-        "carrier_offset_hz": 10_000,
-        "carrier_offsets_hz": [10_000, 15_000],
-        "hop_samples": 1_000,
-        "samples_per_symbol": 10,
-        "modulation": "RANDU phase-shifted hopping complex weather audio",
+        "carrier_offset_hz": -16_000,
+        "carrier_offsets_hz": [-16_000, -10_000, -4_000, 3_000, 9_000, 15_000],
+        "hop_samples": 4_410,
+        "samples_per_symbol": 4_410,
+        "modulation": "random frequency-hopping complex weather audio with RANDU QPSK phase symbols",
         "source_mode": "weather_wav_pair",
         "lock_to_center": True,
+        "hop_mode": "keyed random",
+        "hop_key": "weather-task-3.01-hop-v1",
+        "phase_prng": "randu",
+        "phase_seed": 1,
         "randu_samples_per_chip": 10,
-        "square_signal": True,
         "public_payload": False,
-        "mission_note": "Second weather report pair with the fixed-seed RANDU phase shifter.",
+        "mission_note": "Complex weather audio randomly hops among six RF channels every 100 ms. A separate fixed-seed RANDU sequence rotates only its QPSK phase symbols.",
     },
     "weather-boring-active-re": {
         "stem": "EmergencyWarningLight",
@@ -1053,6 +1056,29 @@ def randu_state_at_chip(chip_index: int, seed: int = 1) -> int:
     return (state * pow(65_539, max(0, chip_index) + 1, 1 << 31)) & 0x7FFFFFFF
 
 
+def weather_hop_offset(capture: dict, hop_index: int) -> float:
+    offsets = [float(value) for value in capture.get("carrier_offsets_hz", [capture.get("carrier_offset_hz", 0)])]
+    if not offsets:
+        return 0.0
+    if str(capture.get("hop_mode", "")).lower() == "keyed random":
+        hop_key = str(capture.get("hop_key", "weather-hop"))
+        digest = hashlib.sha256(f"{hop_key}:{max(0, hop_index)}".encode("utf-8")).digest()
+        return offsets[int.from_bytes(digest[:4], "big") % len(offsets)]
+    return offsets[hop_index % len(offsets)]
+
+
+def weather_carrier_phase(capture: dict, sample_rate: float, sample_index: int, hop_samples: int) -> float:
+    """Return a phase-continuous carrier position for arbitrary sample access."""
+    sample_index = max(0, int(sample_index))
+    complete_hops, partial_samples = divmod(sample_index, hop_samples)
+    accumulated_cycles = sum(
+        weather_hop_offset(capture, hop_index) * hop_samples
+        for hop_index in range(complete_hops)
+    )
+    accumulated_cycles += weather_hop_offset(capture, complete_hops) * partial_samples
+    return 2.0 * math.pi * accumulated_cycles / sample_rate
+
+
 def weather_wav_iq_samples(settings: dict, start_sample: int, sample_count: int) -> list[complex]:
     capture = settings.get("capture", {})
     real_path = bounded_project_path(capture["real_wav_path"])
@@ -1066,7 +1092,6 @@ def weather_wav_iq_samples(settings: dict, start_sample: int, sample_count: int)
     real_values = read_wav_mono_samples(real_path, first_frame, required_frames)
     imag_values = read_wav_mono_samples(imag_path, first_frame, required_frames)
     sample_rate = max(1.0, float(settings.get("sample_rate", 44_100)))
-    carrier_offsets = [float(value) for value in capture.get("carrier_offsets_hz", [capture.get("carrier_offset_hz", 0)])]
     hop_samples = max(1, int(capture.get("hop_samples", 1_000)))
     randu_samples = int(capture.get("randu_samples_per_chip", 0))
     emergency = int(capture.get("emergency", 0xB))
@@ -1075,7 +1100,14 @@ def weather_wav_iq_samples(settings: dict, start_sample: int, sample_count: int)
     samples: list[complex] = []
     phase_table = (1.0 + 0.0j, 0.0 + 1.0j, -1.0 + 0.0j, 0.0 - 1.0j)
     current_chip_index = start_sample // randu_samples if randu_samples else -1
-    randu_state = randu_state_at_chip(current_chip_index) if randu_samples else 0
+    randu_state = (
+        randu_state_at_chip(current_chip_index, int(capture.get("phase_seed", 1)))
+        if randu_samples
+        else 0
+    )
+    current_hop_index = start_sample // hop_samples
+    current_carrier_offset = weather_hop_offset(capture, current_hop_index)
+    carrier_phase = weather_carrier_phase(capture, sample_rate, start_sample, hop_samples)
 
     packet_cache: dict[int, tuple[int, int]] = {}
     for local_index in range(sample_count):
@@ -1105,9 +1137,14 @@ def weather_wav_iq_samples(settings: dict, start_sample: int, sample_count: int)
             shifted = source_value * phase_table[(randu_state >> 28) & 0x03]
             source_value = source_value * shifted if square_signal else shifted
 
-        carrier_offset = carrier_offsets[(absolute_index // hop_samples) % len(carrier_offsets)]
-        phase = 2.0 * math.pi * carrier_offset * absolute_index / sample_rate
-        carrier = complex(math.cos(phase), math.sin(phase))
+        hop_index = absolute_index // hop_samples
+        if hop_index != current_hop_index:
+            current_hop_index = hop_index
+            current_carrier_offset = weather_hop_offset(capture, current_hop_index)
+        carrier = complex(math.cos(carrier_phase), math.sin(carrier_phase))
+        carrier_phase += 2.0 * math.pi * current_carrier_offset / sample_rate
+        if abs(carrier_phase) > math.pi * 4_096:
+            carrier_phase = math.fmod(carrier_phase, 2.0 * math.pi)
         noise = complex(
             deterministic_noise(0x6841, absolute_index * 2),
             deterministic_noise(0x6841, absolute_index * 2 + 1),
@@ -1396,10 +1433,26 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         sample_count = fft_bins if virtual_source else sample_count
     if sample_count < fft_bins:
         raise ValueError(f"Capture needs at least {fft_bins} complete complex-float samples")
-    decoder = decode_gnu_radio_ook(settings)
+    weather_source = settings.get("source_mode") in {"weather_wav_pair", "weather_alarm_wav_pair"}
+    audio_weather_source = settings.get("source_mode") == "weather_wav_pair"
+    decoder = (
+        {
+            "ok": False,
+            "bits": "",
+            "confidence": 0.0,
+            "note": "Audio capture: inspect hop timing and demodulate the tuned complex audio instead of amplitude-slicing it as OOK.",
+        }
+        if audio_weather_source
+        else decode_gnu_radio_ook(settings)
+    )
     symbol_phase = int(decoder.get("phase", 0))
     samples_per_symbol = int(decoder.get("samples_per_symbol", settings.get("samples_per_symbol", 500)))
-    if decoder.get("ok") and symbol_phase + fft_bins <= sample_count:
+    if audio_weather_source:
+        hop_samples = max(fft_bins, int(capture_info.get("hop_samples", fft_bins)))
+        frame_stride = max(fft_bins, hop_samples // 4)
+        frame_count = max(1, min(max_frames, 1 + max(0, sample_count - fft_bins) // frame_stride))
+        starts = [index * frame_stride for index in range(frame_count)]
+    elif decoder.get("ok") and symbol_phase + fft_bins <= sample_count:
         available_frames = max_frames if virtual_source else 1 + max(0, (sample_count - symbol_phase - fft_bins) // samples_per_symbol)
         frame_count = max(1, min(max_frames, available_frames, max(1, len(str(decoder.get("bits", ""))))))
         starts = [symbol_phase + index * samples_per_symbol for index in range(frame_count)]
@@ -1470,6 +1523,18 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         },
         "note": str(decoder.get("note") or "Binary symbols recovered from IQ amplitude; byte alignment is estimated from printable payload structure."),
     }
+    if audio_weather_source:
+        parser["stage"] = "energy_detect"
+        parser["fields"].update(
+            {
+                "payload": "complex weather voice audio",
+                "hop_mode": capture_info.get("hop_mode", "repeating pattern"),
+                "hop_period_ms": round(float(capture_info.get("hop_samples", 1_000)) / sample_rate * 1_000, 3),
+                "hop_offsets_hz": capture_info.get("carrier_offsets_hz", [carrier_offset_hz]),
+                "phase_mode": capture_info.get("phase_prng", "none"),
+                "phase_symbol_samples": capture_info.get("randu_samples_per_chip", 0),
+            }
+        )
     if payload_revealed:
         parser["fields"]["payload_ascii"] = payload_preview
         parser["fields"]["payload_state"] = "revealed_by_receiver"
@@ -1506,6 +1571,50 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         source_mode_label = "generated GNU Radio Python flowgraph"
     else:
         source_mode_label = "raw GNU Radio cf32 File Sink capture"
+    preview_sources = [
+        {
+            "label": capture_info.get("title", "GNU Radio tunnel capture"),
+            "kind": (
+                "weather_complex"
+                if weather_source
+                else "gnu_radio_cf32_ask2"
+                if int(decoder.get("bits_per_symbol", 1)) == 2
+                else "gnu_radio_cf32_ook"
+            ),
+            "offset_hz": round(detected_frequency_hz - center_hz, 3),
+            "bandwidth_hz": min(sample_rate / 4, 50_000) if weather_source else 2_000,
+        }
+    ]
+    if weather_source and capture_info.get("carrier_offsets_hz"):
+        preview_sources = [
+            {
+                "label": f"Weather audio hop {index + 1}",
+                "kind": "random_audio_hop" if capture_info.get("hop_mode") else "patterned_audio_hop",
+                "offset_hz": float(offset),
+                "bandwidth_hz": min(5_000, sample_rate / 10),
+            }
+            for index, offset in enumerate(capture_info["carrier_offsets_hz"])
+        ]
+    else:
+        preview_sources.append(
+            {
+                "label": "Nominal GNU Radio tone",
+                "kind": "carrier_reference",
+                "offset_hz": carrier_offset_hz,
+                "bandwidth_hz": 1_000,
+            }
+        )
+    preview_annotations = [
+        {
+            "label": f"hop {index + 1}",
+            "offset_hz": float(offset),
+            "color": "#73f2a6" if index % 2 == 0 else "#ffc766",
+        }
+        for index, offset in enumerate(capture_info.get("carrier_offsets_hz", []))
+    ] if weather_source else [
+        {"label": "detected ASK carrier", "offset_hz": round(detected_frequency_hz - center_hz, 3), "color": "#73f2a6"},
+        {"label": f"nominal {carrier_offset_hz / 1000:g} kHz tone", "offset_hz": carrier_offset_hz, "color": "#ffc766"},
+    ]
     return {
         "challenge_id": challenge_id or "configured-gnu-radio-capture",
         "scheme_id": f"GNU-RADIO-{str(capture_info.get('stem', 'LOCAL-CAPTURE')).upper()}",
@@ -1531,26 +1640,7 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         "duration_seconds": sample_count / sample_rate,
         "decoded_text": decoded_text[:240] if payload_revealed else "",
         "expected_flag": expected_flag if payload_revealed else "",
-        "sources": [
-            {
-                "label": capture_info.get("title", "GNU Radio tunnel capture"),
-                "kind": (
-                    "weather_complex"
-                    if settings.get("source_mode") in {"weather_wav_pair", "weather_alarm_wav_pair"}
-                    else "gnu_radio_cf32_ask2"
-                    if int(decoder.get("bits_per_symbol", 1)) == 2
-                    else "gnu_radio_cf32_ook"
-                ),
-                "offset_hz": round(detected_frequency_hz - center_hz, 3),
-                "bandwidth_hz": min(sample_rate / 4, 50_000) if settings.get("source_mode") in {"weather_wav_pair", "weather_alarm_wav_pair"} else 2_000,
-            },
-            {
-                "label": "Nominal GNU Radio tone",
-                "kind": "carrier_reference",
-                "offset_hz": carrier_offset_hz,
-                "bandwidth_hz": 1_000,
-            },
-        ],
+        "sources": preview_sources,
         "protocol_notes": {
             "datatype": datatype,
             "modulation": f"{modulation_label} from the {source_mode_label}",
@@ -1558,10 +1648,7 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
             "raw_path": f"/api/rf/raw?challenge_id={challenge_id or 'tunnel-reading-signals'}&bytes=2097152",
             "metadata": "The challenge signal source is the editable generated Python flowgraph; recordings are optional developer snapshots.",
         },
-        "annotations": [
-            {"label": "detected ASK carrier", "offset_hz": round(detected_frequency_hz - center_hz, 3), "color": "#73f2a6"},
-            {"label": f"nominal {carrier_offset_hz / 1000:g} kHz tone", "offset_hz": carrier_offset_hz, "color": "#ffc766"},
-        ],
+        "annotations": preview_annotations,
     }
 
 
@@ -1706,7 +1793,7 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
                 **target,
                 "center_mhz": float(imported_capture.get("lock_frequency_hz", imported_capture["detected_frequency_hz"])) / 1e6,
                 "span_khz": float(imported_capture["sample_rate_hz"]) / 1e3,
-                "modulations": {"AUTO", "OOK", "ASK"},
+                "modulations": set(target.get("modulations", {"AUTO"})) | {"AUTO"},
                 "label": str(imported_capture["scheme_id"]),
             }
         except (FileNotFoundError, OSError, ValueError, struct.error):
@@ -1879,6 +1966,43 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
             f"PACKET {base['packet']} decoded / emergency={base['decoded_emergency']}",
             "FORGED ALARM accepted by the extracted receiver logic",
             "WARNING LIGHT ACTIVE",
+            f"FLAG {base['flag']}",
+        ]
+    elif action == "send" and challenge_id == "bushfire-hdl-flaw":
+        bin_match = re.search(r"\b(?:bin|azimuth)\s*[=:]?\s*(\d{1,2})\b", arguments, re.IGNORECASE)
+        correlation_match = re.search(r"\b(?:correlation|corr|score)\s*[=:]?\s*(\d{1,3})\b", arguments, re.IGNORECASE)
+        if not bin_match or not correlation_match:
+            base["ok"] = False
+            base["lines"] = [
+                "Beam-gate input requires an arrival bin and correlation score.",
+                "Use `send beam bin <0..31> correlation <0..255>` after mapping the recovered HDL response.",
+            ]
+            return base, HTTPStatus.BAD_REQUEST
+        arrival_bin = int(bin_match.group(1))
+        correlation = int(correlation_match.group(1))
+        array_gain = 255 if arrival_bin in {2, 10, 18, 26} else 0
+        hidden_lobe = arrival_bin in {10, 18, 26}
+        base["beam_pattern"] = {
+            "arrival_bin": arrival_bin,
+            "correlation": correlation,
+            "array_gain": array_gain,
+            "hidden_lobe": hidden_lobe,
+        }
+        if not 0 <= arrival_bin <= 31 or not 0 <= correlation <= 255:
+            base["ok"] = False
+            base["lines"] = ["Beam input is outside the recovered hardware field widths."]
+            return base, HTTPStatus.BAD_REQUEST
+        if not hidden_lobe or correlation < 240 or array_gain < 240 or MODE["value"] != "attack":
+            base["ok"] = False
+            base["lines"] = [
+                f"BEAM GATE rejected bin={arrival_bin} correlation={correlation} gain={array_gain}",
+                "The main look direction is expected; demonstrate a separate off-axis lobe that aliases the trusted steering vector.",
+            ]
+            return base, HTTPStatus.UNPROCESSABLE_ENTITY
+        base["flag"] = expected_flag_for(session_id, challenge_id)
+        base["lines"] = [
+            f"BEAM GATE accepted off-axis bin={arrival_bin} correlation={correlation} gain={array_gain}",
+            "UNINTENDED LOBE aliases TRUST_VECTOR; relay data crossed the spatial gate",
             f"FLAG {base['flag']}",
         ]
     elif action == "send" and MODE["value"] == "attack" and challenge_id in SEND_FLAG_TASKS and any(
@@ -2513,6 +2637,13 @@ class CTFHandler(SimpleHTTPRequestHandler):
             return
 
         session_id = session_id_from(self, body)
+        challenge_id = str(body.get("challenge_id", ""))
+        if challenge_id != "civilian-emergency-active-re":
+            self.write_json(
+                {"ok": False, "message": "The emergency rebroadcast input is connected only to the final civilian emergency task."},
+                HTTPStatus.NOT_FOUND,
+            )
+            return
         intercept = AIR_WEATHER_SESSIONS.get(session_id)
         if not intercept or str(body.get("intercept_id", "")) != intercept["intercept_id"]:
             self.write_json({"ok": False, "message": "Generate a current intercept before filing the report."}, HTTPStatus.BAD_REQUEST)
@@ -2533,7 +2664,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
             self.write_json({
                 "ok": True,
                 "message": "Protocol accepted. The synthetic public-warning message was rebroadcast on the training net.",
-                "flag": flag_for(session_id, "civilian-emergency-intercept"),
+                "flag": expected_flag_for(session_id, challenge_id),
                 "broadcast": message,
             })
             return

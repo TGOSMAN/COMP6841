@@ -19,6 +19,11 @@ sources together in this directory.
 - `WeatherRadio_T2_RE.wav`
 - `WeatherRadio_T2_IM.wav`
 
+The task 3.01 chain keeps the complex weather audio intact while a keyed random
+schedule selects one of six carrier offsets every 100 ms. A separate fixed-seed
+RANDU stream rotates the QPSK phase symbols every 10 samples. RANDU never
+selects the hop channel; it is only the deliberately weak phase-obscuring layer.
+
 ## Emergency Warning Light
 
 - `EmergencyWarningLight.grc`

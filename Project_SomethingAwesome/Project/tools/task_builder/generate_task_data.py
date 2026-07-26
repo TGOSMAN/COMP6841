@@ -70,11 +70,74 @@ def weather_artifacts(task_id: str) -> list[dict]:
                 "href": f"/radio/GNURadio/WeatherBroadcast/{python_name}",
                 "type": "text/x-python",
             },
+            {
+                "label": "Weather GNU Radio resource guide",
+                "href": "/radio/GNURadio/WeatherBroadcast/README.md",
+                "type": "text/markdown",
+            },
         ]
     )
-    if task_id == "weather-boring-active-re":
+    if task_id == "weather-boring-intercept":
         artifacts.extend(
             [
+                {
+                    "label": "InterceptingReceiver real-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_Broadcast_Re.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
+                {
+                    "label": "InterceptingReceiver imaginary-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_2_IM.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
+            ]
+        )
+    elif task_id == "weather-boring-obscured":
+        artifacts.extend(
+            [
+                {
+                    "label": "InterceptingReceiver_Task2 embedded Python block",
+                    "href": "/radio/GNURadio/WeatherBroadcast/InterceptingReceiver_Task2_epy_block_0.py",
+                    "type": "text/x-python",
+                },
+                {
+                    "label": "InterceptingReceiver_Task2 real-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T2_RE.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
+                {
+                    "label": "InterceptingReceiver_Task2 imaginary-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T2_IM.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
+            ]
+        )
+    elif task_id == "weather-boring-active-re":
+        artifacts.extend(
+            [
+                {
+                    "label": "EmergencyWarningLight hopping block",
+                    "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight_epy_block_0.py",
+                    "type": "text/x-python",
+                },
+                {
+                    "label": "EmergencyWarningLight real-channel packet block",
+                    "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight_epy_block_1.py",
+                    "type": "text/x-python",
+                },
+                {
+                    "label": "EmergencyWarningLight imaginary-channel packet block",
+                    "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight_epy_block_1_0.py",
+                    "type": "text/x-python",
+                },
                 {
                     "label": "Extracted alarm receiver C logic",
                     "href": "/radio/GNURadio/WeatherBroadcast/MyEmbeddedAlarmSystem.c",
@@ -85,7 +148,57 @@ def weather_artifacts(task_id: str) -> list[dict]:
                     "href": "/radio/GNURadio/WeatherBroadcast/MyEmbeddedAlarmSystem.h",
                     "type": "text/x-c",
                 },
+                {
+                    "label": "EmergencyWarningLight real-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T3_RE.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
+                {
+                    "label": "EmergencyWarningLight imaginary-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T3_IM.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
             ]
+        )
+    return artifacts
+
+
+def emergency_audio_artifacts(active_transmission: bool = False) -> list[dict]:
+    artifacts = [
+        {
+            "label": "Emergency audio hopping capture",
+            "href": "/captures/15-air-weather-voice.json",
+            "type": "application/json",
+            "role": "signal",
+        },
+        {
+            "label": "Emergency audio SigMF metadata",
+            "href": "/captures/15-council-weather-audio.sigmf-meta",
+            "type": "application/json",
+        },
+        {
+            "label": "Weekly emergency-network reference transmission",
+            "href": "/radio/GNURadio/EmergencyRadioAudio/Required_Weekly_Test_NOAA.ogg",
+            "type": "audio/ogg",
+            "role": "source_audio",
+        },
+        {
+            "label": "Emergency transmission protocol notes",
+            "href": "/radio/GNURadio/EmergencyRadioAudio/README.md",
+            "type": "text/markdown",
+        },
+    ]
+    if active_transmission:
+        artifacts.append(
+            {
+                "label": "Recovered emergency receiver C logic",
+                "href": "/radio/GNURadio/EmergencyRadioAudio/emergency_receiver.c",
+                "type": "text/x-c",
+            }
         )
     return artifacts
 
@@ -95,16 +208,13 @@ ARTIFACTS = {
         {"label": "Clock-recovery metadata capture", "href": "/captures/06-decoder-clock-recovery.json", "type": "application/json", "role": "signal"},
         {"label": "Frame format reference", "href": "/artifacts/telemetry-frame.txt", "type": "text/plain"},
     ],
-    "weather": [
-        {"label": "Weather voice allocation", "href": "/captures/15-air-weather-voice.json", "type": "application/json", "role": "signal"},
-        {"label": "Generated SigMF metadata", "href": "/captures/15-council-weather-audio.sigmf-meta", "type": "application/json"},
-    ],
     "bushfire": [
         {"label": "Jamming and propagation capture", "href": "/captures/12-jamming-propagation.json", "type": "application/json", "role": "signal"},
         {"label": "Firmware manifest", "href": "/tools/firmware_re/firmware_manifest.json", "type": "application/json"},
         {"label": "Bushfire node C source", "href": "/tools/re_binaries/bushfire_node.c", "type": "text/plain"},
         {"label": "Bushfire node binary image", "href": "/tools/re_binaries/bushfire_node.bin", "type": "application/octet-stream"},
-        {"label": "Frequency router HDL", "href": "/tools/hdl/bushfire_frequency_router.v", "type": "text/plain"},
+        {"label": "Recovered 12-element complex beamformer HDL", "href": "/radio/AntennaBinFormer.v", "type": "text/plain"},
+        {"label": "Complex beamformer angular sweep testbench", "href": "/radio/AntennaBinFormer_tb.v", "type": "text/plain"},
     ],
     "farm": [
         {"label": "Malformed long-range TLV burst", "href": "/captures/10-tlv-malformed-burst.json", "type": "application/json", "role": "signal"},
@@ -311,7 +421,7 @@ TASKS = [
         "signal_scheme": "Patterned hopping audio/QAM training capture with a recoverable spoken callsign.",
         "concepts": ["frequency hopping", "audio intercept", "callsign recovery", "offline scripting"],
         "steps": ["Inspect hop timing across the waterfall.", "Predict the next frequency in the clear pattern.", "Reassemble or listen to the voice bursts.", "Submit the callsign codeword."],
-        "hints": ["The first hopping pattern is intentionally clear.", "Use the script interface to automate tune/receive cycles."],
+        "hints": ["The first hopping pattern is intentionally clear.", "Use the script interface to automate tune/receive cycles; a successful receive awards this subtask's callsign flag."],
         "artifacts": weather_artifacts("weather-boring-intercept"),
         "script_commands": ["tune 169.650", "receive"],
     },
@@ -325,15 +435,15 @@ TASKS = [
         "track": "signals",
         "difficulty": "Moderate",
         "points": 220,
-        "scenario": "The weather voice service moves from a clear hop pattern to a weak pseudorandom sequence.",
-        "objective": "Identify the weak generator family, predict enough hops, and recover the callsign codeword.",
-        "details": "Explain that predictable hopping is weak and that pseudorandom hopping is often used. A weak generator from a small list is used, and the learner must identify the pattern and perform the same recovery as before.",
+        "scenario": "The weather voice service now hops randomly between channels while a weak pseudorandom sequence obscures its phase symbols.",
+        "objective": "Track the random carrier hops, identify the weak phase generator, de-rotate the symbols, and recover the callsign codeword.",
+        "details": "The hop selection and phase obfuscation are independent. Follow the changing carrier, then identify RANDU from its phase-symbol sequence and remove those rotations to recover the weather audio.",
         "flag_location": "The codeword spoken as a callsign to everyone.",
         "developer_comments": "Ability to record signal with tuned receiver and download a data file of samples for offline processing.",
-        "signal_scheme": "Weak-PRNG hopping audio capture with recoverable state.",
-        "concepts": ["weak PRNG", "hop prediction", "audio recovery", "scripting"],
-        "steps": ["Collect enough observed hop offsets.", "Compare them with the provided weak-generator candidates.", "Predict remaining hops.", "Recover and submit the callsign codeword."],
-        "hints": ["The sequence is weak by design; treat it as a research exercise.", "Script command: `receive` reports candidate hop-state evidence after lock."],
+        "signal_scheme": "Complex weather voice audio randomly hops between six RF channels every 100 ms; fixed-seed RANDU rotates only the QPSK phase symbols.",
+        "concepts": ["frequency hopping", "weak PRNG", "phase de-rotation", "audio recovery", "scripting"],
+        "steps": ["Track the observed carrier hop for each 100 ms interval.", "Extract the QPSK phase-symbol sequence.", "Identify RANDU and predict the remaining phase rotations.", "De-rotate the audio and submit the spoken callsign codeword."],
+        "hints": ["RANDU controls phase symbols only; it does not choose the hop channel.", "After locking the receiver, `decode weak-prng` awards this subtask's own recovered callsign flag."],
         "artifacts": weather_artifacts("weather-boring-obscured"),
         "script_commands": ["tune 169.650", "receive", "decode weak-prng"],
     },
@@ -377,8 +487,8 @@ TASKS = [
         "signal_scheme": "AM voice bursts across a synthetic emergency-radio allocation.",
         "concepts": ["IQ recording", "audio bursts", "hop pattern", "message recovery"],
         "steps": ["Open the emergency audio capture.", "Identify active frequencies and burst order.", "Listen to or inspect the reassembled call.", "Submit the callsign or location."],
-        "hints": ["This is the interactive audio level in the browser.", "Generate a new intercept and use the transcript backup if audio playback is unavailable."],
-        "artifacts": ARTIFACTS["weather"],
+        "hints": ["Play the supplied weekly-test reference from the Evidence panel to recognise the emergency-network cadence.", "Tune 169.650 MHz and run `receive`; this subtask awards its own callsign/location flag."],
+        "artifacts": emergency_audio_artifacts(),
         "script_commands": ["tune 169.650", "receive"],
     },
     {
@@ -399,8 +509,8 @@ TASKS = [
         "signal_scheme": "Weak-PRNG hopped emergency audio bursts.",
         "concepts": ["weak PRNG", "state recovery", "hop prediction", "audio operations"],
         "steps": ["Collect hop observations.", "Test the weak generator list.", "Predict the next burst frequency.", "Recover the callsign/location flag."],
-        "hints": ["The generator is weak enough for research and scripting.", "Use the networked terminal to automate repeated tune/status calls."],
-        "artifacts": ARTIFACTS["weather"],
+        "hints": ["The generator is weak enough for research and scripting.", "After predicting the sequence, `decode weak-prng` awards this subtask's own recovery flag."],
+        "artifacts": emergency_audio_artifacts(),
         "script_commands": ["tune 169.650", "decode weak-prng"],
     },
     {
@@ -421,9 +531,9 @@ TASKS = [
         "signal_scheme": "Digital emergency-audio metadata with integrity checks.",
         "concepts": ["reverse engineering", "metadata integrity", "message crafting", "operator effect"],
         "steps": ["Study the extracted receiver C file.", "Find metadata and integrity-check placement.", "Create a valid warning message.", "Activate the virtual warning light without triggering checks."],
-        "hints": ["The warning light is controlled by metadata, not by audio level alone.", "Try `send evacuation warning auth` after understanding the fields."],
-        "artifacts": ARTIFACTS["weather"],
-        "script_commands": ["tune 169.650", "send evacuation warning auth"],
+        "hints": ["The warning light is controlled by authenticated metadata, not by audio level alone.", "Use the emergency-transmission panel to intercept a current AUTH code and rebroadcast a complete warning."],
+        "artifacts": emergency_audio_artifacts(active_transmission=True),
+        "script_commands": ["tune 169.650", "receive"],
     },
     {
         "id": "bushfire-re-embedded",
@@ -457,17 +567,17 @@ TASKS = [
         "track": "cyber",
         "difficulty": "Advanced",
         "points": 340,
-        "scenario": "A recovered HDL block has a critical control flaw in its state handling.",
-        "objective": "Review the HDL, identify the flaw, and provide a testbench input that reaches the faulty condition.",
-        "details": "Review HDL and find the critical flaw such as no default statement or a race condition with an inferred latch.",
-        "flag_location": "Provide a live testbench input to the file that executes the faulting condition; upon failure it produces a flag.",
-        "developer_comments": "A live HDL testbench runner should be added for this advanced task.",
-        "signal_scheme": "HDL-controlled frequency-routing logic driven by decoded RF commands.",
-        "concepts": ["HDL review", "inferred latch", "testbench", "hardware security"],
-        "steps": ["Open the HDL evidence.", "Find the missing default or latch-style flaw.", "Construct a testbench input for the faulting condition.", "Submit the test input through the local interface."],
-        "hints": ["State machines without defaults often preserve stale control values.", "Try `send testbench latch default`."],
+        "scenario": "A recovered 12-element complex phased-array HDL block accepts relay data only when its quantised I/Q beam sum appears to arrive through the trusted beam.",
+        "objective": "Reverse engineer the beam gate, map its full response, and demonstrate an unintended lobe that is accepted as the trusted look direction.",
+        "details": "The design complex-multiplies every I/Q ADC channel by a quantised steering coefficient, accumulates the result, and gates data on beam magnitude. Inspect the HDL and sweep testbench to discover where the array geometry creates additional accepted lobes.",
+        "flag_location": "Submit an off-axis arrival bin and correlation score that the recovered beam gate still accepts.",
+        "developer_comments": "The advanced HDL task models a phased-array security boundary with an intended main lobe and poorly understood secondary/grating lobes.",
+        "signal_scheme": "Twelve-element complex I/Q multiply-accumulate beamformer with four-state phase weights gating decoded 433.92 MHz relay data.",
+        "concepts": ["HDL reverse engineering", "beamforming", "grating lobes", "spatial access control"],
+        "steps": ["Inspect the recovered beam-gate HDL.", "Run or reason through the 32-bin sweep testbench.", "Separate the intended main beam from off-axis accepted lobes.", "Submit one hidden lobe as `send beam bin <n> correlation <score>`."],
+        "hints": ["Do not assume a matching quantised steering vector identifies only one physical direction.", "The accepted off-axis response has correlation above the HDL threshold."],
         "artifacts": ARTIFACTS["bushfire"],
-        "script_commands": ["send testbench latch default"],
+        "script_commands": ["send beam bin <n> correlation <score>"],
     },
     {
         "id": "bushfire-rce",

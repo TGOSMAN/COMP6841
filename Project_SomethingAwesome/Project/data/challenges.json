@@ -455,7 +455,7 @@
     ],
     "hints": [
       "The first hopping pattern is intentionally clear.",
-      "Use the script interface to automate tune/receive cycles."
+      "Use the script interface to automate tune/receive cycles; a successful receive awards this subtask's callsign flag."
     ],
     "artifacts": [
       {
@@ -517,27 +517,28 @@
     "track": "signals",
     "difficulty": "Moderate",
     "points": 220,
-    "scenario": "The weather voice service moves from a clear hop pattern to a weak pseudorandom sequence.",
-    "objective": "Identify the weak generator family, predict enough hops, and recover the callsign codeword.",
-    "details": "Explain that predictable hopping is weak and that pseudorandom hopping is often used. A weak generator from a small list is used, and the learner must identify the pattern and perform the same recovery as before.",
+    "scenario": "The weather voice service now hops randomly between channels while a weak pseudorandom sequence obscures its phase symbols.",
+    "objective": "Track the random carrier hops, identify the weak phase generator, de-rotate the symbols, and recover the callsign codeword.",
+    "details": "The hop selection and phase obfuscation are independent. Follow the changing carrier, then identify RANDU from its phase-symbol sequence and remove those rotations to recover the weather audio.",
     "flag_location": "The codeword spoken as a callsign to everyone.",
     "developer_comments": "Ability to record signal with tuned receiver and download a data file of samples for offline processing.",
-    "signal_scheme": "Weak-PRNG hopping audio capture with recoverable state.",
+    "signal_scheme": "Complex weather voice audio randomly hops between six RF channels every 100 ms; fixed-seed RANDU rotates only the QPSK phase symbols.",
     "concepts": [
+      "frequency hopping",
       "weak PRNG",
-      "hop prediction",
+      "phase de-rotation",
       "audio recovery",
       "scripting"
     ],
     "steps": [
-      "Collect enough observed hop offsets.",
-      "Compare them with the provided weak-generator candidates.",
-      "Predict remaining hops.",
-      "Recover and submit the callsign codeword."
+      "Track the observed carrier hop for each 100 ms interval.",
+      "Extract the QPSK phase-symbol sequence.",
+      "Identify RANDU and predict the remaining phase rotations.",
+      "De-rotate the audio and submit the spoken callsign codeword."
     ],
     "hints": [
-      "The sequence is weak by design; treat it as a research exercise.",
-      "Script command: `receive` reports candidate hop-state evidence after lock."
+      "RANDU controls phase symbols only; it does not choose the hop channel.",
+      "After locking the receiver, `decode weak-prng` awards this subtask's own recovered callsign flag."
     ],
     "artifacts": [
       {
@@ -565,14 +566,14 @@
         "type": "text/x-python"
       },
       {
-        "label": "InterceptingReceiver_Task2 embedded Python block",
-        "href": "/radio/GNURadio/WeatherBroadcast/InterceptingReceiver_Task2_epy_block_0.py",
-        "type": "text/x-python"
-      },
-      {
         "label": "Weather GNU Radio resource guide",
         "href": "/radio/GNURadio/WeatherBroadcast/README.md",
         "type": "text/markdown"
+      },
+      {
+        "label": "InterceptingReceiver_Task2 embedded Python block",
+        "href": "/radio/GNURadio/WeatherBroadcast/InterceptingReceiver_Task2_epy_block_0.py",
+        "type": "text/x-python"
       },
       {
         "label": "InterceptingReceiver_Task2 real-channel WAV source",
@@ -653,6 +654,11 @@
         "type": "text/x-python"
       },
       {
+        "label": "Weather GNU Radio resource guide",
+        "href": "/radio/GNURadio/WeatherBroadcast/README.md",
+        "type": "text/markdown"
+      },
+      {
         "label": "EmergencyWarningLight hopping block",
         "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight_epy_block_0.py",
         "type": "text/x-python"
@@ -676,11 +682,6 @@
         "label": "Extracted alarm receiver header",
         "href": "/radio/GNURadio/WeatherBroadcast/MyEmbeddedAlarmSystem.h",
         "type": "text/x-c"
-      },
-      {
-        "label": "Weather GNU Radio resource guide",
-        "href": "/radio/GNURadio/WeatherBroadcast/README.md",
-        "type": "text/markdown"
       },
       {
         "label": "EmergencyWarningLight real-channel WAV source",
@@ -731,20 +732,31 @@
       "Submit the callsign or location."
     ],
     "hints": [
-      "This is the interactive audio level in the browser.",
-      "Generate a new intercept and use the transcript backup if audio playback is unavailable."
+      "Play the supplied weekly-test reference from the Evidence panel to recognise the emergency-network cadence.",
+      "Tune 169.650 MHz and run `receive`; this subtask awards its own callsign/location flag."
     ],
     "artifacts": [
       {
-        "label": "Weather voice allocation",
+        "label": "Emergency audio hopping capture",
         "href": "/captures/15-air-weather-voice.json",
         "type": "application/json",
         "role": "signal"
       },
       {
-        "label": "Generated SigMF metadata",
+        "label": "Emergency audio SigMF metadata",
         "href": "/captures/15-council-weather-audio.sigmf-meta",
         "type": "application/json"
+      },
+      {
+        "label": "Weekly emergency-network reference transmission",
+        "href": "/radio/GNURadio/EmergencyRadioAudio/Required_Weekly_Test_NOAA.ogg",
+        "type": "audio/ogg",
+        "role": "source_audio"
+      },
+      {
+        "label": "Emergency transmission protocol notes",
+        "href": "/radio/GNURadio/EmergencyRadioAudio/README.md",
+        "type": "text/markdown"
       }
     ],
     "script_commands": [
@@ -782,19 +794,30 @@
     ],
     "hints": [
       "The generator is weak enough for research and scripting.",
-      "Use the networked terminal to automate repeated tune/status calls."
+      "After predicting the sequence, `decode weak-prng` awards this subtask's own recovery flag."
     ],
     "artifacts": [
       {
-        "label": "Weather voice allocation",
+        "label": "Emergency audio hopping capture",
         "href": "/captures/15-air-weather-voice.json",
         "type": "application/json",
         "role": "signal"
       },
       {
-        "label": "Generated SigMF metadata",
+        "label": "Emergency audio SigMF metadata",
         "href": "/captures/15-council-weather-audio.sigmf-meta",
         "type": "application/json"
+      },
+      {
+        "label": "Weekly emergency-network reference transmission",
+        "href": "/radio/GNURadio/EmergencyRadioAudio/Required_Weekly_Test_NOAA.ogg",
+        "type": "audio/ogg",
+        "role": "source_audio"
+      },
+      {
+        "label": "Emergency transmission protocol notes",
+        "href": "/radio/GNURadio/EmergencyRadioAudio/README.md",
+        "type": "text/markdown"
       }
     ],
     "script_commands": [
@@ -831,25 +854,41 @@
       "Activate the virtual warning light without triggering checks."
     ],
     "hints": [
-      "The warning light is controlled by metadata, not by audio level alone.",
-      "Try `send evacuation warning auth` after understanding the fields."
+      "The warning light is controlled by authenticated metadata, not by audio level alone.",
+      "Use the emergency-transmission panel to intercept a current AUTH code and rebroadcast a complete warning."
     ],
     "artifacts": [
       {
-        "label": "Weather voice allocation",
+        "label": "Emergency audio hopping capture",
         "href": "/captures/15-air-weather-voice.json",
         "type": "application/json",
         "role": "signal"
       },
       {
-        "label": "Generated SigMF metadata",
+        "label": "Emergency audio SigMF metadata",
         "href": "/captures/15-council-weather-audio.sigmf-meta",
         "type": "application/json"
+      },
+      {
+        "label": "Weekly emergency-network reference transmission",
+        "href": "/radio/GNURadio/EmergencyRadioAudio/Required_Weekly_Test_NOAA.ogg",
+        "type": "audio/ogg",
+        "role": "source_audio"
+      },
+      {
+        "label": "Emergency transmission protocol notes",
+        "href": "/radio/GNURadio/EmergencyRadioAudio/README.md",
+        "type": "text/markdown"
+      },
+      {
+        "label": "Recovered emergency receiver C logic",
+        "href": "/radio/GNURadio/EmergencyRadioAudio/emergency_receiver.c",
+        "type": "text/x-c"
       }
     ],
     "script_commands": [
       "tune 169.650",
-      "send evacuation warning auth"
+      "receive"
     ]
   },
   {
@@ -907,8 +946,13 @@
         "type": "application/octet-stream"
       },
       {
-        "label": "Frequency router HDL",
-        "href": "/tools/hdl/bushfire_frequency_router.v",
+        "label": "Recovered 12-element complex beamformer HDL",
+        "href": "/radio/AntennaBinFormer.v",
+        "type": "text/plain"
+      },
+      {
+        "label": "Complex beamformer angular sweep testbench",
+        "href": "/radio/AntennaBinFormer_tb.v",
         "type": "text/plain"
       }
     ],
@@ -927,27 +971,27 @@
     "track": "cyber",
     "difficulty": "Advanced",
     "points": 340,
-    "scenario": "A recovered HDL block has a critical control flaw in its state handling.",
-    "objective": "Review the HDL, identify the flaw, and provide a testbench input that reaches the faulty condition.",
-    "details": "Review HDL and find the critical flaw such as no default statement or a race condition with an inferred latch.",
-    "flag_location": "Provide a live testbench input to the file that executes the faulting condition; upon failure it produces a flag.",
-    "developer_comments": "A live HDL testbench runner should be added for this advanced task.",
-    "signal_scheme": "HDL-controlled frequency-routing logic driven by decoded RF commands.",
+    "scenario": "A recovered 12-element complex phased-array HDL block accepts relay data only when its quantised I/Q beam sum appears to arrive through the trusted beam.",
+    "objective": "Reverse engineer the beam gate, map its full response, and demonstrate an unintended lobe that is accepted as the trusted look direction.",
+    "details": "The design complex-multiplies every I/Q ADC channel by a quantised steering coefficient, accumulates the result, and gates data on beam magnitude. Inspect the HDL and sweep testbench to discover where the array geometry creates additional accepted lobes.",
+    "flag_location": "Submit an off-axis arrival bin and correlation score that the recovered beam gate still accepts.",
+    "developer_comments": "The advanced HDL task models a phased-array security boundary with an intended main lobe and poorly understood secondary/grating lobes.",
+    "signal_scheme": "Twelve-element complex I/Q multiply-accumulate beamformer with four-state phase weights gating decoded 433.92 MHz relay data.",
     "concepts": [
-      "HDL review",
-      "inferred latch",
-      "testbench",
-      "hardware security"
+      "HDL reverse engineering",
+      "beamforming",
+      "grating lobes",
+      "spatial access control"
     ],
     "steps": [
-      "Open the HDL evidence.",
-      "Find the missing default or latch-style flaw.",
-      "Construct a testbench input for the faulting condition.",
-      "Submit the test input through the local interface."
+      "Inspect the recovered beam-gate HDL.",
+      "Run or reason through the 32-bin sweep testbench.",
+      "Separate the intended main beam from off-axis accepted lobes.",
+      "Submit one hidden lobe as `send beam bin <n> correlation <score>`."
     ],
     "hints": [
-      "State machines without defaults often preserve stale control values.",
-      "Try `send testbench latch default`."
+      "Do not assume a matching quantised steering vector identifies only one physical direction.",
+      "The accepted off-axis response has correlation above the HDL threshold."
     ],
     "artifacts": [
       {
@@ -972,13 +1016,18 @@
         "type": "application/octet-stream"
       },
       {
-        "label": "Frequency router HDL",
-        "href": "/tools/hdl/bushfire_frequency_router.v",
+        "label": "Recovered 12-element complex beamformer HDL",
+        "href": "/radio/AntennaBinFormer.v",
+        "type": "text/plain"
+      },
+      {
+        "label": "Complex beamformer angular sweep testbench",
+        "href": "/radio/AntennaBinFormer_tb.v",
         "type": "text/plain"
       }
     ],
     "script_commands": [
-      "send testbench latch default"
+      "send beam bin <n> correlation <score>"
     ]
   },
   {
@@ -1036,8 +1085,13 @@
         "type": "application/octet-stream"
       },
       {
-        "label": "Frequency router HDL",
-        "href": "/tools/hdl/bushfire_frequency_router.v",
+        "label": "Recovered 12-element complex beamformer HDL",
+        "href": "/radio/AntennaBinFormer.v",
+        "type": "text/plain"
+      },
+      {
+        "label": "Complex beamformer angular sweep testbench",
+        "href": "/radio/AntennaBinFormer_tb.v",
         "type": "text/plain"
       }
     ],
@@ -1100,8 +1154,13 @@
         "type": "application/octet-stream"
       },
       {
-        "label": "Frequency router HDL",
-        "href": "/tools/hdl/bushfire_frequency_router.v",
+        "label": "Recovered 12-element complex beamformer HDL",
+        "href": "/radio/AntennaBinFormer.v",
+        "type": "text/plain"
+      },
+      {
+        "label": "Complex beamformer angular sweep testbench",
+        "href": "/radio/AntennaBinFormer_tb.v",
         "type": "text/plain"
       }
     ],

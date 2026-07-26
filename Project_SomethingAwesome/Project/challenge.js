@@ -125,9 +125,9 @@ function renderChallenge() {
     backLink.href = "/#tasks";
     backLink.textContent = "Back to all situations";
   }
-  const isWeatherRadio = task.id === "civilian-emergency-intercept";
-  byId("weather-radio").hidden = !isWeatherRadio;
-  if (isWeatherRadio) initialiseWeatherRadio();
+  const isEmergencyTransmission = task.id === "civilian-emergency-active-re";
+  byId("weather-radio").hidden = !isEmergencyTransmission;
+  if (isEmergencyTransmission) initialiseWeatherRadio();
   const isAlarmPacketTask = task.id === "weather-boring-active-re";
   byId("alarm-packet-lab").hidden = !isAlarmPacketTask;
   if (isAlarmPacketTask) initialiseAlarmPacketLab();
@@ -234,7 +234,7 @@ async function generateWeatherIntercept() {
     byId("weather-report-form").querySelector("button").disabled = false;
     byId("weather-injection").value = "";
     byId("weather-radio-status").innerHTML = "<i></i> Intercept ready";
-    byId("weather-report-result").textContent = `Intercept ready: ${weatherRadio.intercept.callsign} on ${weatherRadio.intercept.channel}. Listen for the protocol fields, then write your own warning message.`;
+    byId("weather-report-result").textContent = `Transmission captured: ${weatherRadio.intercept.callsign} on ${weatherRadio.intercept.channel}. Recover every protocol field, then compose the accepted emergency rebroadcast.`;
     terminalWrite(`VOICE INTERCEPT ${weatherRadio.intercept.intercept_id} buffered on ${weatherRadio.intercept.channel}`, "system");
   } catch (error) {
     byId("weather-radio-status").innerHTML = "<i></i> Link failed";
@@ -320,7 +320,7 @@ function stopWeatherPlayback(status = "Intercept stopped") {
   try { weatherRadio.noiseSource?.stop(); } catch { /* already stopped */ }
   weatherRadio.noiseSource = null;
   weatherRadio.noiseGain = null;
-  byId("weather-play").textContent = "2. Listen to authentic call";
+  byId("weather-play").textContent = "2. Listen to intercepted call";
   byId("weather-radio-scope").classList.remove("active");
   byId("weather-radio-status").classList.remove("transmitting");
   if (weatherRadio.intercept) byId("weather-radio-status").innerHTML = `<i></i> ${escapeHtml(status)}`;
@@ -343,6 +343,7 @@ async function submitWeatherInjection(event) {
     headers: { "Content-Type": "application/json", "X-Signal-Session": analysis.sessionId },
     body: JSON.stringify({
       session_id: analysis.sessionId,
+      challenge_id: analysis.task.id,
       intercept_id: weatherRadio.intercept.intercept_id,
       message: injectionMessage
     })
@@ -478,7 +479,9 @@ async function loadArtifactCapture(artifact = analysis.task.artifacts.find((cand
     renderLegend();
     renderParserEvent(analysis.meta.parser);
     if (!analysis.playing) togglePlayback();
-    if (analysis.task.id === "civilian-emergency-intercept") await runRfCommand("tune");
+    if (["weather-broadcast-boring-voice", "civilian-emergency-radio-audio-network"].includes(analysis.task.context_id)) {
+      await runRfCommand("tune");
+    }
   } catch (error) {
     byId("capture-status").textContent = "Capture failed to load";
     byId("measurement-bar").textContent = error.message;
@@ -1422,6 +1425,12 @@ async function inspectArtifact(artifact) {
     if (contentType.startsWith("image/")) {
       const url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
       visual.innerHTML = `<img class="artifact-image" src="${url}" alt="${escapeHtml(artifact.label)} preview">`;
+      byId("artifact-content").textContent = `${bytes.length} byte ${contentType} artifact`;
+      return;
+    }
+    if (contentType.startsWith("audio/")) {
+      const url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
+      visual.innerHTML = `<div class="artifact-preview-heading"><strong>Audio reference</strong><span>${escapeHtml(contentType)}</span></div><audio controls preload="metadata" src="${url}"></audio>`;
       byId("artifact-content").textContent = `${bytes.length} byte ${contentType} artifact`;
       return;
     }

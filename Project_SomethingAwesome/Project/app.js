@@ -25,10 +25,6 @@ const state = {
     timer: null
   }
 };
-const signalForgeSession = sessionStorage.getItem("signalForgeSession") || crypto.randomUUID();
-sessionStorage.setItem("signalForgeSession", signalForgeSession);
-const signalSessionHeaders = { "X-Signal-Session": signalForgeSession };
-
 const taskGrid = document.querySelector("#task-grid");
 const filters = document.querySelectorAll(".filter");
 const detailPanel = document.querySelector("#challenge-detail");
@@ -40,11 +36,6 @@ const dataMode = document.querySelector("#data-mode");
 const attackModeButton = document.querySelector("#attack-mode");
 const secureModeButton = document.querySelector("#secure-mode");
 const modeStatus = document.querySelector("#mode-status");
-const operatorForm = document.querySelector("#operator-form");
-const operatorEvents = document.querySelector("#operator-events");
-const refreshOperator = document.querySelector("#refresh-operator");
-const receiveRadio = document.querySelector("#receive-radio");
-const operatorDecode = document.querySelector("#operator-decode");
 const zoomFreq = document.querySelector("#zoom-freq");
 const zoomTime = document.querySelector("#zoom-time");
 const zoomReadout = document.querySelector("#zoom-readout");
@@ -57,7 +48,6 @@ async function boot() {
   updateZoomReadout();
   seedWaterfall();
   drawWaterfall();
-  await loadOperatorEvents();
 }
 
 async function loadMode() {
@@ -247,7 +237,6 @@ async function setMode(mode) {
   const data = await response.json();
   state.mode = data.mode;
   renderMode();
-  await loadOperatorEvents();
 }
 
 function renderMode() {
@@ -256,23 +245,6 @@ function renderMode() {
   modeStatus.textContent = state.mode === "attack" ? "Attack Mode" : "Secure Mode";
   modeStatus.style.color = state.mode === "attack" ? "var(--amber)" : "var(--green)";
 }
-
-operatorForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  await fetch("/operator/comment", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      callsign: document.querySelector("#operator-callsign").value,
-      route_note: document.querySelector("#operator-route-note").value,
-      operator_comment: document.querySelector("#operator-comment").value
-    })
-  });
-  await loadOperatorEvents();
-});
-
-refreshOperator.addEventListener("click", loadOperatorEvents);
-receiveRadio.addEventListener("click", receiveRadioIntercept);
 
 zoomFreq.addEventListener("input", () => {
   state.mainZoom.freq = Number(zoomFreq.value);
@@ -288,49 +260,6 @@ zoomTime.addEventListener("input", () => {
 
 function updateZoomReadout() {
   zoomReadout.textContent = `${state.mainZoom.freq.toFixed(1)}x freq / ${state.mainZoom.time.toFixed(1)}x time`;
-}
-
-async function receiveRadioIntercept() {
-  operatorDecode.textContent = "Receiving burst, correlating preamble...";
-  const response = await fetch("/api/radio/intercept", { headers: signalSessionHeaders });
-  const data = await response.json();
-  document.querySelector("#operator-callsign").value = data.callsign;
-  document.querySelector("#operator-route-note").value = `${data.modulation} ${data.channel_label}: ${data.vehicle_id} ${data.route_code}/${data.schedule_code}`;
-  document.querySelector("#operator-comment").value = data.operator_note;
-  operatorDecode.innerHTML = `
-    <dl>
-      <dt>frame</dt><dd>${data.frame_id}</dd>
-      <dt>channel</dt><dd>${data.channel_label}</dd>
-      <dt>modulation</dt><dd>${data.modulation}</dd>
-      <dt>vehicle</dt><dd>${data.vehicle_id}</dd>
-      <dt>route</dt><dd>${data.route_code}</dd>
-      <dt>checksum</dt><dd>${data.checksum}</dd>
-      <dt>sink</dt><dd>${data.sink_warning}</dd>
-    </dl>
-  `;
-}
-
-async function loadOperatorEvents() {
-  const response = await fetch("/operator/events", { headers: signalSessionHeaders });
-  const data = await response.json();
-  operatorEvents.innerHTML = "";
-  data.events.forEach((event) => {
-    const card = document.createElement("article");
-    card.className = "operator-event";
-    const header = document.createElement("h3");
-    header.textContent = event.callsign;
-    const note = document.createElement("p");
-    note.textContent = event.route_note;
-    const comment = document.createElement("div");
-    comment.className = "operator-comment";
-    if (data.mode === "attack") {
-      comment.innerHTML = event.operator_comment;
-    } else {
-      comment.textContent = event.operator_comment;
-    }
-    card.append(header, note, comment);
-    operatorEvents.appendChild(card);
-  });
 }
 
 pauseButton.addEventListener("click", () => {

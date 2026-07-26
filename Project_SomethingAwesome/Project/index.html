@@ -17,7 +17,6 @@
         <a href="#safety">Safety</a>
         <a href="#blueprint">Learning Arc</a>
         <a href="#tasks">Tasks</a>
-        <a href="#operator-console">Operator</a>
         <a href="#research">Research</a>
         <a href="#bridge">GNU Radio</a>
         <a href="/guide.html">Setup Guide</a>
@@ -209,47 +208,6 @@
         </aside>
 
         <div class="task-grid" id="task-grid"></div>
-      </section>
-
-      <section class="operator-console" id="operator-console">
-        <div class="section-header compact">
-          <p class="eyebrow">Operator Console</p>
-          <h2>RF-to-Operator Trust Boundary</h2>
-          <p>
-            Decoded RF fields become operator-console data. This section exists
-            to show why RF-origin text is still untrusted input: Attack Mode
-            renders one note as active markup, while Secure Mode treats the same
-            field as inert text.
-          </p>
-        </div>
-        <div class="operator-grid">
-          <form id="operator-form" class="operator-form">
-            <div class="radio-ops-panel">
-              <button id="receive-radio" type="button">Receive RF burst</button>
-              <div id="operator-decode" class="operator-decode">No burst decoded yet.</div>
-            </div>
-            <label>
-              Callsign
-              <input id="operator-callsign" value="CIVIC-OPS-1">
-            </label>
-            <label>
-              Route note
-              <input id="operator-route-note" value="Synthetic decoded training event">
-            </label>
-            <label>
-              Decoded operator note
-              <textarea id="operator-comment" placeholder="Receive an RF burst to populate this untrusted field."></textarea>
-            </label>
-            <button type="submit">Post comment</button>
-            <p id="operator-flag" class="flag-result" aria-live="polite"></p>
-          </form>
-          <div>
-            <div class="operator-actions">
-              <button id="refresh-operator" type="button">Refresh events</button>
-            </div>
-            <div id="operator-events" class="operator-events"></div>
-          </div>
-        </div>
       </section>
 
       <section class="lab-band">
