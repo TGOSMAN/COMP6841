@@ -29,7 +29,7 @@ WEATHER_CAPTURE_STEMS = {
 
 def gnu_radio_artifacts(task_id: str, stem: str, folder: str, label_prefix: str) -> list[dict]:
     label = f"{label_prefix} {stem}".strip()
-    return [
+    artifacts = [
         {
             "label": f"{label} generated GNU Radio replay",
             "href": f"/api/rf/gnu-radio-capture?challenge_id={task_id}",
@@ -45,6 +45,26 @@ def gnu_radio_artifacts(task_id: str, stem: str, folder: str, label_prefix: str)
             "source": "generated_gnuradio_python",
         },
     ]
+    if folder != "WeatherBroadcast":
+        artifacts.extend(
+            [
+                {
+                    "label": f"{label} GNU Radio flowgraph",
+                    "href": f"/radio/GNURadio/{folder}/{stem}.grc",
+                    "type": "application/x-gnuradio-grc",
+                    "role": "flowgraph_source",
+                    "source": "gnu_radio_companion",
+                },
+                {
+                    "label": f"{label} generated Python",
+                    "href": f"/radio/GNURadio/{folder}/{stem}.py",
+                    "type": "text/x-python",
+                    "role": "flowgraph_source",
+                    "source": "gnu_radio_companion",
+                },
+            ]
+        )
+    return artifacts
 
 
 def tunnel_artifacts(task_id: str) -> list[dict]:

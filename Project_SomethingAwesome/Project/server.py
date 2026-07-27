@@ -863,6 +863,16 @@ def generated_flowgraph_config(settings: dict) -> dict:
         return cached
 
     source = script_path.read_text(encoding="utf-8", errors="replace")
+    source_sha256 = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    flowgraph_blocks = list(
+        dict.fromkeys(
+            re.findall(
+                r"self\.[A-Za-z_][A-Za-z0-9_]*\s*=\s*"
+                r"((?:[A-Za-z_][A-Za-z0-9_]*\.)+[A-Za-z_][A-Za-z0-9_]*)\s*\(",
+                source,
+            )
+        )
+    )
     payload_match = re.search(r"vector_source_b\(list\((b(?:\"(?:\\.|[^\"])*\"|'(?:\\.|[^'])*'))\)", source)
     if not payload_match:
         raise ValueError(f"Could not find vector_source_b byte payload in {relative}")
@@ -876,17 +886,25 @@ def generated_flowgraph_config(settings: dict) -> dict:
     carrier_match = re.search(r"analog\.sig_source_c\([^,]+,\s*analog\.GR_COS_WAVE,\s*([0-9_]+(?:\.[0-9_]+)?)", source)
     noise_match = re.search(r"noise_voltage\s*=\s*([0-9_]+(?:\.[0-9_]+)?)", source)
     repack_match = re.search(r"repack_bits_bb\(\s*([0-9_]+)\s*,\s*([0-9_]+)", source)
+    interleaved_match = re.search(
+        r"interleaved_char_to_complex\(\s*(?:True|False)\s*,\s*"
+        r"([0-9_]+(?:\.[0-9_]+)?)",
+        source,
+    )
 
     repeat = int(parse_number_literal(repeat_match.group(1), settings.get("samples_per_symbol", 500) * 2)) if repeat_match else int(settings.get("samples_per_symbol", 500)) * 2
     bits_per_symbol = int(parse_number_literal(repack_match.group(2), 1)) if repack_match else int(settings.get("bits_per_symbol", 1))
     bits = payload_bits_msb(payload)
     symbols = symbols_from_bits(bits, bits_per_symbol)
     samples_per_symbol = max(1, repeat // 2)
-    script_hash_seed = int(hashlib.sha256(str(script_path).encode("utf-8")).hexdigest()[:8], 16)
+    script_hash_seed = int(source_sha256[:8], 16)
     config = {
         "source_mode": "generated_python_flowgraph",
         "source_script": str(relative).replace("\\", "/"),
         "script_size_bytes": script_path.stat().st_size,
+        "source_sha256": source_sha256,
+        "flowgraph_blocks": flowgraph_blocks,
+        "flowgraph_block_count": len(flowgraph_blocks),
         "sample_rate": parse_number_literal(sample_rate_match.group(1), float(settings.get("sample_rate", 44_200))) if sample_rate_match else float(settings.get("sample_rate", 44_200)),
         "carrier_offset_hz": parse_number_literal(carrier_match.group(1), float(capture_info.get("carrier_offset_hz", 10_000))) if carrier_match else float(capture_info.get("carrier_offset_hz", 10_000)),
         "repeat": repeat,
@@ -899,6 +917,8 @@ def generated_flowgraph_config(settings: dict) -> dict:
         "symbols": symbols or [0],
         "period_samples": max(1, len(symbols) * samples_per_symbol),
         "noise_voltage": parse_number_literal(noise_match.group(1), 0.0) if noise_match else 0.0,
+        "interleaved_char_to_complex": bool(interleaved_match),
+        "interleaved_scale": parse_number_literal(interleaved_match.group(1), 1.0) if interleaved_match else 1.0,
         "seed": script_hash_seed,
         "has_repack_bits": bool(repack_match),
     }
@@ -1162,14 +1182,17 @@ def generated_flowgraph_iq_samples(settings: dict, start_sample: int, sample_cou
     phase_step = 2.0 * math.pi * carrier_offset / sample_rate
     carrier = complex(math.cos(phase_step * start_sample), math.sin(phase_step * start_sample))
     rotation = complex(math.cos(phase_step), math.sin(phase_step))
-    noise_scale = min(0.025, max(0.0, float(flowgraph.get("noise_voltage", 0.0))) * 0.025)
+    noise_scale = max(0.0, float(flowgraph.get("noise_voltage", 0.0))) * 2.0
+    interleaved_complex = bool(flowgraph.get("interleaved_char_to_complex", False))
+    interleaved_scale = max(1e-9, float(flowgraph.get("interleaved_scale", 1.0)))
     seed = int(flowgraph.get("seed", 0))
     samples: list[complex] = []
     for offset in range(sample_count):
         sample_index = start_sample + offset
         symbol = symbols[(sample_index // samples_per_symbol) % len(symbols)]
-        value = float(symbol)
-        sample = carrier * value
+        value = float(symbol) / interleaved_scale
+        baseband = complex(value, value) if interleaved_complex else complex(value, 0.0)
+        sample = carrier * baseband
         if noise_scale:
             sample += complex(
                 deterministic_noise(seed, sample_index * 2) * noise_scale,
@@ -1523,6 +1546,17 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         },
         "note": str(decoder.get("note") or "Binary symbols recovered from IQ amplitude; byte alignment is estimated from printable payload structure."),
     }
+    if generated_source:
+        parser["fields"].update(
+            {
+                "flowgraph_source": str(flowgraph.get("source_script", "")),
+                "flowgraph_sha256": str(flowgraph.get("source_sha256", "")),
+                "flowgraph_block_count": int(flowgraph.get("flowgraph_block_count", 0)),
+                "flowgraph_blocks": flowgraph.get("flowgraph_blocks", []),
+                "source_payload_bytes": len(flowgraph.get("payload", b"")),
+                "source_period_samples": int(flowgraph.get("period_samples", 0)),
+            }
+        )
     if audio_weather_source:
         parser["stage"] = "energy_detect"
         parser["fields"].update(
@@ -1561,6 +1595,7 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         source_files["generated_python"] = {
             "path": str(flowgraph.get("source_script", "")).replace("\\", "/"),
             "size_bytes": int(flowgraph.get("script_size_bytes", 0)),
+            "sha256": str(flowgraph.get("source_sha256", "")),
         }
         source_files.pop("raw_iq", None)
         source_files.pop("file_meta", None)

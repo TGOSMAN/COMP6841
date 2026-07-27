@@ -45,6 +45,20 @@
         "type": "bounded generated cf32 IQ sample",
         "role": "raw_iq",
         "source": "generated_gnuradio_python"
+      },
+      {
+        "label": "ReadingSignals GNU Radio flowgraph",
+        "href": "/radio/GNURadio/Tunnel_Task/ReadingSignals.grc",
+        "type": "application/x-gnuradio-grc",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
+      },
+      {
+        "label": "ReadingSignals generated Python",
+        "href": "/radio/GNURadio/Tunnel_Task/ReadingSignals.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
       }
     ],
     "script_commands": [
@@ -97,6 +111,20 @@
         "type": "bounded generated cf32 IQ sample",
         "role": "raw_iq",
         "source": "generated_gnuradio_python"
+      },
+      {
+        "label": "TuningSignals GNU Radio flowgraph",
+        "href": "/radio/GNURadio/Tunnel_Task/TuningSignals.grc",
+        "type": "application/x-gnuradio-grc",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
+      },
+      {
+        "label": "TuningSignals generated Python",
+        "href": "/radio/GNURadio/Tunnel_Task/TuningSignals.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
       }
     ],
     "script_commands": [
@@ -151,6 +179,20 @@
         "type": "bounded generated cf32 IQ sample",
         "role": "raw_iq",
         "source": "generated_gnuradio_python"
+      },
+      {
+        "label": "DoSAttackMe GNU Radio flowgraph",
+        "href": "/radio/GNURadio/Tunnel_Task/DoSAttackMe.grc",
+        "type": "application/x-gnuradio-grc",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
+      },
+      {
+        "label": "DoSAttackMe generated Python",
+        "href": "/radio/GNURadio/Tunnel_Task/DoSAttackMe.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
       }
     ],
     "script_commands": [
@@ -205,6 +247,20 @@
         "type": "bounded generated cf32 IQ sample",
         "role": "raw_iq",
         "source": "generated_gnuradio_python"
+      },
+      {
+        "label": "InjectionTime GNU Radio flowgraph",
+        "href": "/radio/GNURadio/Tunnel_Task/InjectionTime.grc",
+        "type": "application/x-gnuradio-grc",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
+      },
+      {
+        "label": "InjectionTime generated Python",
+        "href": "/radio/GNURadio/Tunnel_Task/InjectionTime.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
       }
     ],
     "script_commands": [
@@ -258,6 +314,20 @@
         "type": "bounded generated cf32 IQ sample",
         "role": "raw_iq",
         "source": "generated_gnuradio_python"
+      },
+      {
+        "label": "Song metadata ReadingSignals GNU Radio flowgraph",
+        "href": "/radio/GNURadio/Song_Meta/ReadingSignals.grc",
+        "type": "application/x-gnuradio-grc",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
+      },
+      {
+        "label": "Song metadata ReadingSignals generated Python",
+        "href": "/radio/GNURadio/Song_Meta/ReadingSignals.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
       }
     ],
     "script_commands": [
@@ -310,6 +380,20 @@
         "type": "bounded generated cf32 IQ sample",
         "role": "raw_iq",
         "source": "generated_gnuradio_python"
+      },
+      {
+        "label": "Song metadata TuningSignals GNU Radio flowgraph",
+        "href": "/radio/GNURadio/Song_Meta/TuningSignals.grc",
+        "type": "application/x-gnuradio-grc",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
+      },
+      {
+        "label": "Song metadata TuningSignals generated Python",
+        "href": "/radio/GNURadio/Song_Meta/TuningSignals.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
       }
     ],
     "script_commands": [
@@ -364,6 +448,20 @@
         "type": "bounded generated cf32 IQ sample",
         "role": "raw_iq",
         "source": "generated_gnuradio_python"
+      },
+      {
+        "label": "Song metadata DoSAttackMe GNU Radio flowgraph",
+        "href": "/radio/GNURadio/Song_Meta/DoSAttackMe.grc",
+        "type": "application/x-gnuradio-grc",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
+      },
+      {
+        "label": "Song metadata DoSAttackMe generated Python",
+        "href": "/radio/GNURadio/Song_Meta/DoSAttackMe.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
       }
     ],
     "script_commands": [
@@ -418,6 +516,20 @@
         "type": "bounded generated cf32 IQ sample",
         "role": "raw_iq",
         "source": "generated_gnuradio_python"
+      },
+      {
+        "label": "Song metadata InjectionTime GNU Radio flowgraph",
+        "href": "/radio/GNURadio/Song_Meta/InjectionTime.grc",
+        "type": "application/x-gnuradio-grc",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
+      },
+      {
+        "label": "Song metadata InjectionTime generated Python",
+        "href": "/radio/GNURadio/Song_Meta/InjectionTime.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source",
+        "source": "gnu_radio_companion"
       }
     ],
     "script_commands": [
