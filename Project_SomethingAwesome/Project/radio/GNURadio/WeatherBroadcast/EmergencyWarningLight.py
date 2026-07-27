@@ -30,7 +30,8 @@ import sip
 import threading
 
 
-RESOURCE_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from signal_forge_live_sink import SignalForgeLiveSink
 
 
 
@@ -76,6 +77,13 @@ class EmergencyWarningLight(gr.top_block, Qt.QWidget):
         # Blocks
         ##################################################
 
+        self.signal_forge_live_sink_0 = SignalForgeLiveSink(
+            challenge_id="weather-boring-active-re",
+            center_hz=169_650_000,
+            sample_rate_hz=samp_rate,
+            source_label="EmergencyWarningLight.py post-channel-model CF32",
+            modulation="live generated alarm metadata",
+        )
         self.qtgui_waterfall_sink_x_0 = qtgui.waterfall_sink_c(
             1024, #size
             window.WIN_BLACKMAN_hARRIS, #wintype
@@ -172,8 +180,6 @@ class EmergencyWarningLight(gr.top_block, Qt.QWidget):
             taps=[1.0],
             noise_seed=0,
             block_tags=False)
-        self.blocks_wavfile_source_1 = blocks.wavfile_source(str(RESOURCE_DIR / 'WeatherRadio_T3_IM.wav'), True)
-        self.blocks_wavfile_source_0 = blocks.wavfile_source(str(RESOURCE_DIR / 'WeatherRadio_T3_RE.wav'), True)
         self.blocks_stream_mux_0 = blocks.stream_mux(gr.sizeof_gr_complex*1, (1000, 1000))
         self.blocks_packed_to_unpacked_xx_0_0 = blocks.packed_to_unpacked_ii(1, gr.GR_MSB_FIRST)
         self.blocks_packed_to_unpacked_xx_0 = blocks.packed_to_unpacked_ii(1, gr.GR_MSB_FIRST)
@@ -183,6 +189,8 @@ class EmergencyWarningLight(gr.top_block, Qt.QWidget):
         self.blocks_float_to_short_0_0 = blocks.float_to_short(1, 1)
         self.blocks_float_to_short_0 = blocks.float_to_short(1, 1)
         self.blocks_float_to_complex_0 = blocks.float_to_complex(1)
+        self.analog_packet_q_0 = analog.sig_source_f(samp_rate, analog.GR_COS_WAVE, 1730, 12000, 18000)
+        self.analog_packet_i_0 = analog.sig_source_f(samp_rate, analog.GR_SIN_WAVE, 970, 14000, 20000)
         self.analog_sig_source_x_0_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 500000, 1, 0, 0)
         self.analog_sig_source_x_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 500000, 1, 0, 0)
 
@@ -192,6 +200,8 @@ class EmergencyWarningLight(gr.top_block, Qt.QWidget):
         ##################################################
         self.connect((self.analog_sig_source_x_0, 0), (self.blocks_stream_mux_0, 0))
         self.connect((self.analog_sig_source_x_0_0, 0), (self.blocks_stream_mux_0, 1))
+        self.connect((self.analog_packet_i_0, 0), (self.blocks_float_to_short_0, 0))
+        self.connect((self.analog_packet_q_0, 0), (self.blocks_float_to_short_0_0, 0))
         self.connect((self.blocks_float_to_complex_0, 0), (self.epy_block_0, 0))
         self.connect((self.blocks_float_to_short_0, 0), (self.epy_block_1, 0))
         self.connect((self.blocks_float_to_short_0_0, 0), (self.epy_block_1_0, 0))
@@ -202,8 +212,7 @@ class EmergencyWarningLight(gr.top_block, Qt.QWidget):
         self.connect((self.blocks_packed_to_unpacked_xx_0, 0), (self.blocks_int_to_float_0, 0))
         self.connect((self.blocks_packed_to_unpacked_xx_0_0, 0), (self.blocks_int_to_float_0_0, 0))
         self.connect((self.blocks_stream_mux_0, 0), (self.blocks_multiply_xx_0, 1))
-        self.connect((self.blocks_wavfile_source_0, 0), (self.blocks_float_to_short_0, 0))
-        self.connect((self.blocks_wavfile_source_1, 0), (self.blocks_float_to_short_0_0, 0))
+        self.connect((self.channels_channel_model_0, 0), (self.signal_forge_live_sink_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_time_sink_x_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_waterfall_sink_x_0, 0))
         self.connect((self.epy_block_0, 0), (self.blocks_multiply_xx_0, 0))
@@ -226,6 +235,8 @@ class EmergencyWarningLight(gr.top_block, Qt.QWidget):
         self.samp_rate = samp_rate
         self.analog_sig_source_x_0.set_sampling_freq(self.samp_rate)
         self.analog_sig_source_x_0_0.set_sampling_freq(self.samp_rate)
+        self.analog_packet_i_0.set_sampling_freq(self.samp_rate)
+        self.analog_packet_q_0.set_sampling_freq(self.samp_rate)
         self.qtgui_time_sink_x_0.set_samp_rate(self.samp_rate)
         self.qtgui_waterfall_sink_x_0.set_frequency_range(0, self.samp_rate)
 

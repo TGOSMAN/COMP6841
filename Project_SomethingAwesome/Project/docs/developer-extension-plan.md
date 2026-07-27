@@ -14,7 +14,7 @@ This project is designed to give you room to push the CTF toward serious contest
 
 ## Security Hardening Ideas
 
-Current Secure Mode uses HMAC-SHA256, timestamp freshness, nonce replay rejection, parameterized SQL, server-side authorization, and safe output rendering.
+Current defensive examples use HMAC-SHA256, timestamp freshness, nonce replay rejection, parameterized SQL, server-side authorization, and safe output rendering.
 
 Next useful upgrades:
 

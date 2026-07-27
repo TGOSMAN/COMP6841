@@ -99,12 +99,10 @@ sudo apt update
 sudo apt install gnuradio python3-numpy python3-scipy python3-zmq
 gnuradio-companion</code></pre>
             <p>
-              The default challenge replay now uses the generated `.py`
-              flowgraph as the editable source. The backend reads the vector
-              source, repeat rate, bit packing, sample rate, and carrier tone
-              from that script and synthesizes the waterfall stream on demand.
-              File sink recordings are useful snapshots, but they are no longer
-              required for the browser view.
+              The beginner challenge view now consumes the generated `.py`
+              flowgraph while that flowgraph is actually running. Its built-in
+              Signal Forge sink sends the post-channel-model complex samples to
+              the server; no recording is replayed or synthesized by the browser.
             </p>
           </section>
 
@@ -119,8 +117,13 @@ gnuradio-companion</code></pre>
             <pre><code>python tools/script_clients/external_signal_sender.py --challenge-id tunnel-packet-injection --mode fft</code></pre>
             <p>Raw IQ test:</p>
             <pre><code>python tools/script_clients/external_signal_sender.py --challenge-id tunnel-packet-injection --mode iq --block-samples 2048</code></pre>
-            <p>Optional: stream an existing GNU Radio file sink output:</p>
-            <pre><code>python tools/script_clients/external_signal_sender.py --challenge-id tunnel-basic-dos --mode file --file radio/GNURadio/Tunnel_Task/DoSAttackMe.sigmf-data --loop</code></pre>
+            <p>
+              Start the site with <code>python server.py</code>. Opening a
+              beginner challenge automatically launches its mapped generated
+              flowgraph. If GNU Radio uses a custom environment, set
+              <code>SIGNAL_FORGE_GNURADIO_PYTHON</code> to that environment's
+              Python executable before starting the server.
+            </p>
           </section>
 
           <section class="guide-section" id="zmq">
@@ -208,7 +211,7 @@ gnuradio-companion</code></pre>
               </article>
               <article>
                 <h3>Defence</h3>
-                <p>Build Secure Mode around freshness, message authentication, server-side policy, hardened parsers, anomaly detection, and operational holdover logic.</p>
+                <p>Build defensive paths around freshness, message authentication, server-side policy, hardened parsers, anomaly detection, and operational holdover logic.</p>
               </article>
             </div>
           </section>

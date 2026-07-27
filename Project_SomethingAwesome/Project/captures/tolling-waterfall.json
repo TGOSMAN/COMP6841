@@ -17,7 +17,7 @@
     "modulation": "2-FSK teaching burst with FHSS-like channel plan",
     "symbol_rate": 2400,
     "channel_spacing_hz": 160000,
-    "integrity": "weak checksum in attack captures; HMAC/freshness in secure mode"
+    "integrity": "weak checksum in challenge captures; HMAC/freshness in the defensive telemetry example"
   },
   "annotations": [
     {

@@ -80,46 +80,6 @@ blocks:
     coordinate: [1784, 864.0]
     rotation: 0
     state: enabled
-- name: blocks_file_meta_sink_0
-  id: blocks_file_meta_sink
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: ''
-    detached: 'False'
-    extra_dict: pmt.make_dict()
-    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\Tunnel_Task\ReadingSignals.sigmf-meta
-    max_seg_size: '1000000'
-    rel_rate: '1'
-    samp_rate: samp_rate
-    type: complex
-    unbuffered: 'False'
-    vlen: '1'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [2720, 124.0]
-    rotation: 0
-    state: enabled
-- name: blocks_file_sink_0
-  id: blocks_file_sink
-  parameters:
-    affinity: ''
-    alias: ''
-    append: 'False'
-    comment: ''
-    file: C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project\radio\GNURadio\Tunnel_Task\ReadingSignals.sigmf-data
-    type: complex
-    unbuffered: 'False'
-    vlen: '1'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate: [2712, 384.0]
-    rotation: 0
-    state: enabled
 - name: blocks_interleaved_char_to_complex_0
   id: blocks_interleaved_char_to_complex
   parameters:
@@ -421,8 +381,6 @@ connections:
 - [blocks_repeat_0, '0', blocks_interleaved_char_to_complex_0, '0']
 - [blocks_unpack_k_bits_bb_0, '0', blocks_repeat_0, '0']
 - [blocks_vector_source_x_0, '0', blocks_unpack_k_bits_bb_0, '0']
-- [channels_channel_model_0, '0', blocks_file_meta_sink_0, '0']
-- [channels_channel_model_0, '0', blocks_file_sink_0, '0']
 - [channels_channel_model_0, '0', qtgui_time_sink_x_0, '0']
 - [channels_channel_model_0, '0', qtgui_waterfall_sink_x_0, '0']
 - [low_pass_filter_0, '0', blocks_multiply_xx_0, '0']

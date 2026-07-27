@@ -13,11 +13,6 @@
         <a href="/guide.html">Setup Guide</a>
       </div>
       <div class="challenge-progress" id="challenge-progress" aria-label="Challenge navigation"></div>
-      <div class="mode-switch compact" aria-label="Security mode">
-        <button id="attack-mode" class="active" type="button">Attack</button>
-        <button id="secure-mode" type="button">Secure</button>
-        <strong id="mode-status">Attack Mode</strong>
-      </div>
     </header>
 
     <main class="challenge-shell">
@@ -69,6 +64,10 @@
               <button id="source-external" type="button">External feed</button>
               <a id="source-raw-download" href="/api/rf/raw" download>Raw IQ</a>
             </div>
+          </div>
+          <div class="signal-data-alert" id="signal-data-alert" role="status" hidden>
+            <strong>No live signal data received</strong>
+            <span id="signal-data-alert-detail">Waiting for the mapped GNU Radio Python flowgraph to stream samples.</span>
           </div>
 
           <div class="analyser-controls receiver-basic" aria-label="Receiver controls">

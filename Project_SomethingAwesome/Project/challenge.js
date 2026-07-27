@@ -19,7 +19,7 @@ const analysis = {
   frontendMode: "basic",
   tx: { config: null, remainingFrames: 0, history: new Map() },
   sourceMode: "live",
-  live: { stream: null, started: false, events: [], lastSamples: [], fallbackAttempted: false },
+  live: { stream: null, started: false, events: [], lastSamples: [], noDataTimer: null },
   audio: { context: null, oscillator: null, gain: null, timer: null, playing: false }
 };
 const weatherRadio = {
@@ -57,22 +57,52 @@ function setSignalSourceMode(mode) {
 function describeExternalIngest(meta) {
   const ingest = meta?.external_ingest || {};
   const endpoint = `${ingest.host || "127.0.0.1"}:${ingest.port || 9100}`;
-  if (!ingest.enabled) return `External ingest unavailable: ${ingest.error || endpoint}`;
-  if (!meta?.last_seen) return `Waiting for TCP signal on ${endpoint}`;
-  return `External feed ${endpoint} / ${meta.buffered_rows || 0} buffered`;
+  const liveGnuRadio = meta?.source_mode === "live_gnuradio_stream";
+  const sourceName = liveGnuRadio ? "GNU Radio live sink" : "External ingest";
+  const flowgraph = meta?.flowgraph_process || {};
+  if (liveGnuRadio && ["unavailable", "exited"].includes(flowgraph.state)) {
+    return flowgraph.error || "The mapped GNU Radio flowgraph could not be started";
+  }
+  if (!ingest.enabled) return `${sourceName} unavailable: ${ingest.error || endpoint}`;
+  if (!meta?.last_seen) {
+    return flowgraph.state === "running"
+      ? `Starting ${flowgraph.script || "mapped GNU Radio flowgraph"}`
+      : `Waiting for ${sourceName} CF32 samples on ${endpoint}`;
+  }
+  return `${sourceName} ${endpoint} / ${meta.buffered_rows || 0} buffered`;
+}
+
+function showSignalDataAlert(detail) {
+  byId("signal-data-alert-detail").textContent = detail;
+  byId("signal-data-alert").hidden = false;
+}
+
+function clearSignalDataAlert() {
+  clearTimeout(analysis.live.noDataTimer);
+  analysis.live.noDataTimer = null;
+  byId("signal-data-alert").hidden = true;
+}
+
+function watchForMissingLiveData() {
+  clearTimeout(analysis.live.noDataTimer);
+  analysis.live.noDataTimer = setTimeout(() => {
+    if (!analysis.rows.length) {
+      showSignalDataAlert(
+        "The server is running, but the mapped GNU Radio Python flowgraph has not supplied CF32 samples. No saved capture or synthetic fallback will be used."
+      );
+    }
+  }, 3000);
 }
 
 async function bootChallenge() {
   const sessionHeaders = { "X-Signal-Session": analysis.sessionId };
-  const [tasksResponse, contextsResponse, modeResponse, sessionResponse] = await Promise.all([
+  const [tasksResponse, contextsResponse, sessionResponse] = await Promise.all([
     fetch("/api/tasks"),
     fetch("/api/contexts"),
-    fetch("/api/mode"),
     fetch("/api/rf/session", { headers: sessionHeaders })
   ]);
   analysis.tasks = (await tasksResponse.json()).tasks;
   analysis.contexts = (await contextsResponse.json()).contexts;
-  renderMode((await modeResponse.json()).mode);
   const session = await sessionResponse.json();
   analysis.userData = session.user_data;
   byId("terminal-user").textContent = `${session.user_data.callsign} / ${session.user_data.operator_id}`;
@@ -111,8 +141,13 @@ function renderChallenge() {
     <details><summary>Hint ${hintIndex + 1}</summary><p>${escapeHtml(hint)}</p></details>
   `).join("");
   renderArtifacts();
+  const signalArtifact = task.artifacts.find((artifact) => artifact.role === "signal");
   const rawArtifact = task.artifacts.find((artifact) => artifact.role === "raw_iq");
-  byId("source-raw-download").href = rawArtifact?.href || `/api/rf/raw?challenge_id=${encodeURIComponent(task.id)}`;
+  const liveGnuRadio = signalArtifact?.source === "gnu_radio_python_live";
+  byId("source-artifact").hidden = liveGnuRadio;
+  byId("source-external").hidden = liveGnuRadio;
+  byId("source-raw-download").hidden = !rawArtifact;
+  if (rawArtifact) byId("source-raw-download").href = rawArtifact.href;
   renderParserStages();
   updateEffectStage("idle", "Awaiting receiver output");
   renderPagination(index, sequence);
@@ -491,6 +526,7 @@ async function loadArtifactCapture(artifact = analysis.task.artifacts.find((cand
 
 function startLiveStream() {
   stopLiveStream(false);
+  clearSignalDataAlert();
   setSignalSourceMode("live");
   const artifact = analysis.task.artifacts.find((candidate) => candidate.role === "signal");
   analysis.rows = [];
@@ -500,11 +536,11 @@ function startLiveStream() {
   analysis.frame = 0;
   analysis.live.events = [];
   analysis.live.lastSamples = [];
-  analysis.live.fallbackAttempted = false;
   analysis.playing = true;
   byId("analysis-play").textContent = "Pause";
   byId("capture-status").textContent = "Connecting live parser";
   byId("live-stream-status").textContent = "Connecting to Python stream";
+  watchForMissingLiveData();
   byId("signal-title").textContent = artifact?.label || "Live RF stream";
   const params = new URLSearchParams({
     challenge_id: analysis.task.id,
@@ -517,15 +553,48 @@ function startLiveStream() {
   stream.addEventListener("meta", (event) => {
     analysis.meta = JSON.parse(event.data);
     analysis.captureCenter = Number(analysis.meta.center_hz || 0);
-    analysis.captureSpan = Number(analysis.meta.span_hz || 0);
-    byId("capture-status").textContent = `${analysis.meta.scheme_id} / live`;
-    byId("live-stream-status").textContent = "Streaming raw samples into parser";
+    analysis.captureSpan = Number(analysis.meta.span_hz || analysis.meta.sample_rate_hz || 0);
+    const liveGnuRadio = analysis.meta.source_mode === "live_gnuradio_stream";
+    const flowgraphState = analysis.meta.flowgraph_process?.state;
+    byId("capture-status").textContent = analysis.meta.last_seen
+      ? `${analysis.meta.scheme_id} / live`
+      : liveGnuRadio ? "GNU Radio flowgraph idle" : `${analysis.meta.scheme_id} / live`;
+    byId("live-stream-status").textContent = liveGnuRadio
+      ? describeExternalIngest(analysis.meta)
+      : "Streaming raw samples into parser";
+    if (liveGnuRadio && ["unavailable", "exited"].includes(flowgraphState)) {
+      showSignalDataAlert(
+        analysis.meta.flowgraph_process?.error ||
+        "The mapped GNU Radio Python flowgraph could not be started, so there is no live signal data."
+      );
+    }
     resetAnalysisView();
+    renderCaptureMetadata();
+    renderLegend();
+    renderParserEvent(analysis.meta.parser);
+  });
+  stream.addEventListener("status", (event) => {
+    const status = JSON.parse(event.data);
+    analysis.meta = { ...(analysis.meta || {}), ...status };
+    analysis.captureCenter = Number(analysis.meta.center_hz || analysis.captureCenter || 0);
+    analysis.captureSpan = Number(analysis.meta.span_hz || analysis.captureSpan || 0);
+    byId("capture-status").textContent = status.last_seen
+      ? `${status.scheme_id} / live`
+      : "GNU Radio flowgraph idle";
+    byId("live-stream-status").textContent = describeExternalIngest(status);
+    const flowgraphState = status.flowgraph_process?.state;
+    if (!status.last_seen && ["unavailable", "exited"].includes(flowgraphState)) {
+      showSignalDataAlert(
+        status.flowgraph_process?.error ||
+        "The mapped GNU Radio Python flowgraph could not be started, so there is no live signal data."
+      );
+    }
     renderCaptureMetadata();
     renderLegend();
   });
   stream.addEventListener("frame", (event) => {
     const payload = JSON.parse(event.data);
+    clearSignalDataAlert();
     recordTransmissionForFrame(analysis.rows.length);
     analysis.rows.push(payload.row);
     if (analysis.rows.length > 180) {
@@ -536,7 +605,10 @@ function startLiveStream() {
     analysis.live.lastSamples = payload.samples || [];
     byId("analysis-frame").max = Math.max(0, analysis.rows.length - 1);
     byId("analysis-frame").value = analysis.frame;
-    byId("capture-status").textContent = `${analysis.rows.length} live frames / ${payload.row.length} FFT bins`;
+    byId("capture-status").textContent = `${analysis.rows.length} GNU Radio live frames / ${payload.row.length} FFT bins`;
+    byId("live-stream-status").textContent = analysis.meta?.source_mode === "live_gnuradio_stream"
+      ? "GNU Radio generated Python stream active"
+      : "Live Python stream active";
     renderParserEvent(payload.parser);
     renderAnalysis();
   });
@@ -545,12 +617,10 @@ function startLiveStream() {
     stopLiveStream(false);
   });
   stream.onerror = () => {
-    byId("live-stream-status").textContent = "Live parser unavailable";
-    if (!analysis.rows.length && !analysis.live.fallbackAttempted) {
-      analysis.live.fallbackAttempted = true;
-      analysis.sourceMode = "artifact";
-      loadArtifactCapture();
-    }
+    byId("live-stream-status").textContent = "GNU Radio live stream unavailable; no recording fallback is permitted";
+    showSignalDataAlert(
+      "The live stream connection failed. Start the mapped GNU Radio generated Python flowgraph and confirm that it can reach the server ingest port."
+    );
   };
 }
 
@@ -564,7 +634,6 @@ function startExternalStream() {
   analysis.frame = 0;
   analysis.live.events = [];
   analysis.live.lastSamples = [];
-  analysis.live.fallbackAttempted = false;
   analysis.playing = true;
   byId("analysis-play").textContent = "Pause";
   byId("capture-status").textContent = "Connecting external feed";
@@ -622,6 +691,8 @@ function startExternalStream() {
 }
 
 function stopLiveStream(updateStatus = true) {
+  clearTimeout(analysis.live.noDataTimer);
+  analysis.live.noDataTimer = null;
   if (analysis.live.stream) {
     analysis.live.stream.close();
     analysis.live.stream = null;
@@ -1411,6 +1482,13 @@ async function inspectArtifact(artifact) {
   inspector.scrollIntoView({ behavior: "smooth", block: "start" });
   try {
     if (artifact.role === "signal") {
+      if (artifact.source === "gnu_radio_python_live") {
+        inspector.hidden = true;
+        setSignalSourceMode("live");
+        startLiveStream();
+        document.querySelector(".analyser-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
       setSignalSourceMode("artifact");
       await loadArtifactCapture(artifact);
       renderSignalArtifactPreview(visual, analysis.meta);
@@ -1886,18 +1964,6 @@ function togglePlayback() {
   }, 1000 / framesPerSecond);
 }
 
-function renderMode(mode) {
-  byId("attack-mode").classList.toggle("active", mode === "attack");
-  byId("secure-mode").classList.toggle("active", mode === "secure");
-  byId("mode-status").textContent = mode === "attack" ? "Attack Mode" : "Secure Mode";
-  byId("mode-status").style.color = mode === "attack" ? "var(--amber)" : "var(--green)";
-}
-
-async function setMode(mode) {
-  const response = await fetch("/api/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) });
-  renderMode((await response.json()).mode);
-}
-
 function toggleTunedAudio() {
   if (analysis.audio.playing) {
     stopTunedAudio();
@@ -1983,8 +2049,6 @@ waterfall.addEventListener("dblclick", async (event) => {
   await runRfCommand("tune");
 });
 byId("artifact-close").addEventListener("click", () => { byId("artifact-inspector").hidden = true; });
-byId("attack-mode").addEventListener("click", () => setMode("attack"));
-byId("secure-mode").addEventListener("click", () => setMode("secure"));
 byId("frontend-basic").addEventListener("click", () => setFrontendMode("basic"));
 byId("frontend-advanced").addEventListener("click", () => setFrontendMode("advanced"));
 byId("receiver-scan").addEventListener("click", () => runRfCommand("scan"));

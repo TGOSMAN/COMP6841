@@ -2,7 +2,6 @@ const state = {
   contexts: [],
   tasks: [],
   selectedTask: null,
-  mode: "attack",
   solved: new Set(JSON.parse(localStorage.getItem("solvedTasks") || "[]")),
   waterfallRows: null,
   waterfallArtifact: null,
@@ -33,9 +32,6 @@ const canvas = document.querySelector("#waterfall");
 const ctx = canvas.getContext("2d", { willReadFrequently: true });
 const pauseButton = document.querySelector("#pause-waterfall");
 const dataMode = document.querySelector("#data-mode");
-const attackModeButton = document.querySelector("#attack-mode");
-const secureModeButton = document.querySelector("#secure-mode");
-const modeStatus = document.querySelector("#mode-status");
 const zoomFreq = document.querySelector("#zoom-freq");
 const zoomTime = document.querySelector("#zoom-time");
 const zoomReadout = document.querySelector("#zoom-readout");
@@ -43,18 +39,11 @@ const consoleSignalLabel = document.querySelector("#console-signal-label");
 
 async function boot() {
   ensureWorkbench();
-  await Promise.all([loadMode(), loadContexts(), loadTasks(), loadResearchNotes(), loadWaterfallRows()]);
+  await Promise.all([loadContexts(), loadTasks(), loadResearchNotes(), loadWaterfallRows()]);
   renderTasks();
   updateZoomReadout();
   seedWaterfall();
   drawWaterfall();
-}
-
-async function loadMode() {
-  const response = await fetch("/api/mode");
-  const data = await response.json();
-  state.mode = data.mode;
-  renderMode();
 }
 
 async function loadTasks() {
@@ -224,27 +213,6 @@ filters.forEach((button) => {
     renderTasks(button.dataset.filter);
   });
 });
-
-attackModeButton.addEventListener("click", () => setMode("attack"));
-secureModeButton.addEventListener("click", () => setMode("secure"));
-
-async function setMode(mode) {
-  const response = await fetch("/api/mode", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode })
-  });
-  const data = await response.json();
-  state.mode = data.mode;
-  renderMode();
-}
-
-function renderMode() {
-  attackModeButton.classList.toggle("active", state.mode === "attack");
-  secureModeButton.classList.toggle("active", state.mode === "secure");
-  modeStatus.textContent = state.mode === "attack" ? "Attack Mode" : "Secure Mode";
-  modeStatus.style.color = state.mode === "attack" ? "var(--amber)" : "var(--green)";
-}
 
 zoomFreq.addEventListener("input", () => {
   state.mainZoom.freq = Number(zoomFreq.value);

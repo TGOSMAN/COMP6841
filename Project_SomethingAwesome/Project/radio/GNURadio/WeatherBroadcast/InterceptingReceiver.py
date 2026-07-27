@@ -11,7 +11,6 @@
 from PyQt5 import Qt
 from gnuradio import qtgui
 from gnuradio import analog
-from gnuradio import audio
 from gnuradio import blocks
 from gnuradio import channels
 from gnuradio.filter import firdes
@@ -28,7 +27,8 @@ import sip
 import threading
 
 
-RESOURCE_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from signal_forge_live_sink import SignalForgeLiveSink
 
 
 
@@ -74,6 +74,13 @@ class InterceptingReceiver(gr.top_block, Qt.QWidget):
         # Blocks
         ##################################################
 
+        self.signal_forge_live_sink_0 = SignalForgeLiveSink(
+            challenge_id="weather-boring-intercept",
+            center_hz=169_650_000,
+            sample_rate_hz=samp_rate,
+            source_label="InterceptingReceiver.py post-channel-model CF32",
+            modulation="live generated hopping complex tones",
+        )
         self.qtgui_waterfall_sink_x_0 = qtgui.waterfall_sink_c(
             1024, #size
             window.WIN_BLACKMAN_hARRIS, #wintype
@@ -167,13 +174,11 @@ class InterceptingReceiver(gr.top_block, Qt.QWidget):
             taps=[1.0],
             noise_seed=0,
             block_tags=False)
-        self.blocks_wavfile_source_1 = blocks.wavfile_source(str(RESOURCE_DIR / 'WeatherRadio_2_IM.wav'), True)
-        self.blocks_wavfile_source_0 = blocks.wavfile_source(str(RESOURCE_DIR / 'WeatherRadio_Broadcast_Re.wav'), True)
         self.blocks_stream_mux_0 = blocks.stream_mux(gr.sizeof_gr_complex*1, (1000, 1000))
         self.blocks_multiply_xx_0 = blocks.multiply_vcc(1)
         self.blocks_float_to_complex_0 = blocks.float_to_complex(1)
-        self.blocks_complex_to_imag_1 = blocks.complex_to_imag(1)
-        self.audio_sink_0 = audio.sink(samp_rate, '', True)
+        self.analog_audio_q_0 = analog.sig_source_f(samp_rate, analog.GR_COS_WAVE, 1170, 0.45, 0)
+        self.analog_audio_i_0 = analog.sig_source_f(samp_rate, analog.GR_SIN_WAVE, 730, 0.65, 0)
         self.analog_sig_source_x_0_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 15000, 1, 0, 0)
         self.analog_sig_source_x_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 10000, 1, 0, 0)
 
@@ -183,14 +188,13 @@ class InterceptingReceiver(gr.top_block, Qt.QWidget):
         ##################################################
         self.connect((self.analog_sig_source_x_0, 0), (self.blocks_stream_mux_0, 0))
         self.connect((self.analog_sig_source_x_0_0, 0), (self.blocks_stream_mux_0, 1))
-        self.connect((self.blocks_complex_to_imag_1, 0), (self.audio_sink_0, 0))
-        self.connect((self.blocks_float_to_complex_0, 0), (self.blocks_complex_to_imag_1, 0))
+        self.connect((self.analog_audio_i_0, 0), (self.blocks_float_to_complex_0, 0))
+        self.connect((self.analog_audio_q_0, 0), (self.blocks_float_to_complex_0, 1))
         self.connect((self.blocks_float_to_complex_0, 0), (self.blocks_multiply_xx_0, 0))
         self.connect((self.blocks_multiply_xx_0, 0), (self.channels_channel_model_0, 0))
         self.connect((self.blocks_multiply_xx_0, 0), (self.qtgui_time_sink_x_0, 1))
         self.connect((self.blocks_stream_mux_0, 0), (self.blocks_multiply_xx_0, 1))
-        self.connect((self.blocks_wavfile_source_0, 0), (self.blocks_float_to_complex_0, 0))
-        self.connect((self.blocks_wavfile_source_1, 0), (self.blocks_float_to_complex_0, 1))
+        self.connect((self.channels_channel_model_0, 0), (self.signal_forge_live_sink_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_time_sink_x_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_waterfall_sink_x_0, 0))
 
@@ -210,6 +214,8 @@ class InterceptingReceiver(gr.top_block, Qt.QWidget):
         self.samp_rate = samp_rate
         self.analog_sig_source_x_0.set_sampling_freq(self.samp_rate)
         self.analog_sig_source_x_0_0.set_sampling_freq(self.samp_rate)
+        self.analog_audio_i_0.set_sampling_freq(self.samp_rate)
+        self.analog_audio_q_0.set_sampling_freq(self.samp_rate)
         self.qtgui_time_sink_x_0.set_samp_rate(self.samp_rate)
         self.qtgui_waterfall_sink_x_0.set_frequency_range(0, self.samp_rate)
 

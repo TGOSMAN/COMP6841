@@ -1,5 +1,4 @@
 {
-  "mode": "attack",
   "rf": {
     "center_hz": 2437000000,
     "span_hz": 2000000,
@@ -7,16 +6,6 @@
     "fft_bins": 1024,
     "modulation": "training OOK/ASK",
     "symbol_rate": 1200
-  },
-  "gnu_radio_capture": {
-    "path": "radio/GNURadio/ReadingSignals.sigmf-data",
-    "datatype": "cf32_le",
-    "sample_rate": 44200,
-    "center_hz": 915000000,
-    "fft_bins": 512,
-    "max_frames": 300,
-    "samples_per_symbol": 500,
-    "decode_max_samples": 500000
   },
   "telemetry": {
     "vehicle_id": "VH-7A29",
@@ -27,11 +16,5 @@
     "timestamp": "2026-07-12T06:41:03Z",
     "nonce": "N-6841-0001",
     "hmac_key": "training-only-hmac-key-change-me"
-  },
-  "security": {
-    "freshness_window_seconds": 300,
-    "attack_mode_allows_replay": true,
-    "secure_mode_requires_hmac": true,
-    "secure_mode_rejects_operator_only_schedules": true
   }
 }

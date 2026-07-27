@@ -177,17 +177,22 @@ blocks:
     coordinate: [2952, 1672.0]
     rotation: 0
     state: enabled
-- name: blocks_wavfile_source_0
-  id: blocks_wavfile_source
+- name: analog_audio_i_0
+  id: analog_sig_source_x
   parameters:
     affinity: ''
     alias: ''
+    amp: '0.65'
     comment: ''
-    file: WeatherRadio_Broadcast_Re.wav
+    freq: '730'
     maxoutbuf: '0'
     minoutbuf: '0'
-    nchan: '1'
-    repeat: 'True'
+    offset: '0'
+    phase: '0'
+    samp_rate: samp_rate
+    showports: 'False'
+    type: float
+    waveform: analog.GR_SIN_WAVE
   states:
     bus_sink: false
     bus_source: false
@@ -195,17 +200,22 @@ blocks:
     coordinate: [1440, 1396.0]
     rotation: 0
     state: enabled
-- name: blocks_wavfile_source_1
-  id: blocks_wavfile_source
+- name: analog_audio_q_0
+  id: analog_sig_source_x
   parameters:
     affinity: ''
     alias: ''
+    amp: '0.45'
     comment: ''
-    file: WeatherRadio_2_IM.wav
+    freq: '1170'
     maxoutbuf: '0'
     minoutbuf: '0'
-    nchan: '1'
-    repeat: 'True'
+    offset: '0'
+    phase: '0'
+    samp_rate: samp_rate
+    showports: 'False'
+    type: float
+    waveform: analog.GR_COS_WAVE
   states:
     bus_sink: false
     bus_source: false
@@ -394,6 +404,8 @@ blocks:
     state: enabled
 
 connections:
+- [analog_audio_i_0, '0', blocks_float_to_complex_0, '0']
+- [analog_audio_q_0, '0', blocks_float_to_complex_0, '1']
 - [analog_sig_source_x_0, '0', blocks_stream_mux_0, '0']
 - [analog_sig_source_x_0_0, '0', blocks_stream_mux_0, '1']
 - [blocks_complex_to_imag_1, '0', audio_sink_0, '0']
@@ -402,8 +414,6 @@ connections:
 - [blocks_multiply_xx_0, '0', channels_channel_model_0, '0']
 - [blocks_multiply_xx_0, '0', qtgui_time_sink_x_0, '1']
 - [blocks_stream_mux_0, '0', blocks_multiply_xx_0, '1']
-- [blocks_wavfile_source_0, '0', blocks_float_to_complex_0, '0']
-- [blocks_wavfile_source_1, '0', blocks_float_to_complex_0, '1']
 - [channels_channel_model_0, '0', qtgui_time_sink_x_0, '0']
 - [channels_channel_model_0, '0', qtgui_waterfall_sink_x_0, '0']
 

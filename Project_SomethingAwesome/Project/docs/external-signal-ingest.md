@@ -101,10 +101,10 @@ Synthetic raw IQ feed:
 python tools/script_clients/external_signal_sender.py --challenge-id tunnel-basic-dos --mode iq --block-samples 2048
 ```
 
-Stream a GNU Radio `File Sink` output:
+Run the mapped GNU Radio-generated Python flowgraph:
 
 ```powershell
-python tools/script_clients/external_signal_sender.py --challenge-id tunnel-basic-dos --mode file --file radio/GNURadio/Tunnel_Task/DoSAttackMe.sigmf-data --loop
+python radio/GNURadio/Tunnel_Task/DoSAttackMe.py
 ```
 
 GNU Radio ZMQ live bridge:
@@ -127,17 +127,10 @@ python -m pip install pyzmq
 
 ## GNU Radio Pattern
 
-For the easiest setup:
-
-1. In GNU Radio Companion, connect the final complex baseband signal to a File
-   Sink using `Complex Float 32`.
-2. Run the flowgraph and write to a `.sigmf-data` or `.cf32` file.
-3. Run `external_signal_sender.py --mode file --file <path> --loop`.
-4. In the challenge page, switch the workbench source to **External feed**.
-
-For a lower-latency setup, add a small Embedded Python Block or standalone
-bridge that opens the TCP socket, sends the `SFORGE RAWIQ` header once, and then
-writes each complex64 block as it is produced.
+For the mapped beginner tasks, run the generated Python file and leave the
+workbench on **Live parser**. The included `SignalForgeLiveSink` is connected
+after the channel model, opens the TCP ingest socket, sends the `SFORGE RAWIQ`
+header, and forwards complex64 blocks as GNU Radio produces them.
 
 ## GNU Radio ZMQ Pattern
 

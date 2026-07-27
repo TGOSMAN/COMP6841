@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 import json
-import html
 import base64
 import hmac
 import hashlib
@@ -11,9 +10,12 @@ import mimetypes
 import os
 import random
 import re
+import shutil
 import sqlite3
 import socketserver
 import struct
+import subprocess
+import sys
 import threading
 import time
 import wave
@@ -34,7 +36,6 @@ CHALLENGES_PATH = DATA_DIR / "challenges.json"
 CONTEXTS_PATH = DATA_DIR / "contexts.json"
 CONFIG_PATH = ROOT / "config" / "range.json"
 VALIDATION_CONFIG_PATH = ROOT / "config" / "validation.json"
-MODE = {"value": "attack"}
 REPLAY_CACHE: set[str] = set()
 AIR_WEATHER_SESSIONS: dict[str, dict] = {}
 OPERATOR_COMMENTS = [
@@ -73,10 +74,9 @@ TUNNEL_GNU_RADIO_CAPTURES = {
     "tunnel-reading-signals": {
         "stem": "ReadingSignals",
         "title": "Reading Signals",
-        "path": "radio/GNURadio/Tunnel_Task/ReadingSignals.sigmf-data",
-        "meta_path": "radio/GNURadio/Tunnel_Task/ReadingSignals.sigmf-meta",
         "grc_path": "radio/GNURadio/Tunnel_Task/ReadingSignals.grc",
         "python_path": "radio/GNURadio/Tunnel_Task/ReadingSignals.py",
+        "source_mode": "live_gnuradio_stream",
         "sample_rate": 44_200,
         "carrier_offset_hz": 10_000,
         "samples_per_symbol": 500,
@@ -88,10 +88,9 @@ TUNNEL_GNU_RADIO_CAPTURES = {
     "tunnel-tuning": {
         "stem": "TuningSignals",
         "title": "Tuning Signals",
-        "path": "radio/GNURadio/Tunnel_Task/TuningSignals.sigmf-data",
-        "meta_path": "radio/GNURadio/Tunnel_Task/TuningSignals.sigmf-meta",
         "grc_path": "radio/GNURadio/Tunnel_Task/TuningSignals.grc",
         "python_path": "radio/GNURadio/Tunnel_Task/TuningSignals.py",
+        "source_mode": "live_gnuradio_stream",
         "sample_rate": 44_200,
         "carrier_offset_hz": 10_000,
         "samples_per_symbol": 500,
@@ -103,10 +102,9 @@ TUNNEL_GNU_RADIO_CAPTURES = {
     "tunnel-basic-dos": {
         "stem": "DoSAttackMe",
         "title": "DoS Attack Me",
-        "path": "radio/GNURadio/Tunnel_Task/DoSAttackMe.sigmf-data",
-        "meta_path": "radio/GNURadio/Tunnel_Task/DoSAttackMe.sigmf-meta",
         "grc_path": "radio/GNURadio/Tunnel_Task/DoSAttackMe.grc",
         "python_path": "radio/GNURadio/Tunnel_Task/DoSAttackMe.py",
+        "source_mode": "live_gnuradio_stream",
         "sample_rate": 44_200,
         "carrier_offset_hz": 10_000,
         "samples_per_symbol": 500,
@@ -118,10 +116,9 @@ TUNNEL_GNU_RADIO_CAPTURES = {
     "tunnel-packet-injection": {
         "stem": "InjectionTime",
         "title": "Injection Time",
-        "path": "radio/GNURadio/Tunnel_Task/InjectionTime.sigmf-data",
-        "meta_path": "radio/GNURadio/Tunnel_Task/InjectionTime.sigmf-meta",
         "grc_path": "radio/GNURadio/Tunnel_Task/InjectionTime.grc",
         "python_path": "radio/GNURadio/Tunnel_Task/InjectionTime.py",
+        "source_mode": "live_gnuradio_stream",
         "sample_rate": 44_200,
         "carrier_offset_hz": 10_000,
         "samples_per_symbol": 500,
@@ -135,10 +132,9 @@ SONG_META_GNU_RADIO_CAPTURES = {
     "broadcast-reading-signals": {
         "stem": "ReadingSignals",
         "title": "Song Metadata Reading Signals",
-        "path": "radio/GNURadio/Song_Meta/ReadingSignals.sigmf-data",
-        "meta_path": "radio/GNURadio/Song_Meta/ReadingSignals.sigmf-meta",
         "grc_path": "radio/GNURadio/Song_Meta/ReadingSignals.grc",
         "python_path": "radio/GNURadio/Song_Meta/ReadingSignals.py",
+        "source_mode": "live_gnuradio_stream",
         "sample_rate": 44_200,
         "carrier_offset_hz": 10_000,
         "samples_per_symbol": 50,
@@ -153,10 +149,9 @@ SONG_META_GNU_RADIO_CAPTURES = {
     "broadcast-tuning": {
         "stem": "TuningSignals",
         "title": "Song Metadata Tuning Signals",
-        "path": "radio/GNURadio/Song_Meta/TuningSignals.sigmf-data",
-        "meta_path": "radio/GNURadio/Song_Meta/TuningSignals.sigmf-meta",
         "grc_path": "radio/GNURadio/Song_Meta/TuningSignals.grc",
         "python_path": "radio/GNURadio/Song_Meta/TuningSignals.py",
+        "source_mode": "live_gnuradio_stream",
         "sample_rate": 44_200,
         "carrier_offset_hz": 10_000,
         "samples_per_symbol": 50,
@@ -171,10 +166,9 @@ SONG_META_GNU_RADIO_CAPTURES = {
     "broadcast-basic-dos": {
         "stem": "DoSAttackMe",
         "title": "Song Metadata DoS Attack Me",
-        "path": "radio/GNURadio/Song_Meta/DoSAttackMe.sigmf-data",
-        "meta_path": "radio/GNURadio/Song_Meta/DoSAttackMe.sigmf-meta",
         "grc_path": "radio/GNURadio/Song_Meta/DoSAttackMe.grc",
         "python_path": "radio/GNURadio/Song_Meta/DoSAttackMe.py",
+        "source_mode": "live_gnuradio_stream",
         "sample_rate": 44_200,
         "carrier_offset_hz": 10_000,
         "samples_per_symbol": 50,
@@ -189,10 +183,9 @@ SONG_META_GNU_RADIO_CAPTURES = {
     "broadcast-packet-injection": {
         "stem": "InjectionTime",
         "title": "Song Metadata Injection Time",
-        "path": "radio/GNURadio/Song_Meta/InjectionTime.sigmf-data",
-        "meta_path": "radio/GNURadio/Song_Meta/InjectionTime.sigmf-meta",
         "grc_path": "radio/GNURadio/Song_Meta/InjectionTime.grc",
         "python_path": "radio/GNURadio/Song_Meta/InjectionTime.py",
+        "source_mode": "live_gnuradio_stream",
         "sample_rate": 44_200,
         "carrier_offset_hz": 10_000,
         "samples_per_symbol": 50,
@@ -209,9 +202,6 @@ WEATHER_GNU_RADIO_CAPTURES = {
     "weather-boring-intercept": {
         "stem": "InterceptingReceiver",
         "title": "Weather Intercepting Receiver",
-        "path": "radio/GNURadio/WeatherBroadcast/WeatherRadio_Broadcast_Re.wav",
-        "real_wav_path": "radio/GNURadio/WeatherBroadcast/WeatherRadio_Broadcast_Re.wav",
-        "imag_wav_path": "radio/GNURadio/WeatherBroadcast/WeatherRadio_2_IM.wav",
         "grc_path": "radio/GNURadio/WeatherBroadcast/InterceptingReceiver.grc",
         "python_path": "radio/GNURadio/WeatherBroadcast/InterceptingReceiver.py",
         "sample_rate": 44_100,
@@ -220,17 +210,14 @@ WEATHER_GNU_RADIO_CAPTURES = {
         "hop_samples": 1_000,
         "samples_per_symbol": 1_000,
         "modulation": "patterned 10/15 kHz hopping complex weather audio",
-        "source_mode": "weather_wav_pair",
+        "source_mode": "live_gnuradio_stream",
         "lock_to_center": True,
         "public_payload": False,
-        "mission_note": "Original weather report I/Q audio pair with a clear repeating hop pattern.",
+        "mission_note": "Live-generated complex weather tones with a clear repeating hop pattern.",
     },
     "weather-boring-obscured": {
         "stem": "InterceptingReceiver_Task2",
         "title": "Obscured Weather Receiver",
-        "path": "radio/GNURadio/WeatherBroadcast/WeatherRadio_T2_RE.wav",
-        "real_wav_path": "radio/GNURadio/WeatherBroadcast/WeatherRadio_T2_RE.wav",
-        "imag_wav_path": "radio/GNURadio/WeatherBroadcast/WeatherRadio_T2_IM.wav",
         "grc_path": "radio/GNURadio/WeatherBroadcast/IThinkItsSecure.grc",
         "python_path": "radio/GNURadio/WeatherBroadcast/InterceptingReceiver_Task2.py",
         "sample_rate": 44_100,
@@ -239,7 +226,7 @@ WEATHER_GNU_RADIO_CAPTURES = {
         "hop_samples": 4_410,
         "samples_per_symbol": 4_410,
         "modulation": "random frequency-hopping complex weather audio with RANDU QPSK phase symbols",
-        "source_mode": "weather_wav_pair",
+        "source_mode": "live_gnuradio_stream",
         "lock_to_center": True,
         "hop_mode": "keyed random",
         "hop_key": "weather-task-3.01-hop-v1",
@@ -252,9 +239,6 @@ WEATHER_GNU_RADIO_CAPTURES = {
     "weather-boring-active-re": {
         "stem": "EmergencyWarningLight",
         "title": "Emergency Warning Light",
-        "path": "radio/GNURadio/WeatherBroadcast/WeatherRadio_T3_RE.wav",
-        "real_wav_path": "radio/GNURadio/WeatherBroadcast/WeatherRadio_T3_RE.wav",
-        "imag_wav_path": "radio/GNURadio/WeatherBroadcast/WeatherRadio_T3_IM.wav",
         "grc_path": "radio/GNURadio/WeatherBroadcast/EmergencyWarningLight.grc",
         "python_path": "radio/GNURadio/WeatherBroadcast/EmergencyWarningLight.py",
         "sample_rate": 3_000_000,
@@ -263,7 +247,7 @@ WEATHER_GNU_RADIO_CAPTURES = {
         "hop_samples": 1_000,
         "samples_per_symbol": 32,
         "modulation": "32-bit custom-interleaved alarm metadata with fixed-seed RANDU phase shifts",
-        "source_mode": "weather_alarm_wav_pair",
+        "source_mode": "live_gnuradio_stream",
         "lock_to_center": True,
         "randu_samples_per_chip": 10,
         "emergency": 0xB,
@@ -271,10 +255,75 @@ WEATHER_GNU_RADIO_CAPTURES = {
         "mission_note": "Third weather report pair carrying the custom alarm packet checked by the extracted C decoder.",
     },
 }
+CIVILIAN_GNU_RADIO_CAPTURES = {
+    "civilian-emergency-intercept": {
+        "stem": "CivilianEmergencyReceiver",
+        "title": "Civilian Emergency Intercepting Receiver",
+        "grc_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.grc",
+        "python_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.py",
+        "sample_rate": 44_100,
+        "carrier_offset_hz": -12_000,
+        "carrier_offsets_hz": [-12_000, -4_000, 6_000, 14_000],
+        "hop_samples": 11_025,
+        "samples_per_symbol": 40,
+        "modulation": "live AM alert audio + Barker-13 BPSK metadata",
+        "source_mode": "live_gnuradio_stream",
+        "lock_to_center": True,
+        "framing": "Barker-13",
+        "integrity": "CRC-16/CCITT-FALSE",
+        "public_payload": False,
+        "mission_note": "Live procedural civil-alert audio with a Barker-13 synchronized metadata frame and CRC-16 trailer.",
+    },
+    "civilian-emergency-obscured": {
+        "stem": "CivilianEmergencyReceiver",
+        "title": "Obscured Civilian Emergency Receiver",
+        "grc_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.grc",
+        "python_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.py",
+        "sample_rate": 44_100,
+        "carrier_offset_hz": -12_000,
+        "carrier_offsets_hz": [-12_000, -4_000, 6_000, 14_000],
+        "hop_samples": 11_025,
+        "samples_per_symbol": 40,
+        "modulation": "weak-PRNG hopped live AM alert audio + Barker-13 BPSK metadata",
+        "source_mode": "live_gnuradio_stream",
+        "lock_to_center": True,
+        "hop_mode": "weak LCG",
+        "framing": "Barker-13",
+        "integrity": "CRC-16/CCITT-FALSE",
+        "public_payload": False,
+        "mission_note": "Live procedural civil-alert audio on weak-PRNG hops; each metadata frame starts with Barker-13 and ends with CRC-16.",
+    },
+    "civilian-emergency-active-re": {
+        "stem": "CivilianEmergencyReceiver",
+        "title": "Active Civilian Emergency Receiver",
+        "grc_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.grc",
+        "python_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.py",
+        "sample_rate": 44_100,
+        "carrier_offset_hz": -12_000,
+        "carrier_offsets_hz": [-12_000, -4_000, 6_000, 14_000],
+        "hop_samples": 11_025,
+        "samples_per_symbol": 40,
+        "modulation": "live AM evacuation audio + Barker-13 BPSK metadata",
+        "source_mode": "live_gnuradio_stream",
+        "lock_to_center": True,
+        "hop_mode": "deterministic alternate",
+        "framing": "Barker-13",
+        "integrity": "CRC-16/CCITT-FALSE",
+        "public_payload": False,
+        "mission_note": "Live procedural evacuation audio carrying authenticated metadata framed by Barker-13 and checked with CRC-16.",
+    },
+}
 GNU_RADIO_CAPTURE_GROUPS = (
     TUNNEL_GNU_RADIO_CAPTURES,
     SONG_META_GNU_RADIO_CAPTURES,
     WEATHER_GNU_RADIO_CAPTURES,
+    CIVILIAN_GNU_RADIO_CAPTURES,
+)
+LIVE_GNU_RADIO_TASKS = (
+    frozenset(TUNNEL_GNU_RADIO_CAPTURES)
+    | frozenset(SONG_META_GNU_RADIO_CAPTURES)
+    | frozenset(WEATHER_GNU_RADIO_CAPTURES)
+    | frozenset(CIVILIAN_GNU_RADIO_CAPTURES)
 )
 FLOWGRAPH_CONFIG_CACHE: dict[tuple[str, int], dict] = {}
 SCRIPT_TERMINALS: dict[str, dict] = {}
@@ -284,15 +333,28 @@ EXTERNAL_INGEST = {"host": "127.0.0.1", "port": 9100, "enabled": False, "error":
 EXTERNAL_INGEST_SERVER: SignalIngestTCPServer | None = None
 MAX_EXTERNAL_LINE_BYTES = 2_000_000
 MAX_EXTERNAL_IQ_SAMPLES = 131_072
+GNU_RADIO_PROCESS_LOCK = threading.Lock()
+GNU_RADIO_PROCESSES: dict[str, dict] = {}
+GNU_RADIO_START_ERRORS: dict[str, str] = {}
+GNU_RADIO_PYTHON: Path | None = None
+GNU_RADIO_DISCOVERY_ERROR = ""
+GNU_RADIO_RUNTIME_DIR = ROOT / "outputs" / "gnuradio-runtime"
 
 
 def default_external_feed(challenge_id: str = "external") -> dict:
     target = RF_TARGETS.get(challenge_id, RF_TARGETS["tunnel-reading-signals"])
     center_hz = float(target["center_mhz"]) * 1_000_000
-    span_hz = float(target["span_khz"]) * 1_000
+    capture = gnu_radio_capture_for(challenge_id)
+    live_gnuradio = challenge_id in LIVE_GNU_RADIO_TASKS and capture is not None
+    span_hz = float(capture["sample_rate"] if live_gnuradio else float(target["span_khz"]) * 1_000)
+    source_label = (
+        f"{capture['stem']}.py post-channel-model CF32"
+        if live_gnuradio
+        else "External user signal"
+    )
     return {
         "challenge_id": challenge_id,
-        "scheme_id": "EXTERNAL-SIGNAL-INGEST-V1",
+        "scheme_id": f"GNU-RADIO-LIVE-{capture['stem'].upper()}" if live_gnuradio else "EXTERNAL-SIGNAL-INGEST-V1",
         "center_hz": center_hz,
         "span_hz": span_hz,
         "sample_rate_hz": span_hz,
@@ -306,17 +368,42 @@ def default_external_feed(challenge_id: str = "external") -> dict:
         "parser": {
             "stage": "raw_iq",
             "confidence": 0,
-            "bit_buffer": "waiting for external frames",
-            "fields": {"protocol": "Signal Forge external ingest v1"},
-            "note": "Send JSON-lines FFT rows or cf32_le IQ blocks to the ingest port.",
+            "bit_buffer": "waiting for GNU Radio CF32 samples" if live_gnuradio else "waiting for external frames",
+            "fields": {
+                "protocol": "Signal Forge GNU Radio live IQ v1" if live_gnuradio else "Signal Forge external ingest v1",
+                **(
+                    {
+                        "framing": capture["framing"],
+                        "integrity": capture["integrity"],
+                        "crc_check": "waiting for a complete live frame",
+                    }
+                    if live_gnuradio and capture.get("framing") and capture.get("integrity")
+                    else {}
+                ),
+            },
+            "note": (
+                f"The server starts {capture.get('python_path', capture['stem'] + '.py')} on demand; "
+                "its live sink streams post-channel-model complex samples here."
+                if live_gnuradio
+                else "Send JSON-lines FFT rows or cf32_le IQ blocks to the ingest port."
+            ),
         },
-        "sources": [{"label": "External user signal", "kind": "external", "offset_hz": 0, "bandwidth_hz": max(1000, span_hz / 16)}],
-        "annotations": [{"label": "external centre", "offset_hz": 0, "color": "#ff4ad2"}],
+        "sources": [{"label": source_label, "kind": "gnu_radio_live" if live_gnuradio else "external", "offset_hz": 0, "bandwidth_hz": max(1000, span_hz / 16)}],
+        "annotations": [{"label": "GNU Radio live centre" if live_gnuradio else "external centre", "offset_hz": 0, "color": "#ff4ad2"}],
         "protocol_notes": {
-            "modulation": "user supplied",
-            "source": "External TCP JSON-lines ingest",
+            "modulation": capture.get("modulation", "GNU Radio flowgraph output") if live_gnuradio else "user supplied",
+            "source": "Live CF32 from the generated GNU Radio Python flowgraph" if live_gnuradio else "External TCP JSON-lines ingest",
             "raw_path": "/api/rf/external/status",
+            **(
+                {
+                    "framing": capture["framing"],
+                    "integrity": capture["integrity"],
+                }
+                if live_gnuradio and capture.get("framing") and capture.get("integrity")
+                else {}
+            ),
         },
+        "source_mode": "live_gnuradio_stream" if live_gnuradio else "external",
     }
 
 
@@ -484,7 +571,7 @@ def gnu_radio_settings(challenge_id: str | None) -> dict | None:
         return None
     target = RF_TARGETS.get(challenge_id, RF_TARGETS["tunnel-reading-signals"])
     return {
-        "path": capture["path"],
+        "path": capture.get("path", ""),
         "datatype": "cf32_le",
         "sample_rate": capture["sample_rate"],
         "center_hz": float(target["center_mhz"]) * 1_000_000,
@@ -500,6 +587,220 @@ def gnu_radio_settings(challenge_id: str | None) -> dict | None:
 
 def tunnel_gnu_radio_settings(challenge_id: str) -> dict | None:
     return gnu_radio_settings(challenge_id)
+
+
+def gnu_radio_python_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    explicit = os.environ.get("SIGNAL_FORGE_GNURADIO_PYTHON", "").strip()
+    conda_prefix = os.environ.get("CONDA_PREFIX", "").strip()
+    if explicit:
+        resolved = shutil.which(explicit)
+        candidates.append(Path(resolved or explicit))
+    if conda_prefix:
+        candidates.append(Path(conda_prefix) / ("python.exe" if os.name == "nt" else "bin/python"))
+    candidates.append(Path(sys.executable))
+    for command in ("python3", "python"):
+        resolved = shutil.which(command)
+        if resolved:
+            candidates.append(Path(resolved))
+    home = Path.home()
+    if os.name == "nt":
+        candidates.extend(
+            [
+                home / "radioconda" / "python.exe",
+                home / "miniforge3" / "envs" / "gnuradio" / "python.exe",
+                home / "mambaforge" / "envs" / "gnuradio" / "python.exe",
+                home / "miniconda3" / "envs" / "gnuradio" / "python.exe",
+                home / "anaconda3" / "envs" / "gnuradio" / "python.exe",
+            ]
+        )
+    else:
+        candidates.extend(
+            [
+                home / "radioconda" / "bin" / "python",
+                home / "miniforge3" / "envs" / "gnuradio" / "bin" / "python",
+                home / "mambaforge" / "envs" / "gnuradio" / "bin" / "python",
+                Path("/usr/bin/python3"),
+                Path("/usr/local/bin/python3"),
+            ]
+        )
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = os.path.normcase(str(candidate.expanduser().absolute()))
+        if key not in seen:
+            unique.append(candidate.expanduser())
+            seen.add(key)
+    return unique
+
+
+def discover_gnu_radio_python() -> Path | None:
+    global GNU_RADIO_PYTHON, GNU_RADIO_DISCOVERY_ERROR
+    if GNU_RADIO_PYTHON and GNU_RADIO_PYTHON.is_file():
+        return GNU_RADIO_PYTHON
+    errors: list[str] = []
+    creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    for candidate in gnu_radio_python_candidates():
+        if not candidate.is_file():
+            continue
+        try:
+            check = subprocess.run(
+                [
+                    str(candidate),
+                    "-c",
+                    "from gnuradio import gr, blocks, channels, qtgui; import PyQt5, numpy",
+                ],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                timeout=8,
+                check=False,
+                creationflags=creation_flags,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            errors.append(f"{candidate}: {error}")
+            continue
+        if check.returncode == 0:
+            GNU_RADIO_PYTHON = candidate.resolve()
+            GNU_RADIO_DISCOVERY_ERROR = ""
+            return GNU_RADIO_PYTHON
+        detail = check.stderr.decode("utf-8", errors="replace").strip().splitlines()
+        errors.append(f"{candidate}: {detail[-1] if detail else 'GNU Radio imports failed'}")
+    GNU_RADIO_DISCOVERY_ERROR = (
+        "No GNU Radio Python runtime was found. Install GNU Radio/Radioconda or set "
+        "SIGNAL_FORGE_GNURADIO_PYTHON to its Python executable."
+    )
+    if errors:
+        GNU_RADIO_DISCOVERY_ERROR += f" Checked {len(errors)} Python installation(s)."
+    return None
+
+
+def gnu_radio_process_status(challenge_id: str) -> dict:
+    with GNU_RADIO_PROCESS_LOCK:
+        entry = GNU_RADIO_PROCESSES.get(challenge_id)
+        if not entry:
+            error = GNU_RADIO_START_ERRORS.get(challenge_id) or GNU_RADIO_DISCOVERY_ERROR
+            return {
+                "state": "unavailable" if error else "not_started",
+                "error": error,
+            }
+        process: subprocess.Popen = entry["process"]
+        return_code = process.poll()
+        if return_code is None:
+            return {
+                "state": "running",
+                "pid": process.pid,
+                "script": entry["script"],
+                "python": entry["python"],
+            }
+        log_handle = entry.get("log_handle")
+        if log_handle and not log_handle.closed:
+            log_handle.close()
+        log_path = Path(entry["log_path"])
+        detail = ""
+        try:
+            detail = log_path.read_text(encoding="utf-8", errors="replace")[-2000:].strip()
+        except OSError:
+            pass
+        return {
+            "state": "exited",
+            "pid": process.pid,
+            "return_code": return_code,
+            "script": entry["script"],
+            "python": entry["python"],
+            "error": detail or f"GNU Radio flowgraph exited with code {return_code}",
+        }
+
+
+def stop_gnu_radio_processes(except_challenge_id: str | None = None) -> None:
+    with GNU_RADIO_PROCESS_LOCK:
+        for challenge_id, entry in list(GNU_RADIO_PROCESSES.items()):
+            if challenge_id == except_challenge_id:
+                continue
+            process: subprocess.Popen = entry["process"]
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+            log_handle = entry.get("log_handle")
+            if log_handle and not log_handle.closed:
+                log_handle.close()
+            GNU_RADIO_PROCESSES.pop(challenge_id, None)
+
+
+def start_gnu_radio_flowgraph(challenge_id: str) -> dict:
+    if challenge_id not in LIVE_GNU_RADIO_TASKS:
+        return {"state": "not_applicable"}
+    current = gnu_radio_process_status(challenge_id)
+    if current.get("state") == "running":
+        return current
+    python_path = discover_gnu_radio_python()
+    if not python_path:
+        GNU_RADIO_START_ERRORS[challenge_id] = GNU_RADIO_DISCOVERY_ERROR
+        return {"state": "unavailable", "error": GNU_RADIO_DISCOVERY_ERROR}
+    capture = gnu_radio_capture_for(challenge_id) or {}
+    relative_script = str(capture.get("python_path", "")).strip()
+    if not relative_script:
+        error = f"No generated Python flowgraph is mapped for {challenge_id}"
+        GNU_RADIO_START_ERRORS[challenge_id] = error
+        return {"state": "unavailable", "error": error}
+    script_path = bounded_project_path(relative_script)
+    if not script_path.is_file():
+        error = f"Generated Python flowgraph not found: {relative_script}"
+        GNU_RADIO_START_ERRORS[challenge_id] = error
+        return {"state": "unavailable", "error": error}
+
+    stop_gnu_radio_processes(except_challenge_id=challenge_id)
+    GNU_RADIO_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    cache_dir = GNU_RADIO_RUNTIME_DIR / ".cache"
+    config_dir = GNU_RADIO_RUNTIME_DIR / ".config"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    config_dir.mkdir(parents=True, exist_ok=True)
+    log_path = GNU_RADIO_RUNTIME_DIR / f"{challenge_id}.log"
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "SIGNAL_INGEST_HOST": str(EXTERNAL_INGEST["host"]),
+            "SIGNAL_INGEST_PORT": str(EXTERNAL_INGEST["port"]),
+            "SIGNAL_FORGE_CHALLENGE_ID": challenge_id,
+            "SIGNAL_FORGE_HEADLESS": "1",
+            "QT_QPA_PLATFORM": environment.get("QT_QPA_PLATFORM", "offscreen"),
+            "XDG_CACHE_HOME": str(cache_dir),
+            "XDG_CONFIG_HOME": str(config_dir),
+        }
+    )
+    if os.name == "nt":
+        environment["APPDATA"] = str(GNU_RADIO_RUNTIME_DIR)
+    creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    log_handle = log_path.open("wb")
+    with EXTERNAL_FEED_LOCK:
+        EXTERNAL_FEEDS[challenge_id] = default_external_feed(challenge_id)
+    try:
+        process = subprocess.Popen(
+            [str(python_path), str(script_path)],
+            cwd=str(script_path.parent),
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            creationflags=creation_flags,
+        )
+    except OSError as error:
+        log_handle.close()
+        message = f"Could not start {relative_script}: {error}"
+        GNU_RADIO_START_ERRORS[challenge_id] = message
+        return {"state": "unavailable", "error": message}
+    with GNU_RADIO_PROCESS_LOCK:
+        GNU_RADIO_START_ERRORS.pop(challenge_id, None)
+        GNU_RADIO_PROCESSES[challenge_id] = {
+            "process": process,
+            "script": relative_script.replace("\\", "/"),
+            "python": str(python_path),
+            "log_path": str(log_path),
+            "log_handle": log_handle,
+        }
+    return gnu_radio_process_status(challenge_id)
 
 
 def bounded_project_path(relative_path: str | Path) -> Path:
@@ -580,7 +881,8 @@ def fft_row_from_complex(samples: list[complex], requested_bins: int = 384) -> t
 
 
 def public_external_feed_meta(feed: dict) -> dict:
-    return {
+    live_gnuradio = feed.get("source_mode") == "live_gnuradio_stream"
+    metadata = {
         "challenge_id": feed["challenge_id"],
         "scheme_id": feed["scheme_id"],
         "center_hz": feed["center_hz"],
@@ -592,6 +894,7 @@ def public_external_feed_meta(feed: dict) -> dict:
         "annotations": feed["annotations"],
         "protocol_notes": feed["protocol_notes"],
         "parser": feed["parser"],
+        "source_mode": feed.get("source_mode", "external"),
         "external_ingest": {
             "host": EXTERNAL_INGEST["host"],
             "port": EXTERNAL_INGEST["port"],
@@ -603,8 +906,15 @@ def public_external_feed_meta(feed: dict) -> dict:
         "pending_frames": len(feed["pending"]),
         "buffered_rows": len(feed["rows"]),
         "client": feed.get("client", ""),
-        "description": "Live frames supplied by an external script, GNU Radio bridge, or C/C++ client over TCP JSON-lines or framed raw IQ.",
+        "description": (
+            "Live post-channel-model CF32 samples supplied directly by the generated GNU Radio Python flowgraph."
+            if live_gnuradio
+            else "Live frames supplied by an external script, GNU Radio bridge, or C/C++ client over TCP JSON-lines or framed raw IQ."
+        ),
     }
+    if live_gnuradio:
+        metadata["flowgraph_process"] = gnu_radio_process_status(feed["challenge_id"])
+    return metadata
 
 
 def ingest_external_signal(payload: dict, client: str = "") -> dict:
@@ -628,8 +938,15 @@ def ingest_external_signal(payload: dict, client: str = "") -> dict:
             feed["scheme_id"] = str(payload["scheme_id"])[:120]
         if "modulation" in payload:
             feed["protocol_notes"]["modulation"] = str(payload["modulation"])[:120]
+        if "framing" in payload:
+            feed["protocol_notes"]["framing"] = str(payload["framing"])[:120]
+        if "integrity" in payload:
+            feed["protocol_notes"]["integrity"] = str(payload["integrity"])[:120]
+        if "crc_check" in payload:
+            feed["protocol_notes"]["crc_check"] = str(payload["crc_check"])[:80]
         if "source_label" in payload:
-            feed["sources"] = [{"label": str(payload["source_label"])[:80], "kind": "external", "offset_hz": 0, "bandwidth_hz": max(1000, feed["span_hz"] / 16)}]
+            source_kind = "gnu_radio_live" if feed.get("source_mode") == "live_gnuradio_stream" else "external"
+            feed["sources"] = [{"label": str(payload["source_label"])[:80], "kind": source_kind, "offset_hz": 0, "bandwidth_hz": max(1000, feed["span_hz"] / 16)}]
         requested_bins = int(payload.get("bins", feed.get("bins", 384)))
 
     if message_type in {"meta", "hello"}:
@@ -649,7 +966,11 @@ def ingest_external_signal(payload: dict, client: str = "") -> dict:
         samples = [round(max(-1.0, min(1.0, float(value))), 4) for value in samples[:512]]
     elif message_type == "iq":
         with EXTERNAL_FEED_LOCK:
-            feed["protocol_notes"]["source"] = "External TCP framed raw IQ ingest"
+            feed["protocol_notes"]["source"] = (
+                "Live CF32 from the generated GNU Radio Python flowgraph"
+                if feed.get("source_mode") == "live_gnuradio_stream"
+                else "External TCP framed raw IQ ingest"
+            )
         data = payload.get("data") or payload.get("iq_base64")
         if not isinstance(data, str):
             raise ValueError("iq message requires base64 cf32_le data")
@@ -677,8 +998,21 @@ def ingest_external_signal(payload: dict, client: str = "") -> dict:
                 "sequence": feed["sequence"],
                 "bins": len(row),
                 "sample_count": len(samples),
+                **(
+                    {
+                        "framing": str(payload["framing"]),
+                        "integrity": str(payload["integrity"]),
+                        "crc_check": str(payload.get("crc_check", "not supplied")),
+                    }
+                    if payload.get("framing") and payload.get("integrity")
+                    else {}
+                ),
             },
-            "note": "Frame accepted from external signal ingest.",
+            "note": (
+                "Frame accepted from the running generated GNU Radio Python flowgraph; any CRC status shown is its live source self-check."
+                if feed.get("source_mode") == "live_gnuradio_stream"
+                else "Frame accepted from external signal ingest."
+            ),
         }
         frame = {
             "frame": feed["sequence"],
@@ -737,7 +1071,10 @@ class SignalIngestHandler(socketserver.StreamRequestHandler):
     def handle(self) -> None:
         client = f"{self.client_address[0]}:{self.client_address[1]}"
         while True:
-            raw_line = self.rfile.readline(MAX_EXTERNAL_LINE_BYTES + 1)
+            try:
+                raw_line = self.rfile.readline(MAX_EXTERNAL_LINE_BYTES + 1)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                return
             if not raw_line:
                 return
             if len(raw_line) > MAX_EXTERNAL_LINE_BYTES:
@@ -823,7 +1160,10 @@ def start_external_ingest_server() -> None:
 
 def configured_gnu_radio_path(settings: dict | None = None) -> tuple[Path, Path]:
     settings = settings or load_config().get("gnu_radio_capture", {})
-    relative_path = Path(str(settings.get("path", "radio/GNURadio/ReadingSignals.sigmf-data")))
+    configured_path = str(settings.get("path", "")).strip()
+    if not configured_path:
+        raise ValueError("No file-backed GNU Radio source is configured")
+    relative_path = Path(configured_path)
     capture_path = bounded_project_path(relative_path)
     return capture_path, relative_path
 
@@ -1419,6 +1759,10 @@ def decode_gnu_radio_ook(settings: dict | None = None) -> dict:
 
 def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: bool = False) -> dict:
     """Convert a GNU Radio Python flowgraph stream or cf32 capture to web FFT rows."""
+    if challenge_id in LIVE_GNU_RADIO_TASKS:
+        raise ValueError(
+            f"{challenge_id} is live-only: start its generated GNU Radio Python flowgraph and use /api/rf/live"
+        )
     settings = tunnel_gnu_radio_settings(challenge_id) or load_config().get("gnu_radio_capture", {})
     settings = gnu_radio_runtime_settings(settings)
     capture_info = settings.get("capture", {})
@@ -1428,6 +1772,8 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         "weather_wav_pair",
         "weather_alarm_wav_pair",
     }
+    if not virtual_source:
+        raise ValueError("Recorded GNU Radio captures are disabled; use the live GNU Radio stream")
     capture_path, relative_path = configured_gnu_radio_path(settings)
     flowgraph = settings.get("flowgraph", {})
     source_relative_path = Path(str(flowgraph.get("source_script") or relative_path.as_posix()))
@@ -1608,7 +1954,11 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         source_mode_label = "raw GNU Radio cf32 File Sink capture"
     preview_sources = [
         {
-            "label": capture_info.get("title", "GNU Radio tunnel capture"),
+            "label": (
+                capture_info.get("title", "GNU Radio tunnel capture")
+                if weather_source
+                else f"{capture_info.get('stem', 'GNU Radio')} File Sink output"
+            ),
             "kind": (
                 "weather_complex"
                 if weather_source
@@ -1630,15 +1980,6 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
             }
             for index, offset in enumerate(capture_info["carrier_offsets_hz"])
         ]
-    else:
-        preview_sources.append(
-            {
-                "label": "Nominal GNU Radio tone",
-                "kind": "carrier_reference",
-                "offset_hz": carrier_offset_hz,
-                "bandwidth_hz": 1_000,
-            }
-        )
     preview_annotations = [
         {
             "label": f"hop {index + 1}",
@@ -1647,8 +1988,11 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         }
         for index, offset in enumerate(capture_info.get("carrier_offsets_hz", []))
     ] if weather_source else [
-        {"label": "detected ASK carrier", "offset_hz": round(detected_frequency_hz - center_hz, 3), "color": "#73f2a6"},
-        {"label": f"nominal {carrier_offset_hz / 1000:g} kHz tone", "offset_hz": carrier_offset_hz, "color": "#ffc766"},
+        {
+            "label": "GNU Radio File Sink output",
+            "offset_hz": round(detected_frequency_hz - center_hz, 3),
+            "color": "#73f2a6",
+        },
     ]
     return {
         "challenge_id": challenge_id or "configured-gnu-radio-capture",
@@ -1669,7 +2013,7 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         "parser": parser,
         "description": f"Waterfall generated live by the backend from {capture_info.get('title', 'a local GNU Radio')} using a {source_mode_label}.",
         "source_file": source_relative_path.as_posix(),
-        "source_mode": settings.get("source_mode", "recorded_cf32"),
+        "source_mode": settings.get("source_mode", "generated_python_flowgraph"),
         "source_files": source_files,
         "sample_count": sample_count,
         "duration_seconds": sample_count / sample_rate,
@@ -1679,9 +2023,17 @@ def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: b
         "protocol_notes": {
             "datatype": datatype,
             "modulation": f"{modulation_label} from the {source_mode_label}",
-            "source": f"Python backend serves a looping cf32 stream from the {source_mode_label}; no pre-recorded SigMF file is required.",
+            "source": (
+                f"Python backend serves a looping cf32 stream interpreted from {source_mode_label}."
+                if generated_source
+                else f"Python backend reads bounded cf32 windows directly from the {source_mode_label}."
+            ),
             "raw_path": f"/api/rf/raw?challenge_id={challenge_id or 'tunnel-reading-signals'}&bytes=2097152",
-            "metadata": "The challenge signal source is the editable generated Python flowgraph; recordings are optional developer snapshots.",
+            "metadata": (
+                "The challenge signal source is the editable generated Python flowgraph."
+                if generated_source
+                else "The challenge signal is the recorded output written by the mapped GNU Radio File Sink."
+            ),
         },
         "annotations": preview_annotations,
     }
@@ -1708,6 +2060,10 @@ def gnu_radio_live_frame(preview: dict, frame: int) -> dict:
 
 
 def read_gnu_radio_raw_sample(challenge_id: str, byte_count: int = 2_097_152, byte_offset: int = 0) -> tuple[bytes, dict]:
+    if challenge_id in LIVE_GNU_RADIO_TASKS:
+        raise ValueError(
+            f"{challenge_id} has no recorded IQ download; samples are streamed live by GNU Radio"
+        )
     settings = tunnel_gnu_radio_settings(challenge_id)
     if not settings:
         raise FileNotFoundError(f"No GNU Radio capture is mapped for {challenge_id}")
@@ -1738,22 +2094,7 @@ def read_gnu_radio_raw_sample(challenge_id: str, byte_count: int = 2_097_152, by
             "stem": settings.get("capture", {}).get("stem", challenge_id),
             "source_mode": settings.get("source_mode"),
         }
-    capture_path, relative_path = configured_gnu_radio_path(settings)
-    if not capture_path.is_file():
-        raise FileNotFoundError(f"GNU Radio capture not found: {relative_path.as_posix()}")
-    file_size = capture_path.stat().st_size
-    byte_offset = max(0, min(max(0, file_size - 1), byte_offset))
-    byte_offset -= byte_offset % 8
-    with capture_path.open("rb") as handle:
-        handle.seek(byte_offset)
-        data = handle.read(byte_count)
-    return data, {
-        "source_file": relative_path.as_posix(),
-        "source_size": file_size,
-        "offset": byte_offset,
-        "bytes": len(data),
-        "stem": settings.get("capture", {}).get("stem", challenge_id),
-    }
+    raise ValueError("Recorded GNU Radio captures are disabled; use the live GNU Radio stream")
 
 
 def public_task(task: dict) -> dict:
@@ -1821,7 +2162,7 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
         return {"ok": False, "lines": ["No RF target is assigned to this subtask."]}, HTTPStatus.NOT_FOUND
 
     imported_capture = None
-    if gnu_radio_capture_for(challenge_id):
+    if gnu_radio_capture_for(challenge_id) and challenge_id not in LIVE_GNU_RADIO_TASKS:
         try:
             imported_capture = gnu_radio_capture_preview(challenge_id, reveal_payload=action == "receive")
             target = {
@@ -1947,7 +2288,7 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
     ):
         base["flag"] = expected_flag_for(session_id, challenge_id)
         base["lines"] = ["DECODE accepted / recovered hidden field", f"FLAG {base['flag']}"]
-    elif action == "interfere" and MODE["value"] == "attack" and challenge_id in INTERFERENCE_FLAG_TASKS and any(
+    elif action == "interfere" and challenge_id in INTERFERENCE_FLAG_TASKS and any(
         word in lower_args for word in {"noise", "dos", "mismatch", "jam", "metadata"}
     ):
         tx_hits, tx_report = transmitter_target_overlap(transmitter, target)
@@ -1961,7 +2302,7 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
             return base, HTTPStatus.BAD_REQUEST
         base["flag"] = expected_flag_for(session_id, challenge_id)
         base["lines"] = ["INTERFERENCE accepted / decoded string mismatch observed", f"DISPLAY OUTPUT {base['flag']}"]
-    elif action == "transmit" and MODE["value"] == "attack" and challenge_id in TRANSMIT_FLAG_TASKS and any(
+    elif action == "transmit" and challenge_id in TRANSMIT_FLAG_TASKS and any(
         word in lower_args for word in {"sign", "message", "metadata", "fibonacci", "tone", "gate", "null", "theta", "replay", "waveform"}
     ):
         tx_hits, tx_report = transmitter_target_overlap(transmitter, target)
@@ -1988,12 +2329,12 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
         emergency = alarm_decode_packet(packet)
         base["packet"] = f"0x{packet:08X}"
         base["decoded_emergency"] = f"0x{emergency:X}"
-        base["alarm_active"] = emergency == 0xB and MODE["value"] == "attack"
+        base["alarm_active"] = emergency == 0xB
         if not base["alarm_active"]:
             base["ok"] = False
             base["lines"] = [
                 f"PACKET {base['packet']} decoded / emergency={base['decoded_emergency']}",
-                "Warning light remained off: AlarmCheck did not accept an unauthenticated emergency value in the current mode.",
+                "Warning light remained off: AlarmCheck did not accept the supplied emergency value.",
             ]
             return base, HTTPStatus.UNPROCESSABLE_ENTITY
         base["flag"] = expected_flag_for(session_id, challenge_id)
@@ -2027,7 +2368,7 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
             base["ok"] = False
             base["lines"] = ["Beam input is outside the recovered hardware field widths."]
             return base, HTTPStatus.BAD_REQUEST
-        if not hidden_lobe or correlation < 240 or array_gain < 240 or MODE["value"] != "attack":
+        if not hidden_lobe or correlation < 240 or array_gain < 240:
             base["ok"] = False
             base["lines"] = [
                 f"BEAM GATE rejected bin={arrival_bin} correlation={correlation} gain={array_gain}",
@@ -2040,7 +2381,7 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
             "UNINTENDED LOBE aliases TRUST_VECTOR; relay data crossed the spatial gate",
             f"FLAG {base['flag']}",
         ]
-    elif action == "send" and MODE["value"] == "attack" and challenge_id in SEND_FLAG_TASKS and any(
+    elif action == "send" and challenge_id in SEND_FLAG_TASKS and any(
         word in lower_args
         for word in {"warning", "light", "auth", "evacuation", "anomaly", "testbench", "latch", "default", "bitstream", "superuser", "kill"}
     ):
@@ -2065,9 +2406,9 @@ def script_interface_description() -> dict:
             "POST /api/script/terminal": "Run one terminal command against a selected subtask.",
             "GET /api/contexts": "List situations and nested subtasks.",
             "GET /api/tasks": "List all subtasks.",
-            "GET /api/rf/live": "Stream live SSE parser events. Mapped GNU Radio subtasks synthesize cf32 IQ from their generated Python flowgraph scripts.",
-            "GET /api/rf/raw": "Download bounded generated cf32 IQ samples; use bytes and offset query params.",
-            "GET /api/rf/gnu-radio-capture": "Analyse a selected generated GNU Radio Python flowgraph with challenge_id and return measured FFT, tuned IQ, and recovered bits.",
+            "GET /api/rf/live": "Stream SSE frames. Beginner tasks wait for live post-channel-model CF32 from their generated GNU Radio Python flowgraph.",
+            "GET /api/rf/raw": "Download bounded IQ only for non-live tasks; live GNU Radio tasks intentionally expose no recording.",
+            "GET /api/rf/gnu-radio-capture": "Inspect non-live sources. Beginner GNU Radio tasks are intentionally live-only.",
             "TCP signal ingest": f"Send JSON-lines or raw cf32_le framed IQ to {EXTERNAL_INGEST['host']}:{EXTERNAL_INGEST['port']}. Use SIGNAL_INGEST_HOST/SIGNAL_INGEST_PORT to change it.",
             "GNU Radio ZMQ bridge": "Run tools/script_clients/zmq_signal_bridge.py against a GNU Radio ZMQ PUSH/PUB Sink, then view it with External feed.",
             "GET /api/rf/external/status": "Describe the currently buffered external signal feed for a challenge.",
@@ -2345,9 +2686,6 @@ class CTFHandler(SimpleHTTPRequestHandler):
             public_config["telemetry"].pop("hmac_key", None)
             self.write_json(public_config)
             return
-        if parsed.path == "/api/mode":
-            self.write_json({"mode": MODE["value"]})
-            return
         if parsed.path == "/api/tasks":
             self.write_json({"tasks": [public_task(task) for task in load_challenges()]})
             return
@@ -2410,7 +2748,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
                     "path": "/api/rsu/maintenance/parse",
                     "content_type": "application/json",
                     "schema": {"type": "0x42", "declared_length": 111, "payload": "operator note"},
-                    "operator_note": "Attack Mode models the native parser's trusted-length behaviour; Secure Mode requires exact length agreement.",
+                    "operator_note": "This training endpoint models the native parser's trusted-length behaviour; compare it with the bounded parser source.",
                 }
             )
             return
@@ -2424,9 +2762,6 @@ class CTFHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path == "/api/mode":
-            self.handle_mode()
-            return
         if parsed.path == "/api/flag":
             self.handle_flag()
             return
@@ -2481,6 +2816,10 @@ class CTFHandler(SimpleHTTPRequestHandler):
     def handle_rf_live(self, query: str) -> None:
         params = parse_qs(query)
         challenge_id = params.get("challenge_id", ["tunnel-reading-signals"])[0]
+        if challenge_id in LIVE_GNU_RADIO_TASKS:
+            start_gnu_radio_flowgraph(challenge_id)
+            self.handle_rf_external_live(query)
+            return
         session_id = params.get("session_id", [session_id_from(self)])[0]
         target = RF_TARGETS.get(challenge_id, RF_TARGETS["tunnel-reading-signals"])
         try:
@@ -2490,16 +2829,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
             bins = 384
             rate = 18.0
         rate = max(3.0, min(40.0, rate))
-        gnu_radio_preview = None
-        try:
-            if gnu_radio_capture_for(challenge_id):
-                gnu_radio_preview = gnu_radio_capture_preview(challenge_id)
-                profile = {key: value for key, value in gnu_radio_preview.items() if key not in {"rows", "time_rows", "iq_rows"}}
-            else:
-                profile = live_signal_profile(challenge_id, target=target, bins=bins)
-        except (FileNotFoundError, OSError, ValueError, struct.error) as error:
-            profile = live_signal_profile(challenge_id, target=target, bins=bins)
-            profile["protocol_notes"]["source"] = f"GNU Radio capture unavailable ({error}); using Python fallback profile."
+        profile = live_signal_profile(challenge_id, target=target, bins=bins)
 
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -2519,10 +2849,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
             frame_count = max(1, int(profile.get("frames", 720)))
             while True:
                 looped_frame = frame % frame_count
-                if gnu_radio_preview:
-                    send_event("frame", gnu_radio_live_frame(gnu_radio_preview, looped_frame))
-                else:
-                    send_event("frame", generate_live_frame(profile, looped_frame, session_id=session_id))
+                send_event("frame", generate_live_frame(profile, looped_frame, session_id=session_id))
                 frame += 1
                 time.sleep(1 / rate)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
@@ -2565,6 +2892,15 @@ class CTFHandler(SimpleHTTPRequestHandler):
     def handle_rf_raw(self, query: str) -> None:
         params = parse_qs(query)
         challenge_id = params.get("challenge_id", ["tunnel-reading-signals"])[0]
+        if challenge_id in LIVE_GNU_RADIO_TASKS:
+            self.write_json(
+                {
+                    "error": "This challenge is live-only. Start its generated GNU Radio Python flowgraph; no SigMF or recorded IQ is read.",
+                    "status": external_feed_snapshot(challenge_id),
+                },
+                HTTPStatus.CONFLICT,
+            )
+            return
         target = RF_TARGETS.get(challenge_id, RF_TARGETS["tunnel-reading-signals"])
         try:
             byte_count = int(params.get("bytes", ["2097152"])[0])
@@ -2597,6 +2933,11 @@ class CTFHandler(SimpleHTTPRequestHandler):
     def handle_gnu_radio_capture(self, query: str = "") -> None:
         params = parse_qs(query)
         challenge_id = params.get("challenge_id", ["tunnel-reading-signals"])[0]
+        if challenge_id in LIVE_GNU_RADIO_TASKS:
+            snapshot = external_feed_snapshot(challenge_id)
+            status = HTTPStatus.OK if snapshot.get("last_seen") else HTTPStatus.SERVICE_UNAVAILABLE
+            self.write_json(snapshot, status)
+            return
         try:
             self.write_json(gnu_radio_capture_preview(challenge_id))
         except FileNotFoundError as error:
@@ -2622,7 +2963,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
 
         emergency = alarm_decode_packet(packet)
         alarm_pattern = emergency == 0xB
-        accepted = alarm_pattern and MODE["value"] == "attack"
+        accepted = alarm_pattern
         response = {
             "ok": accepted,
             "packet": f"0x{packet:08X}",
@@ -2631,8 +2972,6 @@ class CTFHandler(SimpleHTTPRequestHandler):
             "message": (
                 "Forged packet accepted by AlarmCheck(); the emergency warning light is active."
                 if accepted
-                else "Alarm bits matched, but Secure Mode rejected the unauthenticated packet."
-                if alarm_pattern
                 else "Packet decoded successfully, but its emergency nibble does not activate the light."
             ),
         }
@@ -2642,7 +2981,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
             response["message"] += f" Flag: {response['flag']}"
             self.write_json(response)
             return
-        self.write_json(response, HTTPStatus.FORBIDDEN if alarm_pattern else HTTPStatus.UNPROCESSABLE_ENTITY)
+        self.write_json(response, HTTPStatus.UNPROCESSABLE_ENTITY)
 
     def handle_flag(self) -> None:
         try:
@@ -2709,32 +3048,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
             "accepted_fields": [label for label, present in required.items() if present],
         })
 
-    def handle_mode(self) -> None:
-        try:
-            body = read_json_body(self)
-        except json.JSONDecodeError:
-            self.write_json({"error": "Invalid JSON."}, HTTPStatus.BAD_REQUEST)
-            return
-        requested = str(body.get("mode", "")).lower()
-        if requested not in {"attack", "secure"}:
-            self.write_json({"error": "mode must be attack or secure"}, HTTPStatus.BAD_REQUEST)
-            return
-        MODE["value"] = requested
-        if requested == "attack":
-            REPLAY_CACHE.clear()
-        self.write_json({"mode": MODE["value"]})
-
     def handle_vulnerable_events(self, query: str) -> None:
-        if MODE["value"] == "secure":
-            self.write_json(
-                {
-                    "mode": "secure",
-                    "blocked": True,
-                    "reason": "Secure Mode disables the intentionally vulnerable SQL endpoint. Use /api/toll/safe-events.",
-                },
-                HTTPStatus.FORBIDDEN,
-            )
-            return
         params = parse_qs(query)
         vehicle_id = params.get("vehicle_id", [""])[0]
         sql = (
@@ -2803,17 +3117,6 @@ class CTFHandler(SimpleHTTPRequestHandler):
             return
 
         schedule = schedules[0]
-        if MODE["value"] == "secure" and schedule["operator_only"] and not vehicle_is_operator(vehicle_id):
-            self.write_json(
-                {
-                    "mode": "secure",
-                    "authorized_schedule": False,
-                    "decision": "rejected",
-                    "reason": "Secure Mode derives operator-only schedule entitlement server-side.",
-                },
-                HTTPStatus.FORBIDDEN,
-            )
-            return
         result = {
             "vehicle_id": vehicle_id,
             "booth_id": booth_id,
@@ -2891,9 +3194,8 @@ class CTFHandler(SimpleHTTPRequestHandler):
     def handle_operator_events(self) -> None:
         self.write_json(
             {
-                "mode": MODE["value"],
                 "events": OPERATOR_COMMENTS,
-                "rendering_note": "Attack Mode intentionally renders comments as HTML in the browser. Secure Mode renders text only.",
+                "rendering_note": "The training console intentionally renders RF-origin comments as HTML so the output-boundary flaw remains observable.",
             }
         )
 
@@ -2908,10 +3210,8 @@ class CTFHandler(SimpleHTTPRequestHandler):
             "route_note": str(body.get("route_note", "")),
             "operator_comment": str(body.get("operator_comment", "")),
         }
-        if MODE["value"] == "secure":
-            event = {key: html.escape(value) for key, value in event.items()}
         OPERATOR_COMMENTS.append(event)
-        self.write_json({"ok": True, "mode": MODE["value"], "event": event})
+        self.write_json({"ok": True, "event": event})
 
     def handle_maintenance_parser(self) -> None:
         try:
@@ -2927,28 +3227,14 @@ class CTFHandler(SimpleHTTPRequestHandler):
         if tlv_type != 0x42:
             self.write_json({"decision": "rejected", "reason": "unsupported TLV type"}, HTTPStatus.BAD_REQUEST)
             return
-        if MODE["value"] == "secure" and declared_length != actual_length:
-            self.write_json(
-                {
-                    "mode": "secure",
-                    "decision": "rejected",
-                    "declared_length": declared_length,
-                    "actual_length": actual_length,
-                    "reason": "declared length does not equal available payload length",
-                },
-                HTTPStatus.BAD_REQUEST,
-            )
-            return
-
         result = {
-            "mode": MODE["value"],
             "decision": "parsed",
             "declared_length": declared_length,
             "actual_length": actual_length,
             "length_mismatch": declared_length != actual_length,
             "diagnostic_command_seen": "MAINT_DIAG_UNLOCK" in payload,
         }
-        if MODE["value"] == "attack" and declared_length > actual_length and "MAINT_DIAG_UNLOCK" in payload:
+        if declared_length > actual_length and "MAINT_DIAG_UNLOCK" in payload:
             result["diagnostic_access"] = "granted"
             result["flag"] = flag_for(session_id_from(self, body), "length-field-chaos")
         self.write_json(result)
@@ -3053,19 +3339,19 @@ class CTFHandler(SimpleHTTPRequestHandler):
         if action == "decode" and challenge_id == "reverse-the-decoder":
             base["flag"] = flag_for(session_id, challenge_id)
             base["lines"] = ["CHECKSUM expected=5e provided=5e valid=true", f"DECODER OUTPUT {base['flag']}"]
-        elif action == "interfere" and MODE["value"] == "attack" and challenge_id == "free-trip-logic-flaw" and any(word in arguments.lower() for word in {"replay", "maint_free", "maintenance"}):
+        elif action == "interfere" and challenge_id == "free-trip-logic-flaw" and any(word in arguments.lower() for word in {"replay", "maint_free", "maintenance"}):
             base["flag"] = flag_for(session_id, challenge_id)
             base["lines"] = ["INTERFERENCE replay aligned / schedule=MAINT_FREE", "TOLL OUTPUT price=0", f"FLAG {base['flag']}"]
         elif action == "transmit":
-            if MODE["value"] == "attack" and challenge_id == "free-trip-logic-flaw" and "replay" in arguments.lower():
+            if challenge_id == "free-trip-logic-flaw" and "replay" in arguments.lower():
                 base["flag"] = flag_for(session_id, challenge_id)
                 base["lines"] = ["TX replay waveform visible in receiver passband", "TARGET OUTPUT schedule=MAINT_FREE price=0", f"FLAG {base['flag']}"]
             else:
                 base["lines"] = ["TX burst injected into local spectrum simulation.", "No target state change was observed for this waveform."]
-        elif action == "forward" and MODE["value"] == "attack" and challenge_id == "operator-console-xss" and "console" in arguments.lower():
+        elif action == "forward" and challenge_id == "operator-console-xss" and "console" in arguments.lower():
             base["flag"] = flag_for(session_id, challenge_id)
-            base["lines"] = ["FORWARD operator_note -> console", "Console rendered RF-origin control in Attack Mode.", f"UI OUTPUT {base['flag']}"]
-        elif action == "send" and MODE["value"] == "attack" and challenge_id == "length-field-chaos" and "maint_diag_unlock" in arguments.lower():
+            base["lines"] = ["FORWARD operator_note -> console", "Console rendered the RF-origin control.", f"UI OUTPUT {base['flag']}"]
+        elif action == "send" and challenge_id == "length-field-chaos" and "maint_diag_unlock" in arguments.lower():
             base["flag"] = flag_for(session_id, challenge_id)
             base["lines"] = ["TX TLV accepted / length mismatch reached native parser", "DIAGNOSTIC ACCESS granted", f"TARGET OUTPUT {base['flag']}"]
         else:
@@ -3104,14 +3390,13 @@ def verify_telemetry_packet(packet: dict) -> dict:
         REPLAY_CACHE.add(nonce)
 
     return {
-        "mode": MODE["value"],
         "hmac_valid": hmac_valid,
         "fresh_timestamp": fresh_timestamp,
         "replay_seen": replay_seen,
         "authorized_schedule": None,
         "decision": "accepted" if accepted else "rejected",
         "reason": "packet authenticated and fresh" if accepted else "packet failed HMAC, freshness, or replay checks",
-        "expected_hmac_for_training": expected if MODE["value"] == "attack" else None,
+        "expected_hmac_for_training": expected,
     }
 
 
@@ -3192,7 +3477,7 @@ def radio_intercept(session_id: str = "anonymous") -> dict:
             f"<button onclick=\"document.querySelector('#operator-flag').textContent='{flag_for(session_id, 'operator-console-xss')}'\">"
             "Render test</button>"
         ),
-        "sink_warning": "This decoded note is untrusted RF-origin text. Attack Mode renders it as HTML; Secure Mode renders it as text.",
+        "sink_warning": "This decoded note is untrusted RF-origin text and the training console renders it as HTML.",
         "operator_action": "Correlate burst with toll event, then review trust boundary before posting to console.",
     }
 
@@ -3212,7 +3497,7 @@ def research_notes() -> dict:
             "Hard cyber stages should combine RE, memory corruption, fuzzing, protocol state-machine bugs, XSS sinks, authorization failures, and telemetry replay."
         ],
         "sota_security": [
-            "Secure Mode demonstrates HMAC, freshness checks, replay rejection, server-side authorization, and safe SQL as the baseline, not the finish line.",
+            "Defensive examples demonstrate HMAC, freshness checks, replay rejection, server-side authorization, and safe SQL as the baseline, not the finish line.",
             "SOTA hard levels should require layered assurance: hardware root of trust, secure boot, signed firmware, key separation, remote attestation, and measured boot evidence.",
             "Radio SOTA should cover adaptive hopping, spread spectrum, interference classification, MIMO/beam/null steering concepts, propagation modelling, and jamming resilience.",
             "Cyber SOTA should include memory-safe parsers, fuzzing harnesses, binary hardening, SBOM/supply-chain checks, CSP/output encoding, and backend policy enforcement.",
@@ -3242,11 +3527,20 @@ def main() -> None:
     init_db()
     os.chdir(ROOT)
     port = int(os.environ.get("PORT", "8000"))
-    mimetypes.add_type("application/json", ".sigmf-meta")
     start_external_ingest_server()
+    gnu_radio_python = discover_gnu_radio_python()
+    if gnu_radio_python:
+        print(f"GNU Radio Python detected: {gnu_radio_python}")
+    else:
+        print(GNU_RADIO_DISCOVERY_ERROR)
     server = ThreadingHTTPServer(("localhost", port), CTFHandler)
     print(f"Signal Forge CTF serving http://localhost:{port}")
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    finally:
+        stop_gnu_radio_processes()
+        if EXTERNAL_INGEST_SERVER is not None:
+            EXTERNAL_INGEST_SERVER.shutdown()
 
 
 if __name__ == "__main__":

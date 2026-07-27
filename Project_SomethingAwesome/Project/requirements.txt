@@ -1,0 +1,5 @@
+# Runtime helpers used by the GNU Radio-generated Python flowgraphs.
+# GNU Radio itself must be installed through Radioconda/Conda or the operating
+# system package manager; it is not installed from PyPI.
+numpy>=1.24,<3
+PyQt5>=5.15,<6

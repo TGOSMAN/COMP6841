@@ -28,7 +28,12 @@ then send either normalized FFT rows or raw `cf32_le` IQ blocks:
 ```powershell
 python tools/script_clients/external_signal_sender.py --challenge-id tunnel-basic-dos --mode fft
 python tools/script_clients/external_signal_sender.py --challenge-id tunnel-basic-dos --mode iq --block-samples 2048
-python tools/script_clients/external_signal_sender.py --challenge-id tunnel-basic-dos --mode file --file radio/GNURadio/Tunnel_Task/DoSAttackMe.sigmf-data --loop
+```
+
+Mapped beginner tasks use their generated GNU Radio Python files directly:
+
+```powershell
+python radio/GNURadio/Tunnel_Task/DoSAttackMe.py
 ```
 
 GNU Radio ZMQ live bridge:

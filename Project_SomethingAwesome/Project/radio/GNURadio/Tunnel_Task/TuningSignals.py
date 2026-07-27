@@ -27,6 +27,10 @@ from gnuradio import gr, blocks
 import pmt
 import sip
 import threading
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from signal_forge_live_sink import SignalForgeLiveSink
 
 
 
@@ -72,6 +76,13 @@ class TuningSignals(gr.top_block, Qt.QWidget):
         # Blocks
         ##################################################
 
+        self.signal_forge_live_sink_0 = SignalForgeLiveSink(
+            challenge_id="tunnel-tuning",
+            center_hz=915_000_000,
+            sample_rate_hz=samp_rate,
+            source_label="TuningSignals.py post-channel-model CF32",
+            modulation="OOK",
+        )
         self.qtgui_waterfall_sink_x_0 = qtgui.waterfall_sink_c(
             1024, #size
             window.WIN_BLACKMAN_hARRIS, #wintype
@@ -179,10 +190,6 @@ class TuningSignals(gr.top_block, Qt.QWidget):
         self.blocks_repeat_0 = blocks.repeat(gr.sizeof_char*1, 1000)
         self.blocks_multiply_xx_0 = blocks.multiply_vcc(1)
         self.blocks_interleaved_char_to_complex_0 = blocks.interleaved_char_to_complex(False,1.0)
-        self.blocks_file_sink_0 = blocks.file_sink(gr.sizeof_gr_complex*1, 'C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\TuningSignals.sigmf-data', False)
-        self.blocks_file_sink_0.set_unbuffered(False)
-        self.blocks_file_meta_sink_0 = blocks.file_meta_sink(gr.sizeof_gr_complex*1, 'C:\\GithubRepositories\\COMP6841\\Project_SomethingAwesome\\Project\\radio\\GNURadio\\TuningSignals.sigmf-meta', samp_rate, 1, blocks.GR_FILE_FLOAT, True, 1000000, pmt.make_dict(), False)
-        self.blocks_file_meta_sink_0.set_unbuffered(False)
         self.analog_sig_source_x_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 10000, 1, 0, 0)
 
 
@@ -196,10 +203,9 @@ class TuningSignals(gr.top_block, Qt.QWidget):
         self.connect((self.blocks_repeat_0, 0), (self.blocks_interleaved_char_to_complex_0, 0))
         self.connect((self.blocks_unpack_k_bits_bb_0, 0), (self.blocks_repeat_0, 0))
         self.connect((self.blocks_vector_source_x_0, 0), (self.blocks_unpack_k_bits_bb_0, 0))
-        self.connect((self.channels_channel_model_0, 0), (self.blocks_file_meta_sink_0, 0))
-        self.connect((self.channels_channel_model_0, 0), (self.blocks_file_sink_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_time_sink_x_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_waterfall_sink_x_0, 0))
+        self.connect((self.channels_channel_model_0, 0), (self.signal_forge_live_sink_0, 0))
         self.connect((self.low_pass_filter_0, 0), (self.blocks_multiply_xx_0, 0))
 
 

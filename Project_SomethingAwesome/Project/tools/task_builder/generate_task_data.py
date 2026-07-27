@@ -29,22 +29,26 @@ WEATHER_CAPTURE_STEMS = {
 
 def gnu_radio_artifacts(task_id: str, stem: str, folder: str, label_prefix: str) -> list[dict]:
     label = f"{label_prefix} {stem}".strip()
+    live_output = folder in {"Tunnel_Task", "Song_Meta"}
     artifacts = [
         {
-            "label": f"{label} generated GNU Radio replay",
-            "href": f"/api/rf/gnu-radio-capture?challenge_id={task_id}",
-            "type": "generated GNU Radio Python cf32",
+            "label": f"{label} live GNU Radio output" if live_output else f"{label} generated GNU Radio replay",
+            "href": f"/api/rf/external/status?challenge_id={task_id}" if live_output else f"/api/rf/gnu-radio-capture?challenge_id={task_id}",
+            "type": "live GNU Radio CF32 stream" if live_output else "generated GNU Radio Python cf32",
             "role": "signal",
-            "source": "generated_gnuradio_python",
-        },
-        {
-            "label": f"{label} generated raw IQ sample",
-            "href": f"/api/rf/raw?challenge_id={task_id}&bytes=2097152",
-            "type": "bounded generated cf32 IQ sample",
-            "role": "raw_iq",
-            "source": "generated_gnuradio_python",
+            "source": "gnu_radio_python_live" if live_output else "generated_gnuradio_python",
         },
     ]
+    if not live_output:
+        artifacts.append(
+            {
+                "label": f"{label} generated raw IQ sample",
+                "href": f"/api/rf/raw?challenge_id={task_id}&bytes=2097152",
+                "type": "bounded generated cf32 IQ sample",
+                "role": "raw_iq",
+                "source": "generated_gnuradio_python",
+            }
+        )
     if folder != "WeatherBroadcast":
         artifacts.extend(
             [
@@ -187,28 +191,36 @@ def weather_artifacts(task_id: str) -> list[dict]:
     return artifacts
 
 
-def emergency_audio_artifacts(active_transmission: bool = False) -> list[dict]:
+def emergency_audio_artifacts(challenge_id: str, active_transmission: bool = False) -> list[dict]:
     artifacts = [
         {
-            "label": "Emergency audio hopping capture",
-            "href": "/captures/15-air-weather-voice.json",
+            "label": "Live GNU Radio CF32 stream status",
+            "href": f"/api/rf/external/status?challenge_id={challenge_id}",
             "type": "application/json",
             "role": "signal",
+            "source": "gnu_radio_python_live",
         },
         {
-            "label": "Emergency audio SigMF metadata",
-            "href": "/captures/15-council-weather-audio.sigmf-meta",
-            "type": "application/json",
+            "label": "CivilianEmergencyReceiver GNU Radio flowgraph",
+            "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.grc",
+            "type": "application/x-gnuradio-grc",
+            "role": "flowgraph_source",
         },
         {
-            "label": "Weekly emergency-network reference transmission",
-            "href": "/radio/GNURadio/EmergencyRadioAudio/Required_Weekly_Test_NOAA.ogg",
-            "type": "audio/ogg",
-            "role": "source_audio",
+            "label": "CivilianEmergencyReceiver generated Python",
+            "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.py",
+            "type": "text/x-python",
+            "role": "flowgraph_source",
         },
         {
-            "label": "Emergency transmission protocol notes",
-            "href": "/radio/GNURadio/EmergencyRadioAudio/README.md",
+            "label": "Barker-13 and CRC-16 live source block",
+            "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver_epy_block_0.py",
+            "type": "text/x-python",
+            "role": "flowgraph_source",
+        },
+        {
+            "label": "Live receiver protocol notes",
+            "href": "/radio/GNURadio/CivilianEmergency/README.md",
             "type": "text/markdown",
         },
     ]
@@ -499,16 +511,16 @@ TASKS = [
         "track": "signals",
         "difficulty": "Moderate",
         "points": 200,
-        "scenario": "An IQ recording contains several short public-facility audio bursts spread across frequencies.",
-        "objective": "Identify the hopping pattern, reassemble the bursts, and recover the spoken message.",
-        "details": "The participant receives an IQ recording containing short audio bursts spread across different frequencies. They must identify the hopping pattern, reassemble the bursts, and recover the spoken message.",
+        "scenario": "A live GNU Radio receiver emits public-facility alert audio and a Barker-13 synchronized metadata frame across several frequencies.",
+        "objective": "Follow the live hopping pattern, correlate the Barker-13 prefix, and verify the recovered message with CRC-16.",
+        "details": "The generated GNU Radio Python flowgraph continuously creates alert audio in memory, adds a Barker-13 metadata preamble and a CRC-16/CCITT trailer, passes it through a weather-style channel model, and streams post-channel complex samples directly to the server.",
         "flag_location": "The callsign or location mentioned in the audio is the first flag.",
-        "developer_comments": "Audio output should be a UI feature. Ability to record signal with tuned receiver and download sample files for offline processing.",
-        "signal_scheme": "AM voice bursts across a synthetic emergency-radio allocation.",
-        "concepts": ["IQ recording", "audio bursts", "hop pattern", "message recovery"],
-        "steps": ["Open the emergency audio capture.", "Identify active frequencies and burst order.", "Listen to or inspect the reassembled call.", "Submit the callsign or location."],
-        "hints": ["Play the supplied weekly-test reference from the Evidence panel to recognise the emergency-network cadence.", "Tune 169.650 MHz and run `receive`; this subtask awards its own callsign/location flag."],
-        "artifacts": emergency_audio_artifacts(),
+        "developer_comments": "Strict live GNU Radio source. No saved IQ or audio file is used and there is no synthetic server fallback.",
+        "signal_scheme": "Live GNU Radio AM alert audio with Barker-13 BPSK metadata and CRC-16/CCITT-FALSE.",
+        "concepts": ["live complex stream", "Barker-13 synchronization", "CRC-16 validation", "hop pattern", "message recovery"],
+        "steps": ["Start the receiver and observe the live GNU Radio stream.", "Identify active frequencies and correlate the Barker-13 prefix.", "Reassemble the metadata bytes and verify the trailing CRC-16.", "Submit the callsign or location."],
+        "hints": ["The frame is Barker-13, payload bytes, then a big-endian CRC-16/CCITT-FALSE value.", "Tune 169.650 MHz and run `receive`; if GNU Radio is unavailable the task reports that instead of substituting saved data."],
+        "artifacts": emergency_audio_artifacts("civilian-emergency-intercept"),
         "script_commands": ["tune 169.650", "receive"],
     },
     {
@@ -523,14 +535,14 @@ TASKS = [
         "points": 220,
         "scenario": "The emergency audio network changes to a weak pseudorandom hopping sequence.",
         "objective": "Identify which weak generator was used, recover enough state, and predict remaining hops.",
-        "details": "The system changes to a weak pseudorandom hopping sequence. The participant is told that one generator from a small list was used and must identify it, recover enough state, and predict remaining hops.",
+        "details": "The same generated Python flowgraph now selects its carrier with a weak live LCG. Every generated metadata frame still starts with Barker-13 and ends with CRC-16/CCITT, so synchronization and integrity can be distinguished from hop prediction.",
         "flag_location": "The callsign or location mentioned in the audio is the first flag.",
-        "developer_comments": "Ability to record signal with tuned receiver and download sample files for offline processing.",
-        "signal_scheme": "Weak-PRNG hopped emergency audio bursts.",
-        "concepts": ["weak PRNG", "state recovery", "hop prediction", "audio operations"],
-        "steps": ["Collect hop observations.", "Test the weak generator list.", "Predict the next burst frequency.", "Recover the callsign/location flag."],
-        "hints": ["The generator is weak enough for research and scripting.", "After predicting the sequence, `decode weak-prng` awards this subtask's own recovery flag."],
-        "artifacts": emergency_audio_artifacts(),
+        "developer_comments": "Strict live GNU Radio source. No saved IQ or audio file is used and there is no synthetic server fallback.",
+        "signal_scheme": "Weak-LCG hopped live AM alert audio with Barker-13 BPSK metadata and CRC-16/CCITT-FALSE.",
+        "concepts": ["weak PRNG", "state recovery", "hop prediction", "Barker-13 synchronization", "CRC-16 validation", "audio operations"],
+        "steps": ["Collect hop observations from the live stream.", "Test the weak generator list.", "Predict the next burst frequency and correlate Barker-13.", "Reject frames whose trailing CRC-16 is invalid.", "Recover the callsign/location flag."],
+        "hints": ["The generator is weak enough for research and scripting; framing is independent of the hop sequence.", "After predicting the sequence, `decode weak-prng` awards this subtask's own recovery flag."],
+        "artifacts": emergency_audio_artifacts("civilian-emergency-obscured"),
         "script_commands": ["tune 169.650", "decode weak-prng"],
     },
     {
@@ -543,16 +555,16 @@ TASKS = [
         "track": "cyber",
         "difficulty": "Moderate",
         "points": 280,
-        "scenario": "Recovered digital audio contains metadata that controls normal, priority, and evacuation handling.",
-        "objective": "Reverse engineer the receiver C logic and submit a valid public warning message accepted by the simulated receiver.",
-        "details": "The recovered digital audio contains metadata for normal, priority warning, or evacuation alert handling. The participant is given a partially extracted C file from the receiver software and must reverse engineer metadata, audio frames, and integrity checks. The final task is to create and submit a valid audio warning message that activates the virtual warning light and plays the audio.",
+        "scenario": "A live GNU Radio evacuation transmission carries receiver-control metadata after a Barker-13 synchronization code and before a CRC-16 trailer.",
+        "objective": "Reverse engineer the receiver C logic and submit a complete warning message whose Barker framing and CRC-16 are valid.",
+        "details": "The generated GNU Radio Python flowgraph continuously creates evacuation audio and metadata in memory. The participant must reverse the receiver logic, preserve the Barker-13 prefix, recalculate the CRC-16/CCITT trailer, and submit a message accepted by the simulated receiver.",
         "flag_location": "Triggering the warning light alert system without setting off surrounding checks.",
-        "developer_comments": "The light is an additional UI feature. New audio signal/radio data is needed. Ability to record tuned receiver samples is required.",
-        "signal_scheme": "Digital emergency-audio metadata with integrity checks.",
-        "concepts": ["reverse engineering", "metadata integrity", "message crafting", "operator effect"],
-        "steps": ["Study the extracted receiver C file.", "Find metadata and integrity-check placement.", "Create a valid warning message.", "Activate the virtual warning light without triggering checks."],
-        "hints": ["The warning light is controlled by authenticated metadata, not by audio level alone.", "Use the emergency-transmission panel to intercept a current AUTH code and rebroadcast a complete warning."],
-        "artifacts": emergency_audio_artifacts(active_transmission=True),
+        "developer_comments": "Strict live GNU Radio source. No saved IQ or audio file is used and there is no synthetic server fallback.",
+        "signal_scheme": "Live GNU Radio evacuation audio with Barker-13 framed metadata and CRC-16/CCITT-FALSE.",
+        "concepts": ["reverse engineering", "Barker-13 framing", "CRC-16 integrity", "message crafting", "operator effect"],
+        "steps": ["Study the extracted receiver C file.", "Find the Barker prefix, metadata, and trailing CRC placement.", "Create a warning message with a recalculated CRC-16.", "Activate the virtual warning light without triggering checks."],
+        "hints": ["The warning light is controlled by metadata with a valid CRC, not by audio level alone.", "Use the emergency-transmission panel to intercept a current AUTH code and rebroadcast a complete warning."],
+        "artifacts": emergency_audio_artifacts("civilian-emergency-active-re", active_transmission=True),
         "script_commands": ["tune 169.650", "receive"],
     },
     {

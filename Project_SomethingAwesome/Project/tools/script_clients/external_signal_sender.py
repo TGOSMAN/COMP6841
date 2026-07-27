@@ -7,7 +7,6 @@ import random
 import socket
 import struct
 import time
-from pathlib import Path
 
 
 def gaussian_row(bins: int, frame: int, tone_offset_hz: float, span_hz: float) -> list[float]:
@@ -112,45 +111,13 @@ def send_iq(args: argparse.Namespace) -> None:
             time.sleep(1 / args.rate)
 
 
-def stream_file(args: argparse.Namespace) -> None:
-    source = Path(args.file).expanduser()
-    block_bytes = args.block_samples * 8
-    with source.open("rb") as handle, socket.create_connection((args.host, args.port), timeout=5) as sock:
-        header = (
-            "SFORGE RAWIQ "
-            f"challenge_id={args.challenge_id} center_hz={args.center_hz} "
-            f"sample_rate_hz={args.sample_rate_hz} span_hz={args.span_hz} "
-            f"bins={args.bins} scheme_id={args.scheme_id} modulation=raw_cf32 "
-            f"source_label=GNU_Radio_File_Sink block_samples={args.block_samples}\n"
-        )
-        sock.sendall(header.encode("ascii"))
-        ack = recv_ack(sock)
-        if ack:
-            print(ack)
-        frames_sent = 0
-        while args.frames <= 0 or frames_sent < args.frames:
-            block = handle.read(block_bytes)
-            if len(block) < block_bytes:
-                if not args.loop:
-                    break
-                handle.seek(0)
-                block = handle.read(block_bytes)
-                if len(block) < block_bytes:
-                    break
-            sock.sendall(block)
-            frames_sent += 1
-            time.sleep(1 / args.rate)
-        print(json.dumps({"ok": True, "frames_sent": frames_sent, "source": str(source)}))
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Push external RF frames into the Signal Forge CTF waterfall.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=9100)
     parser.add_argument("--challenge-id", default="tunnel-basic-dos")
-    parser.add_argument("--mode", choices=["fft", "iq", "file"], default="fft")
-    parser.add_argument("--file", help="Raw GNU Radio cf32_le File Sink output for --mode file.")
-    parser.add_argument("--frames", type=int, default=180, help="Use 0 with --mode file to stream until EOF.")
+    parser.add_argument("--mode", choices=["fft", "iq"], default="fft")
+    parser.add_argument("--frames", type=int, default=180)
     parser.add_argument("--rate", type=float, default=18.0, help="Frames or IQ blocks per second.")
     parser.add_argument("--bins", type=int, default=384)
     parser.add_argument("--block-samples", type=int, default=2048)
@@ -159,7 +126,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--span-hz", type=float, default=44_200)
     parser.add_argument("--tone-offset-hz", type=float, default=10_000)
     parser.add_argument("--scheme-id", default="EXTERNAL-DEMO-CF32")
-    parser.add_argument("--loop", action="store_true", help="Loop the file when --mode file reaches EOF.")
     return parser
 
 
@@ -170,10 +136,6 @@ def main() -> None:
         send_fft(args)
     elif args.mode == "iq":
         send_iq(args)
-    else:
-        if not args.file:
-            raise SystemExit("--file is required for --mode file")
-        stream_file(args)
 
 
 if __name__ == "__main__":

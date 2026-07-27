@@ -94,17 +94,22 @@ blocks:
     coordinate: [544, 708.0]
     rotation: 0
     state: enabled
-- name: blocks_wavfile_source_0
-  id: blocks_wavfile_source
+- name: analog_audio_i_0
+  id: analog_sig_source_x
   parameters:
     affinity: ''
     alias: ''
+    amp: '0.68'
     comment: ''
-    file: WeatherRadio_T2_RE.wav
+    freq: '610'
     maxoutbuf: '0'
     minoutbuf: '0'
-    nchan: '1'
-    repeat: 'True'
+    offset: '0'
+    phase: '0'
+    samp_rate: samp_rate
+    showports: 'False'
+    type: float
+    waveform: analog.GR_SIN_WAVE
   states:
     bus_sink: false
     bus_source: false
@@ -112,17 +117,22 @@ blocks:
     coordinate: [80, 604.0]
     rotation: 0
     state: enabled
-- name: blocks_wavfile_source_1
-  id: blocks_wavfile_source
+- name: analog_audio_q_0
+  id: analog_sig_source_x
   parameters:
     affinity: ''
     alias: ''
+    amp: '0.42'
     comment: ''
-    file: WeatherRadio_T2_IM.wav
+    freq: '1320'
     maxoutbuf: '0'
     minoutbuf: '0'
-    nchan: '1'
-    repeat: 'True'
+    offset: '0'
+    phase: '0'
+    samp_rate: samp_rate
+    showports: 'False'
+    type: float
+    waveform: analog.GR_COS_WAVE
   states:
     bus_sink: false
     bus_source: false
@@ -403,11 +413,11 @@ blocks:
     state: enabled
 
 connections:
+- [analog_audio_i_0, '0', blocks_float_to_complex_0, '0']
+- [analog_audio_q_0, '0', blocks_float_to_complex_0, '1']
 - [blocks_complex_to_imag_1, '0', audio_sink_0, '0']
 - [blocks_float_to_complex_0, '0', blocks_complex_to_imag_1, '0']
 - [blocks_float_to_complex_0, '0', epy_block_0, '0']
-- [blocks_wavfile_source_0, '0', blocks_float_to_complex_0, '0']
-- [blocks_wavfile_source_1, '0', blocks_float_to_complex_0, '1']
 - [channels_channel_model_0, '0', qtgui_time_sink_x_0, '0']
 - [channels_channel_model_0, '0', qtgui_waterfall_sink_x_0, '0']
 - [epy_block_0, '0', channels_channel_model_0, '0']

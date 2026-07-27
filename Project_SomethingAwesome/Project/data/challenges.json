@@ -14,7 +14,7 @@
     "details": "Ask learners to inspect the waveform and signalling, extract packets, and recover plain-text content using a simple OOK-style scheme. Provide a live waterfall view and a time-series viewer for closer analysis.",
     "flag_location": "Within plain text packets.",
     "developer_comments": "There should be a little interactive sign showing the text that gets displayed. The signal should already be tuned in.",
-    "signal_scheme": "GNU Radio ReadingSignals cf32 capture: repeated byte payload, unpacked to OOK/ASK amplitude on a 10 kHz training tone.",
+    "signal_scheme": "GNU Radio ReadingSignals generated Python live CF32 stream: repeated byte payload, unpacked to OOK/ASK amplitude on a 10 kHz training tone.",
     "concepts": [
       "waterfall reading",
       "OOK",
@@ -22,7 +22,7 @@
       "plain-text RF"
     ],
     "steps": [
-      "Open the tuned signal capture.",
+      "Observe the tuned live signal stream.",
       "Use the waterfall and time-series view to identify packet boundaries.",
       "Receive the already tuned sign message.",
       "Submit the flag contained in the plain-text packet."
@@ -33,18 +33,11 @@
     ],
     "artifacts": [
       {
-        "label": "ReadingSignals generated GNU Radio replay",
-        "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-reading-signals",
-        "type": "generated GNU Radio Python cf32",
+        "label": "ReadingSignals live GNU Radio output",
+        "href": "/api/rf/external/status?challenge_id=tunnel-reading-signals",
+        "type": "live GNU Radio CF32 stream",
         "role": "signal",
-        "source": "generated_gnuradio_python"
-      },
-      {
-        "label": "ReadingSignals generated raw IQ sample",
-        "href": "/api/rf/raw?challenge_id=tunnel-reading-signals&bytes=2097152",
-        "type": "bounded generated cf32 IQ sample",
-        "role": "raw_iq",
-        "source": "generated_gnuradio_python"
+        "source": "gnu_radio_python_live"
       },
       {
         "label": "ReadingSignals GNU Radio flowgraph",
@@ -80,7 +73,7 @@
     "details": "Introduce why no hardware has infinite bandwidth and why the user must focus on a band of interest. Learners tune the radio, export the tuned output as a waveform, decode the packet, and recover the plain-text flag.",
     "flag_location": "Within the plain text packet radio signal.",
     "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-    "signal_scheme": "GNU Radio TuningSignals cf32 capture: OOK/ASK amplitude on a 10 kHz tone; the useful carrier is present but the receiver starts off-centre.",
+    "signal_scheme": "GNU Radio TuningSignals generated Python live CF32 stream: OOK/ASK amplitude on a 10 kHz tone; the useful carrier is present but the receiver starts off-centre.",
     "concepts": [
       "receiver bandwidth",
       "centre frequency",
@@ -99,18 +92,11 @@
     ],
     "artifacts": [
       {
-        "label": "TuningSignals generated GNU Radio replay",
-        "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-tuning",
-        "type": "generated GNU Radio Python cf32",
+        "label": "TuningSignals live GNU Radio output",
+        "href": "/api/rf/external/status?challenge_id=tunnel-tuning",
+        "type": "live GNU Radio CF32 stream",
         "role": "signal",
-        "source": "generated_gnuradio_python"
-      },
-      {
-        "label": "TuningSignals generated raw IQ sample",
-        "href": "/api/rf/raw?challenge_id=tunnel-tuning&bytes=2097152",
-        "type": "bounded generated cf32 IQ sample",
-        "role": "raw_iq",
-        "source": "generated_gnuradio_python"
+        "source": "gnu_radio_python_live"
       },
       {
         "label": "TuningSignals GNU Radio flowgraph",
@@ -148,7 +134,7 @@
     "details": "Introduce basic signal interference so learners can observe when the backend can no longer decode the expected string. The user gets a flag when the sign can no longer show the true message.",
     "flag_location": "Printed on the interactive sign when the decoded string does not match what was sent.",
     "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-    "signal_scheme": "GNU Radio DoSAttackMe cf32 capture: tunnel OOK packet used as the reference receiver signal, then a local interference action corrupts the displayed sign state.",
+    "signal_scheme": "GNU Radio DoSAttackMe generated Python live CF32 stream: tunnel OOK packet used as the reference receiver signal, then a local interference action corrupts the displayed sign state.",
     "concepts": [
       "interference",
       "availability",
@@ -167,18 +153,11 @@
     ],
     "artifacts": [
       {
-        "label": "DoSAttackMe generated GNU Radio replay",
-        "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-basic-dos",
-        "type": "generated GNU Radio Python cf32",
+        "label": "DoSAttackMe live GNU Radio output",
+        "href": "/api/rf/external/status?challenge_id=tunnel-basic-dos",
+        "type": "live GNU Radio CF32 stream",
         "role": "signal",
-        "source": "generated_gnuradio_python"
-      },
-      {
-        "label": "DoSAttackMe generated raw IQ sample",
-        "href": "/api/rf/raw?challenge_id=tunnel-basic-dos&bytes=2097152",
-        "type": "bounded generated cf32 IQ sample",
-        "role": "raw_iq",
-        "source": "generated_gnuradio_python"
+        "source": "gnu_radio_python_live"
       },
       {
         "label": "DoSAttackMe GNU Radio flowgraph",
@@ -216,7 +195,7 @@
     "details": "Provide a tutorial on configuring the transmitter interface. The learner prepares a packet to be sent and accepted by the tunnelling sign board.",
     "flag_location": "Revealed when a user-written message is transmitted; the flag is appended on the end.",
     "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-    "signal_scheme": "GNU Radio InjectionTime cf32 capture: tunnel sign packet profile used as the target waveform for local packet-injection practice.",
+    "signal_scheme": "GNU Radio InjectionTime generated Python live CF32 stream: tunnel sign packet profile used as the target waveform for local packet-injection practice.",
     "concepts": [
       "packet injection",
       "TX chain",
@@ -235,18 +214,11 @@
     ],
     "artifacts": [
       {
-        "label": "InjectionTime generated GNU Radio replay",
-        "href": "/api/rf/gnu-radio-capture?challenge_id=tunnel-packet-injection",
-        "type": "generated GNU Radio Python cf32",
+        "label": "InjectionTime live GNU Radio output",
+        "href": "/api/rf/external/status?challenge_id=tunnel-packet-injection",
+        "type": "live GNU Radio CF32 stream",
         "role": "signal",
-        "source": "generated_gnuradio_python"
-      },
-      {
-        "label": "InjectionTime generated raw IQ sample",
-        "href": "/api/rf/raw?challenge_id=tunnel-packet-injection&bytes=2097152",
-        "type": "bounded generated cf32 IQ sample",
-        "role": "raw_iq",
-        "source": "generated_gnuradio_python"
+        "source": "gnu_radio_python_live"
       },
       {
         "label": "InjectionTime GNU Radio flowgraph",
@@ -283,7 +255,7 @@
     "details": "Ask learners to inspect the waveform and signalling, extract packets, and recover plain-text content using an accessible FSK or ASK scheme. Provide live waterfall and time-series views.",
     "flag_location": "Within plain text packets.",
     "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-    "signal_scheme": "GNU Radio Song_Meta ReadingSignals cf32 capture: 4-level ASK where each amplitude symbol carries 2 bits on a 10 kHz metadata tone.",
+    "signal_scheme": "GNU Radio Song_Meta ReadingSignals generated Python live CF32 stream: 4-level ASK where each amplitude symbol carries 2 bits on a 10 kHz metadata tone.",
     "concepts": [
       "4-level ASK",
       "2-bit symbols",
@@ -291,7 +263,7 @@
       "console output"
     ],
     "steps": [
-      "Open the metadata capture.",
+      "Observe the live metadata stream.",
       "Identify repeated metadata frames.",
       "Receive the broadcast metadata.",
       "Submit the plain-text packet flag."
@@ -302,18 +274,11 @@
     ],
     "artifacts": [
       {
-        "label": "Song metadata ReadingSignals generated GNU Radio replay",
-        "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-reading-signals",
-        "type": "generated GNU Radio Python cf32",
+        "label": "Song metadata ReadingSignals live GNU Radio output",
+        "href": "/api/rf/external/status?challenge_id=broadcast-reading-signals",
+        "type": "live GNU Radio CF32 stream",
         "role": "signal",
-        "source": "generated_gnuradio_python"
-      },
-      {
-        "label": "Song metadata ReadingSignals generated raw IQ sample",
-        "href": "/api/rf/raw?challenge_id=broadcast-reading-signals&bytes=2097152",
-        "type": "bounded generated cf32 IQ sample",
-        "role": "raw_iq",
-        "source": "generated_gnuradio_python"
+        "source": "gnu_radio_python_live"
       },
       {
         "label": "Song metadata ReadingSignals GNU Radio flowgraph",
@@ -349,7 +314,7 @@
     "details": "Introduce why no hardware has infinite bandwidth and why the user must focus on a band of interest. Learners tune the radio, export the tuned output, decode the packet, and recover the flag.",
     "flag_location": "Within the plain text packet radio signal.",
     "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-    "signal_scheme": "GNU Radio Song_Meta TuningSignals cf32 capture: 4-level ASK/2-bit metadata symbols; useful carrier is present but the receiver starts off-centre.",
+    "signal_scheme": "GNU Radio Song_Meta TuningSignals generated Python live CF32 stream: 4-level ASK/2-bit metadata symbols; useful carrier is present but the receiver starts off-centre.",
     "concepts": [
       "bandwidth",
       "tuning",
@@ -368,18 +333,11 @@
     ],
     "artifacts": [
       {
-        "label": "Song metadata TuningSignals generated GNU Radio replay",
-        "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-tuning",
-        "type": "generated GNU Radio Python cf32",
+        "label": "Song metadata TuningSignals live GNU Radio output",
+        "href": "/api/rf/external/status?challenge_id=broadcast-tuning",
+        "type": "live GNU Radio CF32 stream",
         "role": "signal",
-        "source": "generated_gnuradio_python"
-      },
-      {
-        "label": "Song metadata TuningSignals generated raw IQ sample",
-        "href": "/api/rf/raw?challenge_id=broadcast-tuning&bytes=2097152",
-        "type": "bounded generated cf32 IQ sample",
-        "role": "raw_iq",
-        "source": "generated_gnuradio_python"
+        "source": "gnu_radio_python_live"
       },
       {
         "label": "Song metadata TuningSignals GNU Radio flowgraph",
@@ -417,7 +375,7 @@
     "details": "Introduce basic signal interference so learners can observe when the backend can no longer decode the expected string.",
     "flag_location": "Printed on the interactive receiver display when the decoded string does not match what was sent.",
     "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-    "signal_scheme": "GNU Radio Song_Meta DoSAttackMe cf32 capture: 4-level ASK metadata reference signal plus local simulated interference.",
+    "signal_scheme": "GNU Radio Song_Meta DoSAttackMe generated Python live CF32 stream: 4-level ASK metadata reference signal plus local simulated interference.",
     "concepts": [
       "DoS",
       "interference",
@@ -436,18 +394,11 @@
     ],
     "artifacts": [
       {
-        "label": "Song metadata DoSAttackMe generated GNU Radio replay",
-        "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-basic-dos",
-        "type": "generated GNU Radio Python cf32",
+        "label": "Song metadata DoSAttackMe live GNU Radio output",
+        "href": "/api/rf/external/status?challenge_id=broadcast-basic-dos",
+        "type": "live GNU Radio CF32 stream",
         "role": "signal",
-        "source": "generated_gnuradio_python"
-      },
-      {
-        "label": "Song metadata DoSAttackMe generated raw IQ sample",
-        "href": "/api/rf/raw?challenge_id=broadcast-basic-dos&bytes=2097152",
-        "type": "bounded generated cf32 IQ sample",
-        "role": "raw_iq",
-        "source": "generated_gnuradio_python"
+        "source": "gnu_radio_python_live"
       },
       {
         "label": "Song metadata DoSAttackMe GNU Radio flowgraph",
@@ -485,7 +436,7 @@
     "details": "Provide a tutorial on configuring the transmitter interface. The learner prepares a packet to be sent and accepted by the receiver.",
     "flag_location": "Revealed when a user-written metadata message is transmitted; the flag is appended on the end.",
     "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-    "signal_scheme": "GNU Radio Song_Meta InjectionTime cf32 capture: 4-level ASK metadata target waveform for local packet-injection practice.",
+    "signal_scheme": "GNU Radio Song_Meta InjectionTime generated Python live CF32 stream: 4-level ASK metadata target waveform for local packet-injection practice.",
     "concepts": [
       "packet injection",
       "metadata trust",
@@ -504,18 +455,11 @@
     ],
     "artifacts": [
       {
-        "label": "Song metadata InjectionTime generated GNU Radio replay",
-        "href": "/api/rf/gnu-radio-capture?challenge_id=broadcast-packet-injection",
-        "type": "generated GNU Radio Python cf32",
+        "label": "Song metadata InjectionTime live GNU Radio output",
+        "href": "/api/rf/external/status?challenge_id=broadcast-packet-injection",
+        "type": "live GNU Radio CF32 stream",
         "role": "signal",
-        "source": "generated_gnuradio_python"
-      },
-      {
-        "label": "Song metadata InjectionTime generated raw IQ sample",
-        "href": "/api/rf/raw?challenge_id=broadcast-packet-injection&bytes=2097152",
-        "type": "bounded generated cf32 IQ sample",
-        "role": "raw_iq",
-        "source": "generated_gnuradio_python"
+        "source": "gnu_radio_python_live"
       },
       {
         "label": "Song metadata InjectionTime GNU Radio flowgraph",
@@ -552,7 +496,7 @@
     "details": "The first task uses a frequency-hopping QAM scheme with a clear pattern. A codeword is spoken as a callsign to everyone; that codeword is the flag. A Python receiver template can be provided for implementing the hopping receiver.",
     "flag_location": "The codeword spoken as a callsign to everyone.",
     "developer_comments": "Audio output should be a UI feature. Users should be able to record the tuned receiver and download samples for offline processing.",
-    "signal_scheme": "Patterned hopping audio/QAM training capture with a recoverable spoken callsign.",
+    "signal_scheme": "GNU Radio InterceptingReceiver generated Python live CF32 stream with live complex tones and a clear hopping pattern.",
     "concepts": [
       "frequency hopping",
       "audio intercept",
@@ -571,18 +515,11 @@
     ],
     "artifacts": [
       {
-        "label": "Weather report InterceptingReceiver generated GNU Radio replay",
-        "href": "/api/rf/gnu-radio-capture?challenge_id=weather-boring-intercept",
-        "type": "generated GNU Radio Python cf32",
+        "label": "Weather report InterceptingReceiver live GNU Radio output",
+        "href": "/api/rf/external/status?challenge_id=weather-boring-intercept",
+        "type": "live GNU Radio CF32 stream",
         "role": "signal",
-        "source": "generated_gnuradio_python"
-      },
-      {
-        "label": "Weather report InterceptingReceiver generated raw IQ sample",
-        "href": "/api/rf/raw?challenge_id=weather-boring-intercept&bytes=2097152",
-        "type": "bounded generated cf32 IQ sample",
-        "role": "raw_iq",
-        "source": "generated_gnuradio_python"
+        "source": "gnu_radio_python_live"
       },
       {
         "label": "InterceptingReceiver GNU Radio flowgraph",
@@ -598,20 +535,6 @@
         "label": "Weather GNU Radio resource guide",
         "href": "/radio/GNURadio/WeatherBroadcast/README.md",
         "type": "text/markdown"
-      },
-      {
-        "label": "InterceptingReceiver real-channel WAV source",
-        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_Broadcast_Re.wav",
-        "type": "audio/wav",
-        "role": "source_audio",
-        "download_only": true
-      },
-      {
-        "label": "InterceptingReceiver imaginary-channel WAV source",
-        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_2_IM.wav",
-        "type": "audio/wav",
-        "role": "source_audio",
-        "download_only": true
       }
     ],
     "script_commands": [
@@ -634,7 +557,7 @@
     "details": "The hop selection and phase obfuscation are independent. Follow the changing carrier, then identify RANDU from its phase-symbol sequence and remove those rotations to recover the weather audio.",
     "flag_location": "The codeword spoken as a callsign to everyone.",
     "developer_comments": "Ability to record signal with tuned receiver and download a data file of samples for offline processing.",
-    "signal_scheme": "Complex weather voice audio randomly hops between six RF channels every 100 ms; fixed-seed RANDU rotates only the QPSK phase symbols.",
+    "signal_scheme": "GNU Radio InterceptingReceiver_Task2 generated Python live CF32 stream: complex tones randomly hop between six RF channels every 100 ms while fixed-seed RANDU rotates only the QPSK phase symbols.",
     "concepts": [
       "frequency hopping",
       "weak PRNG",
@@ -654,18 +577,11 @@
     ],
     "artifacts": [
       {
-        "label": "Weather report InterceptingReceiver_Task2 generated GNU Radio replay",
-        "href": "/api/rf/gnu-radio-capture?challenge_id=weather-boring-obscured",
-        "type": "generated GNU Radio Python cf32",
+        "label": "Weather report InterceptingReceiver_Task2 live GNU Radio output",
+        "href": "/api/rf/external/status?challenge_id=weather-boring-obscured",
+        "type": "live GNU Radio CF32 stream",
         "role": "signal",
-        "source": "generated_gnuradio_python"
-      },
-      {
-        "label": "Weather report InterceptingReceiver_Task2 generated raw IQ sample",
-        "href": "/api/rf/raw?challenge_id=weather-boring-obscured&bytes=2097152",
-        "type": "bounded generated cf32 IQ sample",
-        "role": "raw_iq",
-        "source": "generated_gnuradio_python"
+        "source": "gnu_radio_python_live"
       },
       {
         "label": "InterceptingReceiver_Task2 GNU Radio flowgraph",
@@ -686,20 +602,6 @@
         "label": "InterceptingReceiver_Task2 embedded Python block",
         "href": "/radio/GNURadio/WeatherBroadcast/InterceptingReceiver_Task2_epy_block_0.py",
         "type": "text/x-python"
-      },
-      {
-        "label": "InterceptingReceiver_Task2 real-channel WAV source",
-        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T2_RE.wav",
-        "type": "audio/wav",
-        "role": "source_audio",
-        "download_only": true
-      },
-      {
-        "label": "InterceptingReceiver_Task2 imaginary-channel WAV source",
-        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T2_IM.wav",
-        "type": "audio/wav",
-        "role": "source_audio",
-        "download_only": true
       }
     ],
     "script_commands": [
@@ -723,7 +625,7 @@
     "details": "Digital audio is used with metadata. The learner reverses a previously extracted C file to understand how metadata is used. Important warnings can set a flag to make a light and siren sound. If the light flashes, the user gets the flag.",
     "flag_location": "The light being lit or set up should make a flag pop-up appear.",
     "developer_comments": "The light is an additional UI feature. New audio signal/radio data is needed.",
-    "signal_scheme": "Digital audio metadata over a keyed weather channel.",
+    "signal_scheme": "GNU Radio EmergencyWarningLight generated Python live CF32 stream: alarm metadata is generated continuously and carried over the keyed weather channel.",
     "concepts": [
       "reverse engineering",
       "C receiver logic",
@@ -742,18 +644,11 @@
     ],
     "artifacts": [
       {
-        "label": "Weather report EmergencyWarningLight generated GNU Radio replay",
-        "href": "/api/rf/gnu-radio-capture?challenge_id=weather-boring-active-re",
-        "type": "generated GNU Radio Python cf32",
+        "label": "Weather report EmergencyWarningLight live GNU Radio output",
+        "href": "/api/rf/external/status?challenge_id=weather-boring-active-re",
+        "type": "live GNU Radio CF32 stream",
         "role": "signal",
-        "source": "generated_gnuradio_python"
-      },
-      {
-        "label": "Weather report EmergencyWarningLight generated raw IQ sample",
-        "href": "/api/rf/raw?challenge_id=weather-boring-active-re&bytes=2097152",
-        "type": "bounded generated cf32 IQ sample",
-        "role": "raw_iq",
-        "source": "generated_gnuradio_python"
+        "source": "gnu_radio_python_live"
       },
       {
         "label": "EmergencyWarningLight GNU Radio flowgraph",
@@ -794,20 +689,6 @@
         "label": "Extracted alarm receiver header",
         "href": "/radio/GNURadio/WeatherBroadcast/MyEmbeddedAlarmSystem.h",
         "type": "text/x-c"
-      },
-      {
-        "label": "EmergencyWarningLight real-channel WAV source",
-        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T3_RE.wav",
-        "type": "audio/wav",
-        "role": "source_audio",
-        "download_only": true
-      },
-      {
-        "label": "EmergencyWarningLight imaginary-channel WAV source",
-        "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T3_IM.wav",
-        "type": "audio/wav",
-        "role": "source_audio",
-        "download_only": true
       }
     ],
     "script_commands": [
@@ -825,49 +706,58 @@
     "track": "signals",
     "difficulty": "Moderate",
     "points": 200,
-    "scenario": "An IQ recording contains several short public-facility audio bursts spread across frequencies.",
-    "objective": "Identify the hopping pattern, reassemble the bursts, and recover the spoken message.",
-    "details": "The participant receives an IQ recording containing short audio bursts spread across different frequencies. They must identify the hopping pattern, reassemble the bursts, and recover the spoken message.",
+    "scenario": "A live GNU Radio receiver emits public-facility alert audio and a Barker-13 synchronized metadata frame across several frequencies.",
+    "objective": "Follow the live hopping pattern, correlate the Barker-13 prefix, and verify the recovered message with CRC-16.",
+    "details": "The generated GNU Radio Python flowgraph continuously creates alert audio in memory, adds a Barker-13 metadata preamble and a CRC-16/CCITT trailer, passes it through a weather-style channel model, and streams post-channel complex samples directly to the server.",
     "flag_location": "The callsign or location mentioned in the audio is the first flag.",
-    "developer_comments": "Audio output should be a UI feature. Ability to record signal with tuned receiver and download sample files for offline processing.",
-    "signal_scheme": "AM voice bursts across a synthetic emergency-radio allocation.",
+    "developer_comments": "Strict live GNU Radio source. No saved IQ or audio file is used and there is no synthetic server fallback.",
+    "signal_scheme": "Live GNU Radio AM alert audio with Barker-13 BPSK metadata and CRC-16/CCITT-FALSE.",
     "concepts": [
-      "IQ recording",
-      "audio bursts",
+      "live complex stream",
+      "Barker-13 synchronization",
+      "CRC-16 validation",
       "hop pattern",
       "message recovery"
     ],
     "steps": [
-      "Open the emergency audio capture.",
-      "Identify active frequencies and burst order.",
-      "Listen to or inspect the reassembled call.",
+      "Start the receiver and observe the live GNU Radio stream.",
+      "Identify active frequencies and correlate the Barker-13 prefix.",
+      "Reassemble the metadata bytes and verify the trailing CRC-16.",
       "Submit the callsign or location."
     ],
     "hints": [
-      "Play the supplied weekly-test reference from the Evidence panel to recognise the emergency-network cadence.",
-      "Tune 169.650 MHz and run `receive`; this subtask awards its own callsign/location flag."
+      "The frame is Barker-13, payload bytes, then a big-endian CRC-16/CCITT-FALSE value.",
+      "Tune 169.650 MHz and run `receive`; if GNU Radio is unavailable the task reports that instead of substituting saved data."
     ],
     "artifacts": [
       {
-        "label": "Emergency audio hopping capture",
-        "href": "/captures/15-air-weather-voice.json",
+        "label": "Live GNU Radio CF32 stream status",
+        "href": "/api/rf/external/status?challenge_id=civilian-emergency-intercept",
         "type": "application/json",
-        "role": "signal"
+        "role": "signal",
+        "source": "gnu_radio_python_live"
       },
       {
-        "label": "Emergency audio SigMF metadata",
-        "href": "/captures/15-council-weather-audio.sigmf-meta",
-        "type": "application/json"
+        "label": "CivilianEmergencyReceiver GNU Radio flowgraph",
+        "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.grc",
+        "type": "application/x-gnuradio-grc",
+        "role": "flowgraph_source"
       },
       {
-        "label": "Weekly emergency-network reference transmission",
-        "href": "/radio/GNURadio/EmergencyRadioAudio/Required_Weekly_Test_NOAA.ogg",
-        "type": "audio/ogg",
-        "role": "source_audio"
+        "label": "CivilianEmergencyReceiver generated Python",
+        "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source"
       },
       {
-        "label": "Emergency transmission protocol notes",
-        "href": "/radio/GNURadio/EmergencyRadioAudio/README.md",
+        "label": "Barker-13 and CRC-16 live source block",
+        "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver_epy_block_0.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source"
+      },
+      {
+        "label": "Live receiver protocol notes",
+        "href": "/radio/GNURadio/CivilianEmergency/README.md",
         "type": "text/markdown"
       }
     ],
@@ -888,47 +778,58 @@
     "points": 220,
     "scenario": "The emergency audio network changes to a weak pseudorandom hopping sequence.",
     "objective": "Identify which weak generator was used, recover enough state, and predict remaining hops.",
-    "details": "The system changes to a weak pseudorandom hopping sequence. The participant is told that one generator from a small list was used and must identify it, recover enough state, and predict remaining hops.",
+    "details": "The same generated Python flowgraph now selects its carrier with a weak live LCG. Every generated metadata frame still starts with Barker-13 and ends with CRC-16/CCITT, so synchronization and integrity can be distinguished from hop prediction.",
     "flag_location": "The callsign or location mentioned in the audio is the first flag.",
-    "developer_comments": "Ability to record signal with tuned receiver and download sample files for offline processing.",
-    "signal_scheme": "Weak-PRNG hopped emergency audio bursts.",
+    "developer_comments": "Strict live GNU Radio source. No saved IQ or audio file is used and there is no synthetic server fallback.",
+    "signal_scheme": "Weak-LCG hopped live AM alert audio with Barker-13 BPSK metadata and CRC-16/CCITT-FALSE.",
     "concepts": [
       "weak PRNG",
       "state recovery",
       "hop prediction",
+      "Barker-13 synchronization",
+      "CRC-16 validation",
       "audio operations"
     ],
     "steps": [
-      "Collect hop observations.",
+      "Collect hop observations from the live stream.",
       "Test the weak generator list.",
-      "Predict the next burst frequency.",
+      "Predict the next burst frequency and correlate Barker-13.",
+      "Reject frames whose trailing CRC-16 is invalid.",
       "Recover the callsign/location flag."
     ],
     "hints": [
-      "The generator is weak enough for research and scripting.",
+      "The generator is weak enough for research and scripting; framing is independent of the hop sequence.",
       "After predicting the sequence, `decode weak-prng` awards this subtask's own recovery flag."
     ],
     "artifacts": [
       {
-        "label": "Emergency audio hopping capture",
-        "href": "/captures/15-air-weather-voice.json",
+        "label": "Live GNU Radio CF32 stream status",
+        "href": "/api/rf/external/status?challenge_id=civilian-emergency-obscured",
         "type": "application/json",
-        "role": "signal"
+        "role": "signal",
+        "source": "gnu_radio_python_live"
       },
       {
-        "label": "Emergency audio SigMF metadata",
-        "href": "/captures/15-council-weather-audio.sigmf-meta",
-        "type": "application/json"
+        "label": "CivilianEmergencyReceiver GNU Radio flowgraph",
+        "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.grc",
+        "type": "application/x-gnuradio-grc",
+        "role": "flowgraph_source"
       },
       {
-        "label": "Weekly emergency-network reference transmission",
-        "href": "/radio/GNURadio/EmergencyRadioAudio/Required_Weekly_Test_NOAA.ogg",
-        "type": "audio/ogg",
-        "role": "source_audio"
+        "label": "CivilianEmergencyReceiver generated Python",
+        "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source"
       },
       {
-        "label": "Emergency transmission protocol notes",
-        "href": "/radio/GNURadio/EmergencyRadioAudio/README.md",
+        "label": "Barker-13 and CRC-16 live source block",
+        "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver_epy_block_0.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source"
+      },
+      {
+        "label": "Live receiver protocol notes",
+        "href": "/radio/GNURadio/CivilianEmergency/README.md",
         "type": "text/markdown"
       }
     ],
@@ -947,49 +848,58 @@
     "track": "cyber",
     "difficulty": "Moderate",
     "points": 280,
-    "scenario": "Recovered digital audio contains metadata that controls normal, priority, and evacuation handling.",
-    "objective": "Reverse engineer the receiver C logic and submit a valid public warning message accepted by the simulated receiver.",
-    "details": "The recovered digital audio contains metadata for normal, priority warning, or evacuation alert handling. The participant is given a partially extracted C file from the receiver software and must reverse engineer metadata, audio frames, and integrity checks. The final task is to create and submit a valid audio warning message that activates the virtual warning light and plays the audio.",
+    "scenario": "A live GNU Radio evacuation transmission carries receiver-control metadata after a Barker-13 synchronization code and before a CRC-16 trailer.",
+    "objective": "Reverse engineer the receiver C logic and submit a complete warning message whose Barker framing and CRC-16 are valid.",
+    "details": "The generated GNU Radio Python flowgraph continuously creates evacuation audio and metadata in memory. The participant must reverse the receiver logic, preserve the Barker-13 prefix, recalculate the CRC-16/CCITT trailer, and submit a message accepted by the simulated receiver.",
     "flag_location": "Triggering the warning light alert system without setting off surrounding checks.",
-    "developer_comments": "The light is an additional UI feature. New audio signal/radio data is needed. Ability to record tuned receiver samples is required.",
-    "signal_scheme": "Digital emergency-audio metadata with integrity checks.",
+    "developer_comments": "Strict live GNU Radio source. No saved IQ or audio file is used and there is no synthetic server fallback.",
+    "signal_scheme": "Live GNU Radio evacuation audio with Barker-13 framed metadata and CRC-16/CCITT-FALSE.",
     "concepts": [
       "reverse engineering",
-      "metadata integrity",
+      "Barker-13 framing",
+      "CRC-16 integrity",
       "message crafting",
       "operator effect"
     ],
     "steps": [
       "Study the extracted receiver C file.",
-      "Find metadata and integrity-check placement.",
-      "Create a valid warning message.",
+      "Find the Barker prefix, metadata, and trailing CRC placement.",
+      "Create a warning message with a recalculated CRC-16.",
       "Activate the virtual warning light without triggering checks."
     ],
     "hints": [
-      "The warning light is controlled by authenticated metadata, not by audio level alone.",
+      "The warning light is controlled by metadata with a valid CRC, not by audio level alone.",
       "Use the emergency-transmission panel to intercept a current AUTH code and rebroadcast a complete warning."
     ],
     "artifacts": [
       {
-        "label": "Emergency audio hopping capture",
-        "href": "/captures/15-air-weather-voice.json",
+        "label": "Live GNU Radio CF32 stream status",
+        "href": "/api/rf/external/status?challenge_id=civilian-emergency-active-re",
         "type": "application/json",
-        "role": "signal"
+        "role": "signal",
+        "source": "gnu_radio_python_live"
       },
       {
-        "label": "Emergency audio SigMF metadata",
-        "href": "/captures/15-council-weather-audio.sigmf-meta",
-        "type": "application/json"
+        "label": "CivilianEmergencyReceiver GNU Radio flowgraph",
+        "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.grc",
+        "type": "application/x-gnuradio-grc",
+        "role": "flowgraph_source"
       },
       {
-        "label": "Weekly emergency-network reference transmission",
-        "href": "/radio/GNURadio/EmergencyRadioAudio/Required_Weekly_Test_NOAA.ogg",
-        "type": "audio/ogg",
-        "role": "source_audio"
+        "label": "CivilianEmergencyReceiver generated Python",
+        "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source"
       },
       {
-        "label": "Emergency transmission protocol notes",
-        "href": "/radio/GNURadio/EmergencyRadioAudio/README.md",
+        "label": "Barker-13 and CRC-16 live source block",
+        "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver_epy_block_0.py",
+        "type": "text/x-python",
+        "role": "flowgraph_source"
+      },
+      {
+        "label": "Live receiver protocol notes",
+        "href": "/radio/GNURadio/CivilianEmergency/README.md",
         "type": "text/markdown"
       },
       {

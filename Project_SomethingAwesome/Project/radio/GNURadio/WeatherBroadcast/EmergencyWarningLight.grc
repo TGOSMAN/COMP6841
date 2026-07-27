@@ -250,17 +250,22 @@ blocks:
     coordinate: [2280, 1024.0]
     rotation: 0
     state: enabled
-- name: blocks_wavfile_source_0
-  id: blocks_wavfile_source
+- name: analog_packet_i_0
+  id: analog_sig_source_x
   parameters:
     affinity: ''
     alias: ''
+    amp: '14000'
     comment: ''
-    file: WeatherRadio_T3_RE.wav
+    freq: '970'
     maxoutbuf: '0'
     minoutbuf: '0'
-    nchan: '1'
-    repeat: 'True'
+    offset: '20000'
+    phase: '0'
+    samp_rate: samp_rate
+    showports: 'False'
+    type: float
+    waveform: analog.GR_SIN_WAVE
   states:
     bus_sink: false
     bus_source: false
@@ -268,17 +273,22 @@ blocks:
     coordinate: [8, 492.0]
     rotation: 0
     state: enabled
-- name: blocks_wavfile_source_1
-  id: blocks_wavfile_source
+- name: analog_packet_q_0
+  id: analog_sig_source_x
   parameters:
     affinity: ''
     alias: ''
+    amp: '12000'
     comment: ''
-    file: WeatherRadio_T3_IM.wav
+    freq: '1730'
     maxoutbuf: '0'
     minoutbuf: '0'
-    nchan: '1'
-    repeat: 'True'
+    offset: '18000'
+    phase: '0'
+    samp_rate: samp_rate
+    showports: 'False'
+    type: float
+    waveform: analog.GR_COS_WAVE
   states:
     bus_sink: false
     bus_source: false
@@ -633,6 +643,8 @@ blocks:
     state: enabled
 
 connections:
+- [analog_packet_i_0, '0', blocks_float_to_short_0, '0']
+- [analog_packet_q_0, '0', blocks_float_to_short_0_0, '0']
 - [analog_sig_source_x_0, '0', blocks_stream_mux_0, '0']
 - [analog_sig_source_x_0_0, '0', blocks_stream_mux_0, '1']
 - [blocks_float_to_complex_0, '0', epy_block_0, '0']
@@ -645,8 +657,6 @@ connections:
 - [blocks_packed_to_unpacked_xx_0, '0', blocks_int_to_float_0, '0']
 - [blocks_packed_to_unpacked_xx_0_0, '0', blocks_int_to_float_0_0, '0']
 - [blocks_stream_mux_0, '0', blocks_multiply_xx_0, '1']
-- [blocks_wavfile_source_0, '0', blocks_float_to_short_0, '0']
-- [blocks_wavfile_source_1, '0', blocks_float_to_short_0_0, '0']
 - [channels_channel_model_0, '0', qtgui_time_sink_x_0, '0']
 - [channels_channel_model_0, '0', qtgui_waterfall_sink_x_0, '0']
 - [epy_block_0, '0', blocks_multiply_xx_0, '0']

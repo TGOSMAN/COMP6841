@@ -1,33 +1,32 @@
-# Signal Artifact Generation
+# Live GNU Radio Signal Sources
 
-Signal capture JSON in `captures/` is a generated browser preview, not the
-source of truth. Edit `radio/profiles/training_signals.json`, then regenerate.
+Mapped GNU Radio challenges use the generated Python flowgraphs under
+`radio/GNURadio/` as their only signal source.
 
-```bash
-python radio/generate_gnuradio_artifacts.py --profile all
-python radio/generate_gnuradio_artifacts.py --profile council_weather_audio --write-iq
+Each runtime flowgraph:
+
+1. Generates its payload and waveform continuously in GNU Radio.
+2. Applies its channel model.
+3. Sends post-channel-model CF32 samples through
+   `radio/GNURadio/signal_forge_live_sink.py`.
+4. Streams those samples to the server ingest endpoint at `127.0.0.1:9100`.
+
+The flowgraphs must not read WAV, SigMF, IQ, or capture JSON files, and they must
+not write File Sink or SigMF output. The server does not replay saved data and
+does not synthesize a fallback for a missing mapped flowgraph.
+
+Start the site with:
+
+```powershell
+python -m pip install -r requirements.txt
+python server.py
 ```
 
-On WSL/Ubuntu, install GNU Radio and use `--require-gnuradio` when you want the
-script to fail if the GNU Radio runtime is unavailable.
+GNU Radio itself must be installed through Radioconda/Conda or the operating
+system package manager. Set `SIGNAL_FORGE_GNURADIO_PYTHON` if its Python runtime
+is not discoverable. The site remains available without GNU Radio, but each
+mapped challenge clearly reports that no live samples have arrived.
 
-```bash
-sudo apt update
-sudo apt install gnuradio python3-numpy python3-scipy
-python radio/generate_gnuradio_artifacts.py --require-gnuradio --profile all --write-iq
-```
-
-The generated files are:
-
-- `captures/*.json`: compact artifact metadata for the browser waterfall.
-- `captures/*.sigmf-meta`: SigMF metadata when `--write-iq` is used.
-- `captures/*.sigmf-data`: deterministic complex float IQ preview when
-  `--write-iq` is used.
-
-For a deeper GNU Radio implementation, keep the profile schema stable and map
-each profile to a GNU Radio Companion top block:
-
-1. Read `center_hz`, `sample_rate_hz`, `sources`, and payload metadata.
-2. Generate the waveform with GNU Radio blocks or custom C++/Python blocks.
-3. Write SigMF IQ data.
-4. Run the same profile through this exporter to produce the web preview JSON.
+The old `generate_gnuradio_artifacts.py` utility and `captures/` directory are
+retained only as reference material. They are not part of the runtime signal
+path.
