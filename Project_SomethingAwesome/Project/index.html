@@ -17,9 +17,9 @@
         <a href="#safety">Safety</a>
         <a href="#blueprint">Learning Arc</a>
         <a href="#tasks">Tasks</a>
-        <a href="#operator-console">Operator</a>
         <a href="#research">Research</a>
         <a href="#bridge">GNU Radio</a>
+        <a href="/guide.html">Setup Guide</a>
       </nav>
     </header>
 
@@ -34,16 +34,11 @@
             boundaries interact. The assessed path is generated, local, and
             receive-only; GNU Radio can regenerate artifacts for deeper research.
           </p>
-          <div class="hero-actions">
-            <a class="primary-action" href="#tasks">Browse situations</a>
-            <a class="secondary-action" href="#blueprint">View learning arc</a>
-          </div>
-          <div class="mode-switch" aria-label="Security mode">
-            <span>Security mode</span>
-            <button id="attack-mode" class="active" type="button">Attack</button>
-            <button id="secure-mode" type="button">Secure</button>
-            <strong id="mode-status">Attack Mode</strong>
-          </div>
+        <div class="hero-actions">
+          <a class="primary-action" href="#tasks">Browse situations</a>
+          <a class="secondary-action" href="/guide.html">Set up tools</a>
+          <a class="secondary-action" href="#blueprint">View learning arc</a>
+        </div>
         </div>
         <div class="spectrum-console" aria-label="Live spectrum console">
           <div class="console-head">
@@ -209,56 +204,15 @@
         <div class="task-grid" id="task-grid"></div>
       </section>
 
-      <section class="operator-console" id="operator-console">
-        <div class="section-header compact">
-          <p class="eyebrow">Operator Console</p>
-          <h2>RF-to-Operator Trust Boundary</h2>
-          <p>
-            Decoded RF fields become operator-console data. This section exists
-            to show why RF-origin text is still untrusted input: Attack Mode
-            renders one note as active markup, while Secure Mode treats the same
-            field as inert text.
-          </p>
-        </div>
-        <div class="operator-grid">
-          <form id="operator-form" class="operator-form">
-            <div class="radio-ops-panel">
-              <button id="receive-radio" type="button">Receive RF burst</button>
-              <div id="operator-decode" class="operator-decode">No burst decoded yet.</div>
-            </div>
-            <label>
-              Callsign
-              <input id="operator-callsign" value="CIVIC-OPS-1">
-            </label>
-            <label>
-              Route note
-              <input id="operator-route-note" value="Synthetic decoded training event">
-            </label>
-            <label>
-              Decoded operator note
-              <textarea id="operator-comment" placeholder="Receive an RF burst to populate this untrusted field."></textarea>
-            </label>
-            <button type="submit">Post comment</button>
-            <p id="operator-flag" class="flag-result" aria-live="polite"></p>
-          </form>
-          <div>
-            <div class="operator-actions">
-              <button id="refresh-operator" type="button">Refresh events</button>
-            </div>
-            <div id="operator-events" class="operator-events"></div>
-          </div>
-        </div>
-      </section>
-
       <section class="lab-band">
         <div class="lab-copy">
           <p class="eyebrow">Animated Lab</p>
           <h2>Instrument-style views, not gimmicks</h2>
           <p>
-            The browser renders generated FFT frames, spectrum traces, cursors,
-            tuning controls, and artifact previews now. The next developer step
-            is to feed these same views from GNU Radio-generated SigMF captures
-            or a live ZeroMQ/WebSocket bridge.
+            The browser renders GNU Radio's live post-channel-model samples as
+            FFT frames, spectrum traces, cursors, and tuned time-series views.
+            Beginner challenges wait for their mapped generated Python
+            flowgraph and never substitute a recording.
           </p>
         </div>
         <div class="signal-animation" aria-hidden="true">
@@ -284,10 +238,10 @@
         <p class="eyebrow">GNU Radio Integration</p>
         <h2>Regenerate RF artifacts as developer work</h2>
         <p>
-          The assessed path uses generated files. Your developer path should be
-          profile-driven: edit signal parameters in Python, C/C++, or GNU Radio,
-          export IQ/SigMF data, convert it into waterfall JSON, and attach it to
-          a challenge without redesigning the website.
+          The assessed beginner path uses running generated GNU Radio Python.
+          Edit signal parameters in GNU Radio Companion, run the mapped Python
+          flowgraph, and let its live sink feed the browser without an
+          intermediate capture file.
         </p>
       </section>
 
@@ -301,12 +255,12 @@
           <p>Build GNU Radio Companion generators for OOK/ASK, FSK, audio, hopping, interference, and sensing-style captures.</p>
         </article>
         <article>
-          <h3>3. Export</h3>
-          <p>Write `.sigmf-data`, `.sigmf-meta`, waterfall JSON, decoded examples, and expected-answer notes for each module.</p>
+          <h3>3. Stream</h3>
+          <p>Connect the final complex channel output to the Signal Forge live sink and stream CF32 blocks while the flowgraph runs.</p>
         </article>
         <article>
-          <h3>4. Bridge</h3>
-          <p>Optionally publish FFT rows over ZeroMQ or a Python socket, then feed rows to the browser waterfall.</p>
+          <h3>4. Inspect</h3>
+          <p>Open the mapped challenge and inspect the live FFT and time-domain views while GNU Radio produces samples.</p>
         </article>
         <article>
           <h3>5. Script Terminal</h3>

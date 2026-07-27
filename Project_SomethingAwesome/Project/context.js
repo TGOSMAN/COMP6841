@@ -1,19 +1,16 @@
 const contextState = {
   contexts: [],
   context: null,
-  solved: new Set(JSON.parse(localStorage.getItem("solvedTasks") || "[]")),
-  mode: "attack"
+  solved: new Set(JSON.parse(localStorage.getItem("solvedTasks") || "[]"))
 };
 
 const contextById = (id) => document.getElementById(id);
 
 async function bootContext() {
-  const [contextsResponse, modeResponse] = await Promise.all([
-    fetch("/api/contexts"),
-    fetch("/api/mode")
+  const [contextsResponse] = await Promise.all([
+    fetch("/api/contexts")
   ]);
   contextState.contexts = (await contextsResponse.json()).contexts;
-  renderContextMode((await modeResponse.json()).mode);
 
   const id = decodeURIComponent(location.pathname.split("/").filter(Boolean).pop() || "");
   contextState.context = contextState.contexts.find((candidate) => candidate.id === id);
@@ -69,23 +66,6 @@ function renderSubtaskCard(task) {
   return card;
 }
 
-async function setContextMode(mode) {
-  const response = await fetch("/api/mode", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mode })
-  });
-  renderContextMode((await response.json()).mode);
-}
-
-function renderContextMode(mode) {
-  contextState.mode = mode;
-  contextById("attack-mode").classList.toggle("active", mode === "attack");
-  contextById("secure-mode").classList.toggle("active", mode === "secure");
-  contextById("mode-status").textContent = mode === "attack" ? "Attack Mode" : "Secure Mode";
-  contextById("mode-status").style.color = mode === "attack" ? "var(--amber)" : "var(--green)";
-}
-
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (character) => ({
     "&": "&amp;",
@@ -95,8 +75,5 @@ function escapeHtml(value) {
     "\"": "&quot;"
   }[character]));
 }
-
-contextById("attack-mode").addEventListener("click", () => setContextMode("attack"));
-contextById("secure-mode").addEventListener("click", () => setContextMode("secure"));
 
 bootContext();

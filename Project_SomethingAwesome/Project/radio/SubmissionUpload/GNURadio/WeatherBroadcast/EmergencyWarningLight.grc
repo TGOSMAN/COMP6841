@@ -1,0 +1,668 @@
+options:
+  parameters:
+    author: ''
+    catch_exceptions: 'True'
+    category: '[GRC Hier Blocks]'
+    cmake_opt: ''
+    comment: ''
+    copyright: ''
+    description: ''
+    gen_cmake: 'On'
+    gen_linking: dynamic
+    generate_options: qt_gui
+    hier_block_src_path: '.:'
+    id: EmergencyWarningLight
+    max_nouts: '0'
+    output_language: python
+    placement: (0,0)
+    qt_qss_theme: ''
+    realtime_scheduling: ''
+    run: 'True'
+    run_command: '{python} -u {filename}'
+    run_options: prompt
+    sizing_mode: fixed
+    thread_safe_setters: ''
+    title: EmergencyWarningLight
+    window_size: (1000,1000)
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [24, 256.0]
+    rotation: 0
+    state: enabled
+
+blocks:
+- name: samp_rate
+  id: variable
+  parameters:
+    comment: ''
+    value: '3000000'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [320, 296.0]
+    rotation: 0
+    state: enabled
+- name: analog_sig_source_x_0
+  id: analog_sig_source_x
+  parameters:
+    affinity: ''
+    alias: ''
+    amp: '1'
+    comment: ''
+    freq: '500000'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    offset: '0'
+    phase: '0'
+    samp_rate: samp_rate
+    showports: 'False'
+    type: complex
+    waveform: analog.GR_COS_WAVE
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1984, 872.0]
+    rotation: 0
+    state: enabled
+- name: analog_sig_source_x_0_0
+  id: analog_sig_source_x
+  parameters:
+    affinity: ''
+    alias: ''
+    amp: '1'
+    comment: ''
+    freq: '500000'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    offset: '0'
+    phase: '0'
+    samp_rate: samp_rate
+    showports: 'False'
+    type: complex
+    waveform: analog.GR_COS_WAVE
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1992, 1112.0]
+    rotation: 0
+    state: enabled
+- name: blocks_float_to_complex_0
+  id: blocks_float_to_complex
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1664, 716.0]
+    rotation: 0
+    state: enabled
+- name: blocks_float_to_short_0
+  id: blocks_float_to_short
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    scale: '1'
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [320, 504.0]
+    rotation: 0
+    state: enabled
+- name: blocks_float_to_short_0_0
+  id: blocks_float_to_short
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    scale: '1'
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [296, 976.0]
+    rotation: 0
+    state: enabled
+- name: blocks_int_to_float_0
+  id: blocks_int_to_float
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    scale: '1'
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1360, 576.0]
+    rotation: 0
+    state: enabled
+- name: blocks_int_to_float_0_0
+  id: blocks_int_to_float
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    scale: '1'
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1352, 840.0]
+    rotation: 0
+    state: enabled
+- name: blocks_multiply_xx_0
+  id: blocks_multiply_xx
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    num_inputs: '2'
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [2560, 716.0]
+    rotation: 0
+    state: enabled
+- name: blocks_packed_to_unpacked_xx_0
+  id: blocks_packed_to_unpacked_xx
+  parameters:
+    affinity: ''
+    alias: ''
+    bits_per_chunk: '1'
+    comment: ''
+    endianness: gr.GR_MSB_FIRST
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    num_ports: '1'
+    type: int
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [928, 492.0]
+    rotation: 0
+    state: enabled
+- name: blocks_packed_to_unpacked_xx_0_0
+  id: blocks_packed_to_unpacked_xx
+  parameters:
+    affinity: ''
+    alias: ''
+    bits_per_chunk: '1'
+    comment: ''
+    endianness: gr.GR_MSB_FIRST
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    num_ports: '1'
+    type: int
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [920, 964.0]
+    rotation: 0
+    state: enabled
+- name: blocks_stream_mux_0
+  id: blocks_stream_mux
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    lengths: (1000, 1000)
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    num_inputs: '2'
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [2280, 1024.0]
+    rotation: 0
+    state: enabled
+- name: analog_packet_i_0
+  id: analog_sig_source_x
+  parameters:
+    affinity: ''
+    alias: ''
+    amp: '14000'
+    comment: ''
+    freq: '970'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    offset: '20000'
+    phase: '0'
+    samp_rate: samp_rate
+    showports: 'False'
+    type: float
+    waveform: analog.GR_SIN_WAVE
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [8, 492.0]
+    rotation: 0
+    state: enabled
+- name: analog_packet_q_0
+  id: analog_sig_source_x
+  parameters:
+    affinity: ''
+    alias: ''
+    amp: '12000'
+    comment: ''
+    freq: '1730'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    offset: '18000'
+    phase: '0'
+    samp_rate: samp_rate
+    showports: 'False'
+    type: float
+    waveform: analog.GR_COS_WAVE
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [8, 964.0]
+    rotation: 0
+    state: enabled
+- name: channels_channel_model_0
+  id: channels_channel_model
+  parameters:
+    affinity: ''
+    alias: ''
+    block_tags: 'False'
+    comment: ''
+    epsilon: '1.0'
+    freq_offset: '0.0'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    noise_voltage: '0.2'
+    seed: '0'
+    taps: '1.0'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [2832, 648.0]
+    rotation: 0
+    state: enabled
+- name: epy_block_0
+  id: epy_block
+  parameters:
+    _source_code: "\"\"\"\nEmbedded Python Blocks:\n\nEach time this file is saved,\
+      \ GRC will instantiate the first class it finds\nto get ports and parameters\
+      \ of your block. The arguments to __init__  will\nbe the parameters. All of\
+      \ them are required to have default values!\n\"\"\"\n\nimport numpy as np\n\
+      from gnuradio import gr\n\n\nclass blk(gr.sync_block):\n    \"\"\"\n    RANDU-based\
+      \ spreading block for continuous complex audio/QAM.\n\n    Input:\n        complex64\
+      \ baseband signal, I + jQ\n\n    Output:\n        complex64 spread signal\n\n\
+      \    The RANDU state is converted into a binary chip:\n        +1 or -1\n\n\
+      \    One chip is held for samples_per_chip input samples.\n    \"\"\"\n\n  \
+      \  def __init__(self, samples_per_chip=10, seed=1):\n        gr.sync_block.__init__(\n\
+      \            self,\n            name=\"RANDU Phase Shifter\",\n            in_sig=[np.complex64],\n\
+      \            out_sig=[np.complex64]\n        )\n\n        self.samples_per_chip\
+      \ = max(1, int(samples_per_chip))\n\n        # RANDU should not be started from\
+      \ zero.\n        self.state = int(seed) & 0x7FFFFFFF\n\n        if self.state\
+      \ == 0:\n            self.state = 1\n\n        # Using an odd seed is more representative\
+      \ of RANDU.\n        if self.state % 2 == 0:\n            self.state += 1\n\n\
+      \        self.current_chip = np.complex64(1.0 + 0.0j)\n        self.chip_sample_counter\
+      \ = 0\n\n    def next_randu(self):\n        \"\"\"\n        RANDU recurrence:\n\
+      \n            x[n+1] = 65539*x[n] mod 2^31\n        \"\"\"\n\n        self.state\
+      \ = (65539 * self.state) & 0x7FFFFFFF\n        return self.state\n\n    def\
+      \ generate_chip(self):\n    \tstate = self.next_randu()\n\n    \t# Select two\
+      \ relatively high state bits.\n    \tphase_index = (state >> 28) & 0x03\n\n\
+      \    \tphase_table = (\n        \tnp.complex64(1.0 + 0.0j),\n        \tnp.complex64(0.0\
+      \ + 1.0j),\n        \tnp.complex64(-1.0 + 0.0j),\n        \tnp.complex64(0.0\
+      \ - 1.0j)\n    \t)\n\n    \treturn phase_table[phase_index]\n\n    def work(self,\
+      \ input_items, output_items):\n        x = input_items[0]\n        y = output_items[0]\n\
+      \n        for i in range(len(x)):\n\n            # Generate a new chip at the\
+      \ chip-rate boundary.\n            if self.chip_sample_counter == 0:\n     \
+      \           self.current_chip = self.generate_chip()\n\n            # Apply\
+      \ the same sign change to I and Q.\n            y[i] = x[i] * self.current_chip\n\
+      \n            self.chip_sample_counter += 1\n\n            if self.chip_sample_counter\
+      \ >= self.samples_per_chip:\n                self.chip_sample_counter = 0\n\n\
+      \        return len(y)"
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    samples_per_chip: '10'
+    seed: '1'
+  states:
+    _io_cache: ('RANDU Phase Shifter', 'blk', [('samples_per_chip', '10'), ('seed',
+      '1')], [('0', 'complex', 1)], [('0', 'complex', 1)], '\n    RANDU-based spreading
+      block for continuous complex audio/QAM.\n\n    Input:\n        complex64 baseband
+      signal, I + jQ\n\n    Output:\n        complex64 spread signal\n\n    The RANDU
+      state is converted into a binary chip:\n        +1 or -1\n\n    One chip is
+      held for samples_per_chip input samples.\n    ', ['samples_per_chip'])
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [2016, 692.0]
+    rotation: 0
+    state: enabled
+- name: epy_block_1
+  id: epy_block
+  parameters:
+    _source_code: "\"\"\"\nEmbedded Python Blocks:\n\nEach time this file is saved,\
+      \ GRC will instantiate the first class it finds\nto get ports and parameters\
+      \ of your block. The arguments to __init__  will\nbe the parameters. All of\
+      \ them are required to have default values!\n\"\"\"\n\nimport numpy as np\n\
+      from gnuradio import gr\n\n\nclass blk(gr.sync_block):\n    \"\"\"\n    Encode\
+      \ 16-bit data into a 32-bit alarm packet.\n\n    Data bits:\n        Read MSB-first.\n\
+      \n    Emergency bits:\n        Inserted LSB-first after every second data bit\
+      \ equal to 1.\n        Any emergency bits not inserted are appended after the\
+      \ data.\n\n    The result is left-aligned so the C decoder starts at packet\
+      \ bit 31.\n    \"\"\"\n\n    def __init__(self, emergency=0xB):\n        gr.sync_block.__init__(\n\
+      \            self,\n            name=\"Alarm Packet Encoder\",\n           \
+      \ in_sig=[np.uint16],\n            out_sig=[np.uint32],\n        )\n\n     \
+      \   self.emergency = int(emergency) & 0x0F\n\n    @staticmethod\n    def encode(data,\
+      \ emergency):\n        packet = 0\n        packet_length = 0\n        pair_count\
+      \ = 0\n        emergency_index = 0\n\n        # Process the 16 data bits MSB-first.\n\
+      \        for bit_index in range(15, -1, -1):\n            data_bit = (data >>\
+      \ bit_index) & 1\n\n            packet = (packet << 1) | data_bit\n        \
+      \    packet_length += 1\n\n            if data_bit:\n                pair_count\
+      \ += 1\n\n            # Insert an emergency bit after every second data 1.\n\
+      \            if pair_count == 2 and emergency_index < 4:\n                emergency_bit\
+      \ = (\n                    emergency >> emergency_index\n                ) &\
+      \ 1\n\n                packet = (packet << 1) | emergency_bit\n            \
+      \    packet_length += 1\n\n                emergency_index += 1\n          \
+      \      pair_count = 0\n\n        # Append emergency bits that were not interleaved.\n\
+      \        while emergency_index < 4:\n            emergency_bit = (\n       \
+      \         emergency >> emergency_index\n            ) & 1\n\n            packet\
+      \ = (packet << 1) | emergency_bit\n            packet_length += 1\n        \
+      \    emergency_index += 1\n\n        # The C decoder begins reading at bit 31.\n\
+      \        packet <<= 32 - packet_length\n\n        return packet & 0xFFFFFFFF\n\
+      \n    def work(self, input_items, output_items):\n        input_data = input_items[0]\n\
+      \        output_packets = output_items[0]\n\n        for i in range(len(input_data)):\n\
+      \            output_packets[i] = self.encode(\n                int(input_data[i]),\n\
+      \                self.emergency,\n            )\n\n        return len(output_packets)"
+    affinity: ''
+    alias: ''
+    comment: ''
+    emergency: '0xB'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    _io_cache: ('Alarm Packet Encoder', 'blk', [('emergency', '11')], [('0', 'short',
+      1)], [('0', 'int', 1)], '\n    Encode 16-bit data into a 32-bit alarm packet.\n\n    Data
+      bits:\n        Read MSB-first.\n\n    Emergency bits:\n        Inserted LSB-first
+      after every second data bit equal to 1.\n        Any emergency bits not inserted
+      are appended after the data.\n\n    The result is left-aligned so the C decoder
+      starts at packet bit 31.\n    ', ['emergency'])
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [600, 504.0]
+    rotation: 0
+    state: enabled
+- name: epy_block_1_0
+  id: epy_block
+  parameters:
+    _source_code: "\"\"\"\nEmbedded Python Blocks:\n\nEach time this file is saved,\
+      \ GRC will instantiate the first class it finds\nto get ports and parameters\
+      \ of your block. The arguments to __init__  will\nbe the parameters. All of\
+      \ them are required to have default values!\n\"\"\"\n\nimport numpy as np\n\
+      from gnuradio import gr\n\n\nclass blk(gr.sync_block):\n    \"\"\"\n    Encode\
+      \ 16-bit data into a 32-bit alarm packet.\n\n    Data bits:\n        Read MSB-first.\n\
+      \n    Emergency bits:\n        Inserted LSB-first after every second data bit\
+      \ equal to 1.\n        Any emergency bits not inserted are appended after the\
+      \ data.\n\n    The result is left-aligned so the C decoder starts at packet\
+      \ bit 31.\n    \"\"\"\n\n    def __init__(self, emergency=0xB):\n        gr.sync_block.__init__(\n\
+      \            self,\n            name=\"Alarm Packet Encoder\",\n           \
+      \ in_sig=[np.uint16],\n            out_sig=[np.uint32],\n        )\n\n     \
+      \   self.emergency = int(emergency) & 0x0F\n\n    @staticmethod\n    def encode(data,\
+      \ emergency):\n        packet = 0\n        packet_length = 0\n        pair_count\
+      \ = 0\n        emergency_index = 0\n\n        # Process the 16 data bits MSB-first.\n\
+      \        for bit_index in range(15, -1, -1):\n            data_bit = (data >>\
+      \ bit_index) & 1\n\n            packet = (packet << 1) | data_bit\n        \
+      \    packet_length += 1\n\n            if data_bit:\n                pair_count\
+      \ += 1\n\n            # Insert an emergency bit after every second data 1.\n\
+      \            if pair_count == 2 and emergency_index < 4:\n                emergency_bit\
+      \ = (\n                    emergency >> emergency_index\n                ) &\
+      \ 1\n\n                packet = (packet << 1) | emergency_bit\n            \
+      \    packet_length += 1\n\n                emergency_index += 1\n          \
+      \      pair_count = 0\n\n        # Append emergency bits that were not interleaved.\n\
+      \        while emergency_index < 4:\n            emergency_bit = (\n       \
+      \         emergency >> emergency_index\n            ) & 1\n\n            packet\
+      \ = (packet << 1) | emergency_bit\n            packet_length += 1\n        \
+      \    emergency_index += 1\n\n        # The C decoder begins reading at bit 31.\n\
+      \        packet <<= 32 - packet_length\n\n        return packet & 0xFFFFFFFF\n\
+      \n    def work(self, input_items, output_items):\n        input_data = input_items[0]\n\
+      \        output_packets = output_items[0]\n\n        for i in range(len(input_data)):\n\
+      \            output_packets[i] = self.encode(\n                int(input_data[i]),\n\
+      \                self.emergency,\n            )\n\n        return len(output_packets)"
+    affinity: ''
+    alias: ''
+    comment: ''
+    emergency: '0xB'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    _io_cache: ('Alarm Packet Encoder', 'blk', [('emergency', '11')], [('0', 'short',
+      1)], [('0', 'int', 1)], '\n    Encode 16-bit data into a 32-bit alarm packet.\n\n    Data
+      bits:\n        Read MSB-first.\n\n    Emergency bits:\n        Inserted LSB-first
+      after every second data bit equal to 1.\n        Any emergency bits not inserted
+      are appended after the data.\n\n    The result is left-aligned so the C decoder
+      starts at packet bit 31.\n    ', ['emergency'])
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [592, 976.0]
+    rotation: 0
+    state: enabled
+- name: qtgui_time_sink_x_0
+  id: qtgui_time_sink_x
+  parameters:
+    affinity: ''
+    alias: ''
+    alpha1: '1.0'
+    alpha10: '1.0'
+    alpha2: '1.0'
+    alpha3: '1.0'
+    alpha4: '1.0'
+    alpha5: '1.0'
+    alpha6: '1.0'
+    alpha7: '1.0'
+    alpha8: '1.0'
+    alpha9: '1.0'
+    autoscale: 'False'
+    axislabels: 'True'
+    color1: blue
+    color10: dark blue
+    color2: red
+    color3: green
+    color4: black
+    color5: cyan
+    color6: magenta
+    color7: yellow
+    color8: dark red
+    color9: dark green
+    comment: ''
+    ctrlpanel: 'False'
+    entags: 'True'
+    grid: 'False'
+    gui_hint: ''
+    label1: Signal 1
+    label10: Signal 10
+    label2: Signal 2
+    label3: Signal 3
+    label4: Signal 4
+    label5: Signal 5
+    label6: Signal 6
+    label7: Signal 7
+    label8: Signal 8
+    label9: Signal 9
+    legend: 'True'
+    marker1: '-1'
+    marker10: '-1'
+    marker2: '-1'
+    marker3: '-1'
+    marker4: '-1'
+    marker5: '-1'
+    marker6: '-1'
+    marker7: '-1'
+    marker8: '-1'
+    marker9: '-1'
+    name: '""'
+    nconnections: '2'
+    size: '1024'
+    srate: samp_rate
+    stemplot: 'False'
+    style1: '1'
+    style10: '1'
+    style2: '1'
+    style3: '1'
+    style4: '1'
+    style5: '1'
+    style6: '1'
+    style7: '1'
+    style8: '1'
+    style9: '1'
+    tr_chan: '0'
+    tr_delay: '0'
+    tr_level: '0.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_slope: qtgui.TRIG_SLOPE_POS
+    tr_tag: '""'
+    type: complex
+    update_time: '0.10'
+    width1: '1'
+    width10: '1'
+    width2: '1'
+    width3: '1'
+    width4: '1'
+    width5: '1'
+    width6: '1'
+    width7: '1'
+    width8: '1'
+    width9: '1'
+    ylabel: Amplitude
+    ymax: '1'
+    ymin: '-1'
+    yunit: '""'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [3128, 1032.0]
+    rotation: 0
+    state: enabled
+- name: qtgui_waterfall_sink_x_0
+  id: qtgui_waterfall_sink_x
+  parameters:
+    affinity: ''
+    alias: ''
+    alpha1: '1.0'
+    alpha10: '1.0'
+    alpha2: '1.0'
+    alpha3: '1.0'
+    alpha4: '1.0'
+    alpha5: '1.0'
+    alpha6: '1.0'
+    alpha7: '1.0'
+    alpha8: '1.0'
+    alpha9: '1.0'
+    axislabels: 'True'
+    bw: samp_rate
+    color1: '0'
+    color10: '0'
+    color2: '0'
+    color3: '0'
+    color4: '0'
+    color5: '0'
+    color6: '0'
+    color7: '0'
+    color8: '0'
+    color9: '0'
+    comment: ''
+    fc: '0'
+    fftsize: '1024'
+    freqhalf: 'True'
+    grid: 'False'
+    gui_hint: ''
+    int_max: '10'
+    int_min: '-140'
+    label1: ''
+    label10: ''
+    label2: ''
+    label3: ''
+    label4: ''
+    label5: ''
+    label6: ''
+    label7: ''
+    label8: ''
+    label9: ''
+    legend: 'True'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    name: '""'
+    nconnections: '1'
+    showports: 'False'
+    type: complex
+    update_time: '0.001'
+    wintype: window.WIN_BLACKMAN_hARRIS
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [3176, 680.0]
+    rotation: 0
+    state: enabled
+
+connections:
+- [analog_packet_i_0, '0', blocks_float_to_short_0, '0']
+- [analog_packet_q_0, '0', blocks_float_to_short_0_0, '0']
+- [analog_sig_source_x_0, '0', blocks_stream_mux_0, '0']
+- [analog_sig_source_x_0_0, '0', blocks_stream_mux_0, '1']
+- [blocks_float_to_complex_0, '0', epy_block_0, '0']
+- [blocks_float_to_short_0, '0', epy_block_1, '0']
+- [blocks_float_to_short_0_0, '0', epy_block_1_0, '0']
+- [blocks_int_to_float_0, '0', blocks_float_to_complex_0, '0']
+- [blocks_int_to_float_0_0, '0', blocks_float_to_complex_0, '1']
+- [blocks_multiply_xx_0, '0', channels_channel_model_0, '0']
+- [blocks_multiply_xx_0, '0', qtgui_time_sink_x_0, '1']
+- [blocks_packed_to_unpacked_xx_0, '0', blocks_int_to_float_0, '0']
+- [blocks_packed_to_unpacked_xx_0_0, '0', blocks_int_to_float_0_0, '0']
+- [blocks_stream_mux_0, '0', blocks_multiply_xx_0, '1']
+- [channels_channel_model_0, '0', qtgui_time_sink_x_0, '0']
+- [channels_channel_model_0, '0', qtgui_waterfall_sink_x_0, '0']
+- [epy_block_0, '0', blocks_multiply_xx_0, '0']
+- [epy_block_1, '0', blocks_packed_to_unpacked_xx_0, '0']
+- [epy_block_1_0, '0', blocks_packed_to_unpacked_xx_0_0, '0']
+
+metadata:
+  file_format: 1
+  grc_version: 3.10.12.0

@@ -1,14 +1,26 @@
 from __future__ import annotations
 
+import ast
 import json
-import html
+import base64
 import hmac
 import hashlib
+import math
 import mimetypes
 import os
 import random
+import re
+import shutil
 import sqlite3
+import socketserver
+import struct
+import subprocess
+import sys
+import threading
 import time
+import wave
+from collections import deque
+from contextlib import nullcontext
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -23,7 +35,7 @@ DB_PATH = DATA_DIR / "tolling.db"
 CHALLENGES_PATH = DATA_DIR / "challenges.json"
 CONTEXTS_PATH = DATA_DIR / "contexts.json"
 CONFIG_PATH = ROOT / "config" / "range.json"
-MODE = {"value": "attack"}
+VALIDATION_CONFIG_PATH = ROOT / "config" / "validation.json"
 REPLAY_CACHE: set[str] = set()
 AIR_WEATHER_SESSIONS: dict[str, dict] = {}
 OPERATOR_COMMENTS = [
@@ -58,7 +70,348 @@ RF_TARGETS = {
     "farm-gate-rce": {"center_mhz": 902.3, "span_khz": 650, "modulations": {"AUTO", "4-FSK", "FSK"}, "label": "FARM-GATE-RCE-902"},
     "farm-gate-fuzz-spoof": {"center_mhz": 902.3, "span_khz": 650, "modulations": {"AUTO", "4-FSK", "FSK"}, "label": "FARM-GATE-SPOOF-902"},
 }
+TUNNEL_GNU_RADIO_CAPTURES = {
+    "tunnel-reading-signals": {
+        "stem": "ReadingSignals",
+        "title": "Reading Signals",
+        "grc_path": "radio/GNURadio/Tunnel_Task/ReadingSignals.grc",
+        "python_path": "radio/GNURadio/Tunnel_Task/ReadingSignals.py",
+        "source_mode": "live_gnuradio_stream",
+        "sample_rate": 44_200,
+        "carrier_offset_hz": 10_000,
+        "samples_per_symbol": 500,
+        "flag": "FLAG{LIFE_IS_LIKE_A_BOX_OF_CHOCS}",
+        "source_flag": "FLAG{LIFE_IS LIKE A BOX_OF_CHOCS}",
+        "public_payload": True,
+        "mission_note": "Already tuned tunnel sign packet.",
+    },
+    "tunnel-tuning": {
+        "stem": "TuningSignals",
+        "title": "Tuning Signals",
+        "grc_path": "radio/GNURadio/Tunnel_Task/TuningSignals.grc",
+        "python_path": "radio/GNURadio/Tunnel_Task/TuningSignals.py",
+        "source_mode": "live_gnuradio_stream",
+        "sample_rate": 44_200,
+        "carrier_offset_hz": 10_000,
+        "samples_per_symbol": 500,
+        "flag": "FLAG{HELLO_WORLD_I_DID_IT}",
+        "source_flag": "FLAG{HELLO_WORLD_I_DID_IT}",
+        "public_payload": True,
+        "mission_note": "Same tunnel sign packet, but acquisition requires centre/span correction.",
+    },
+    "tunnel-basic-dos": {
+        "stem": "DoSAttackMe",
+        "title": "DoS Attack Me",
+        "grc_path": "radio/GNURadio/Tunnel_Task/DoSAttackMe.grc",
+        "python_path": "radio/GNURadio/Tunnel_Task/DoSAttackMe.py",
+        "source_mode": "live_gnuradio_stream",
+        "sample_rate": 44_200,
+        "carrier_offset_hz": 10_000,
+        "samples_per_symbol": 500,
+        "flag": "FLAG{OH_NO_YOU_DIDNT}",
+        "source_flag": "FLAG{OH_NO_YOU_DIDNT}",
+        "public_payload": False,
+        "mission_note": "Tunnel sign packet used to show controlled local interference effects.",
+    },
+    "tunnel-packet-injection": {
+        "stem": "InjectionTime",
+        "title": "Injection Time",
+        "grc_path": "radio/GNURadio/Tunnel_Task/InjectionTime.grc",
+        "python_path": "radio/GNURadio/Tunnel_Task/InjectionTime.py",
+        "source_mode": "live_gnuradio_stream",
+        "sample_rate": 44_200,
+        "carrier_offset_hz": 10_000,
+        "samples_per_symbol": 500,
+        "flag": "FLAG{GET_VAXED_BABY}",
+        "source_flag": "FLAG{GET_VAXED_BABY}",
+        "public_payload": False,
+        "mission_note": "Tunnel sign packet used as the local packet-injection target waveform.",
+    },
+}
+SONG_META_GNU_RADIO_CAPTURES = {
+    "broadcast-reading-signals": {
+        "stem": "ReadingSignals",
+        "title": "Song Metadata Reading Signals",
+        "grc_path": "radio/GNURadio/Song_Meta/ReadingSignals.grc",
+        "python_path": "radio/GNURadio/Song_Meta/ReadingSignals.py",
+        "source_mode": "live_gnuradio_stream",
+        "sample_rate": 44_200,
+        "carrier_offset_hz": 10_000,
+        "samples_per_symbol": 50,
+        "bits_per_symbol": 2,
+        "bit_order": "msb",
+        "modulation": "4-level ASK / 2-bit symbols",
+        "flag": "FLAG{SOMEBODY_ONCE_TOLD_ME THE WORLD_IS}",
+        "source_flag": "FLAG{SOMEBODY_ONCE_TOLD_ME THE WORLD_IS}",
+        "public_payload": True,
+        "mission_note": "Already tuned song metadata side-channel packet.",
+    },
+    "broadcast-tuning": {
+        "stem": "TuningSignals",
+        "title": "Song Metadata Tuning Signals",
+        "grc_path": "radio/GNURadio/Song_Meta/TuningSignals.grc",
+        "python_path": "radio/GNURadio/Song_Meta/TuningSignals.py",
+        "source_mode": "live_gnuradio_stream",
+        "sample_rate": 44_200,
+        "carrier_offset_hz": 10_000,
+        "samples_per_symbol": 50,
+        "bits_per_symbol": 2,
+        "bit_order": "msb",
+        "modulation": "4-level ASK / 2-bit symbols",
+        "flag": "FLAG{FOR_THOSE_OF_YOU_WHO_JUST_TUNED_IN}",
+        "source_flag": "FLAG{FOR_THOSE_OF_YOU_WHO_JUST_TUNED_IN}",
+        "public_payload": True,
+        "mission_note": "Song metadata side-channel packet that requires receiver centre/span correction.",
+    },
+    "broadcast-basic-dos": {
+        "stem": "DoSAttackMe",
+        "title": "Song Metadata DoS Attack Me",
+        "grc_path": "radio/GNURadio/Song_Meta/DoSAttackMe.grc",
+        "python_path": "radio/GNURadio/Song_Meta/DoSAttackMe.py",
+        "source_mode": "live_gnuradio_stream",
+        "sample_rate": 44_200,
+        "carrier_offset_hz": 10_000,
+        "samples_per_symbol": 50,
+        "bits_per_symbol": 2,
+        "bit_order": "msb",
+        "modulation": "4-level ASK / 2-bit symbols",
+        "flag": "FLAG{HI_THERE_IM_DORY}",
+        "source_flag": "",
+        "public_payload": False,
+        "mission_note": "Song metadata packet used as the reference receiver signal before controlled local interference.",
+    },
+    "broadcast-packet-injection": {
+        "stem": "InjectionTime",
+        "title": "Song Metadata Injection Time",
+        "grc_path": "radio/GNURadio/Song_Meta/InjectionTime.grc",
+        "python_path": "radio/GNURadio/Song_Meta/InjectionTime.py",
+        "source_mode": "live_gnuradio_stream",
+        "sample_rate": 44_200,
+        "carrier_offset_hz": 10_000,
+        "samples_per_symbol": 50,
+        "bits_per_symbol": 2,
+        "bit_order": "msb",
+        "modulation": "4-level ASK / 2-bit symbols",
+        "flag": "FLAG{THERES_NO_INJECTION_THAT_MAKES_YOU_SMARTER}",
+        "source_flag": "FLAG{THERES_NO_INJECTION_THAT_MAKES_YOU_SMARTER}",
+        "public_payload": False,
+        "mission_note": "Song metadata packet used as the local packet-injection target waveform.",
+    },
+}
+WEATHER_GNU_RADIO_CAPTURES = {
+    "weather-boring-intercept": {
+        "stem": "InterceptingReceiver",
+        "title": "Weather Intercepting Receiver",
+        "grc_path": "radio/GNURadio/WeatherBroadcast/InterceptingReceiver.grc",
+        "python_path": "radio/GNURadio/WeatherBroadcast/InterceptingReceiver.py",
+        "sample_rate": 44_100,
+        "carrier_offset_hz": 10_000,
+        "carrier_offsets_hz": [10_000, 15_000],
+        "hop_samples": 1_000,
+        "samples_per_symbol": 1_000,
+        "modulation": "patterned 10/15 kHz hopping complex weather audio",
+        "source_mode": "live_gnuradio_stream",
+        "lock_to_center": True,
+        "public_payload": False,
+        "mission_note": "Live-generated complex weather tones with a clear repeating hop pattern.",
+    },
+    "weather-boring-obscured": {
+        "stem": "InterceptingReceiver_Task2",
+        "title": "Obscured Weather Receiver",
+        "grc_path": "radio/GNURadio/WeatherBroadcast/IThinkItsSecure.grc",
+        "python_path": "radio/GNURadio/WeatherBroadcast/InterceptingReceiver_Task2.py",
+        "sample_rate": 44_100,
+        "carrier_offset_hz": -16_000,
+        "carrier_offsets_hz": [-16_000, -10_000, -4_000, 3_000, 9_000, 15_000],
+        "hop_samples": 4_410,
+        "samples_per_symbol": 4_410,
+        "modulation": "random frequency-hopping complex weather audio with RANDU QPSK phase symbols",
+        "source_mode": "live_gnuradio_stream",
+        "lock_to_center": True,
+        "hop_mode": "keyed random",
+        "hop_key": "weather-task-3.01-hop-v1",
+        "phase_prng": "randu",
+        "phase_seed": 1,
+        "randu_samples_per_chip": 10,
+        "public_payload": False,
+        "mission_note": "Complex weather audio randomly hops among six RF channels every 100 ms. A separate fixed-seed RANDU sequence rotates only its QPSK phase symbols.",
+    },
+    "weather-boring-active-re": {
+        "stem": "EmergencyWarningLight",
+        "title": "Emergency Warning Light",
+        "grc_path": "radio/GNURadio/WeatherBroadcast/EmergencyWarningLight.grc",
+        "python_path": "radio/GNURadio/WeatherBroadcast/EmergencyWarningLight.py",
+        "sample_rate": 3_000_000,
+        "carrier_offset_hz": 500_000,
+        "carrier_offsets_hz": [500_000],
+        "hop_samples": 1_000,
+        "samples_per_symbol": 32,
+        "modulation": "32-bit custom-interleaved alarm metadata with fixed-seed RANDU phase shifts",
+        "source_mode": "live_gnuradio_stream",
+        "lock_to_center": True,
+        "randu_samples_per_chip": 10,
+        "emergency": 0xB,
+        "public_payload": False,
+        "mission_note": "Third weather report pair carrying the custom alarm packet checked by the extracted C decoder.",
+    },
+}
+CIVILIAN_GNU_RADIO_CAPTURES = {
+    "civilian-emergency-intercept": {
+        "stem": "CivilianEmergencyReceiver",
+        "title": "Civilian Emergency Intercepting Receiver",
+        "grc_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.grc",
+        "python_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.py",
+        "sample_rate": 44_100,
+        "carrier_offset_hz": -12_000,
+        "carrier_offsets_hz": [-12_000, -4_000, 6_000, 14_000],
+        "hop_samples": 11_025,
+        "samples_per_symbol": 40,
+        "modulation": "live AM alert audio + Barker-13 BPSK metadata",
+        "source_mode": "live_gnuradio_stream",
+        "lock_to_center": True,
+        "framing": "Barker-13",
+        "integrity": "CRC-16/CCITT-FALSE",
+        "public_payload": False,
+        "mission_note": "Live procedural civil-alert audio with a Barker-13 synchronized metadata frame and CRC-16 trailer.",
+    },
+    "civilian-emergency-obscured": {
+        "stem": "CivilianEmergencyReceiver",
+        "title": "Obscured Civilian Emergency Receiver",
+        "grc_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.grc",
+        "python_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.py",
+        "sample_rate": 44_100,
+        "carrier_offset_hz": -12_000,
+        "carrier_offsets_hz": [-12_000, -4_000, 6_000, 14_000],
+        "hop_samples": 11_025,
+        "samples_per_symbol": 40,
+        "modulation": "weak-PRNG hopped live AM alert audio + Barker-13 BPSK metadata",
+        "source_mode": "live_gnuradio_stream",
+        "lock_to_center": True,
+        "hop_mode": "weak LCG",
+        "framing": "Barker-13",
+        "integrity": "CRC-16/CCITT-FALSE",
+        "public_payload": False,
+        "mission_note": "Live procedural civil-alert audio on weak-PRNG hops; each metadata frame starts with Barker-13 and ends with CRC-16.",
+    },
+    "civilian-emergency-active-re": {
+        "stem": "CivilianEmergencyReceiver",
+        "title": "Active Civilian Emergency Receiver",
+        "grc_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.grc",
+        "python_path": "radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.py",
+        "sample_rate": 44_100,
+        "carrier_offset_hz": -12_000,
+        "carrier_offsets_hz": [-12_000, -4_000, 6_000, 14_000],
+        "hop_samples": 11_025,
+        "samples_per_symbol": 40,
+        "modulation": "live AM evacuation audio + Barker-13 BPSK metadata",
+        "source_mode": "live_gnuradio_stream",
+        "lock_to_center": True,
+        "hop_mode": "deterministic alternate",
+        "framing": "Barker-13",
+        "integrity": "CRC-16/CCITT-FALSE",
+        "public_payload": False,
+        "mission_note": "Live procedural evacuation audio carrying authenticated metadata framed by Barker-13 and checked with CRC-16.",
+    },
+}
+GNU_RADIO_CAPTURE_GROUPS = (
+    TUNNEL_GNU_RADIO_CAPTURES,
+    SONG_META_GNU_RADIO_CAPTURES,
+    WEATHER_GNU_RADIO_CAPTURES,
+    CIVILIAN_GNU_RADIO_CAPTURES,
+)
+LIVE_GNU_RADIO_TASKS = (
+    frozenset(TUNNEL_GNU_RADIO_CAPTURES)
+    | frozenset(SONG_META_GNU_RADIO_CAPTURES)
+    | frozenset(WEATHER_GNU_RADIO_CAPTURES)
+    | frozenset(CIVILIAN_GNU_RADIO_CAPTURES)
+)
+FLOWGRAPH_CONFIG_CACHE: dict[tuple[str, int], dict] = {}
 SCRIPT_TERMINALS: dict[str, dict] = {}
+EXTERNAL_FEED_LOCK = threading.Lock()
+EXTERNAL_FEEDS: dict[str, dict] = {}
+EXTERNAL_INGEST = {"host": "127.0.0.1", "port": 9100, "enabled": False, "error": ""}
+EXTERNAL_INGEST_SERVER: SignalIngestTCPServer | None = None
+MAX_EXTERNAL_LINE_BYTES = 2_000_000
+MAX_EXTERNAL_IQ_SAMPLES = 131_072
+GNU_RADIO_PROCESS_LOCK = threading.Lock()
+GNU_RADIO_PROCESSES: dict[str, dict] = {}
+GNU_RADIO_START_ERRORS: dict[str, str] = {}
+GNU_RADIO_PYTHON: Path | None = None
+GNU_RADIO_DISCOVERY_ERROR = ""
+GNU_RADIO_RUNTIME_DIR = ROOT / "outputs" / "gnuradio-runtime"
+
+
+def default_external_feed(challenge_id: str = "external") -> dict:
+    target = RF_TARGETS.get(challenge_id, RF_TARGETS["tunnel-reading-signals"])
+    center_hz = float(target["center_mhz"]) * 1_000_000
+    capture = gnu_radio_capture_for(challenge_id)
+    live_gnuradio = challenge_id in LIVE_GNU_RADIO_TASKS and capture is not None
+    span_hz = float(capture["sample_rate"] if live_gnuradio else float(target["span_khz"]) * 1_000)
+    source_label = (
+        f"{capture['stem']}.py post-channel-model CF32"
+        if live_gnuradio
+        else "External user signal"
+    )
+    return {
+        "challenge_id": challenge_id,
+        "scheme_id": f"GNU-RADIO-LIVE-{capture['stem'].upper()}" if live_gnuradio else "EXTERNAL-SIGNAL-INGEST-V1",
+        "center_hz": center_hz,
+        "span_hz": span_hz,
+        "sample_rate_hz": span_hz,
+        "bins": 384,
+        "frames": 1_000_000,
+        "rows": deque(maxlen=240),
+        "pending": deque(maxlen=512),
+        "sequence": 0,
+        "last_seen": 0.0,
+        "client": "",
+        "parser": {
+            "stage": "raw_iq",
+            "confidence": 0,
+            "bit_buffer": "waiting for GNU Radio CF32 samples" if live_gnuradio else "waiting for external frames",
+            "fields": {
+                "protocol": "Signal Forge GNU Radio live IQ v1" if live_gnuradio else "Signal Forge external ingest v1",
+                **(
+                    {
+                        "framing": capture["framing"],
+                        "integrity": capture["integrity"],
+                        "crc_check": "waiting for a complete live frame",
+                    }
+                    if live_gnuradio and capture.get("framing") and capture.get("integrity")
+                    else {}
+                ),
+            },
+            "note": (
+                f"The server starts {capture.get('python_path', capture['stem'] + '.py')} on demand; "
+                "its live sink streams post-channel-model complex samples here."
+                if live_gnuradio
+                else "Send JSON-lines FFT rows or cf32_le IQ blocks to the ingest port."
+            ),
+        },
+        "sources": [{"label": source_label, "kind": "gnu_radio_live" if live_gnuradio else "external", "offset_hz": 0, "bandwidth_hz": max(1000, span_hz / 16)}],
+        "annotations": [{"label": "GNU Radio live centre" if live_gnuradio else "external centre", "offset_hz": 0, "color": "#ff4ad2"}],
+        "protocol_notes": {
+            "modulation": capture.get("modulation", "GNU Radio flowgraph output") if live_gnuradio else "user supplied",
+            "source": "Live CF32 from the generated GNU Radio Python flowgraph" if live_gnuradio else "External TCP JSON-lines ingest",
+            "raw_path": "/api/rf/external/status",
+            **(
+                {
+                    "framing": capture["framing"],
+                    "integrity": capture["integrity"],
+                }
+                if live_gnuradio and capture.get("framing") and capture.get("integrity")
+                else {}
+            ),
+        },
+        "source_mode": "live_gnuradio_stream" if live_gnuradio else "external",
+    }
+
+
+def external_feed_for(challenge_id: str) -> dict:
+    with EXTERNAL_FEED_LOCK:
+        if challenge_id not in EXTERNAL_FEEDS:
+            EXTERNAL_FEEDS[challenge_id] = default_external_feed(challenge_id)
+        return EXTERNAL_FEEDS[challenge_id]
 
 RECEIVE_FLAG_TASKS = {
     "tunnel-reading-signals",
@@ -122,6 +475,34 @@ def load_challenges() -> list[dict]:
         return json.load(handle)
 
 
+def public_static_artifact_paths() -> set[str]:
+    """Return the local files explicitly published by challenge metadata."""
+    allowed: set[str] = set()
+    for task in load_challenges():
+        for artifact in task.get("artifacts", []):
+            request_path = unquote(urlparse(str(artifact.get("href", ""))).path)
+            if not request_path or request_path.startswith("/api/"):
+                continue
+            normalized = f"/{request_path.lstrip('/')}"
+            try:
+                bounded_project_path(normalized.lstrip("/"))
+            except ValueError:
+                continue
+            allowed.add(normalized)
+    return allowed
+
+
+def validate_public_static_artifacts() -> None:
+    """Fail startup when a challenge advertises a missing local resource."""
+    missing = [
+        request_path
+        for request_path in sorted(public_static_artifact_paths())
+        if not bounded_project_path(request_path.lstrip("/")).is_file()
+    ]
+    if missing:
+        raise RuntimeError(f"Missing public challenge artifacts: {', '.join(missing)}")
+
+
 def load_contexts() -> list[dict]:
     with CONTEXTS_PATH.open("r", encoding="utf-8") as handle:
         return json.load(handle)
@@ -130,6 +511,1590 @@ def load_contexts() -> list[dict]:
 def load_config() -> dict:
     with CONFIG_PATH.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def load_validation_config() -> dict:
+    with VALIDATION_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def configured_flags_for(challenge_id: str) -> list[str]:
+    validation = load_validation_config()
+    flags: list[str] = []
+    primary = str(validation.get("flags", {}).get(challenge_id, "")).strip()
+    if primary:
+        flags.append(primary)
+    for alias in validation.get("aliases", {}).get(challenge_id, []):
+        alias_text = str(alias).strip()
+        if alias_text:
+            flags.append(alias_text)
+    gnu_radio_capture = gnu_radio_capture_for(challenge_id)
+    if gnu_radio_capture:
+        for key in ("flag", "source_flag"):
+            value = str(gnu_radio_capture.get(key, "")).strip()
+            if value:
+                flags.append(value)
+    unique: list[str] = []
+    seen: set[str] = set()
+    for flag in flags:
+        normalized = flag.upper()
+        if normalized not in seen:
+            unique.append(flag)
+            seen.add(normalized)
+    return unique
+
+
+def expected_flag_for(session_id: str, challenge_id: str) -> str:
+    static_flags = configured_flags_for(challenge_id)
+    return static_flags[0] if static_flags else flag_for(session_id, challenge_id)
+
+
+def is_valid_flag(session_id: str, challenge_id: str, submitted: str) -> bool:
+    expected = {flag.upper() for flag in configured_flags_for(challenge_id)}
+    expected.add(flag_for(session_id, challenge_id).upper())
+    return submitted.strip().upper() in expected
+
+
+def gnu_radio_capture_for(challenge_id: str | None) -> dict | None:
+    if not challenge_id:
+        return None
+    for capture_group in GNU_RADIO_CAPTURE_GROUPS:
+        capture = capture_group.get(challenge_id)
+        if capture:
+            return capture
+    return None
+
+
+def gnu_radio_settings(challenge_id: str | None) -> dict | None:
+    capture = gnu_radio_capture_for(challenge_id)
+    if not capture:
+        return None
+    target = RF_TARGETS.get(challenge_id, RF_TARGETS["tunnel-reading-signals"])
+    return {
+        "path": capture.get("path", ""),
+        "datatype": "cf32_le",
+        "sample_rate": capture["sample_rate"],
+        "center_hz": float(target["center_mhz"]) * 1_000_000,
+        "fft_bins": 512,
+        "max_frames": 300,
+        "samples_per_symbol": capture["samples_per_symbol"],
+        "bits_per_symbol": capture.get("bits_per_symbol", 1),
+        "decode_max_samples": 500_000,
+        "source_mode": capture.get("source_mode", "generated_python_flowgraph"),
+        "capture": capture,
+    }
+
+
+def tunnel_gnu_radio_settings(challenge_id: str) -> dict | None:
+    return gnu_radio_settings(challenge_id)
+
+
+def gnu_radio_python_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    explicit = os.environ.get("SIGNAL_FORGE_GNURADIO_PYTHON", "").strip()
+    conda_prefix = os.environ.get("CONDA_PREFIX", "").strip()
+    if explicit:
+        resolved = shutil.which(explicit)
+        candidates.append(Path(resolved or explicit))
+    if conda_prefix:
+        candidates.append(Path(conda_prefix) / ("python.exe" if os.name == "nt" else "bin/python"))
+    candidates.append(Path(sys.executable))
+    for command in ("python3", "python"):
+        resolved = shutil.which(command)
+        if resolved:
+            candidates.append(Path(resolved))
+    home = Path.home()
+    if os.name == "nt":
+        candidates.extend(
+            [
+                home / "radioconda" / "python.exe",
+                home / "miniforge3" / "envs" / "gnuradio" / "python.exe",
+                home / "mambaforge" / "envs" / "gnuradio" / "python.exe",
+                home / "miniconda3" / "envs" / "gnuradio" / "python.exe",
+                home / "anaconda3" / "envs" / "gnuradio" / "python.exe",
+            ]
+        )
+    else:
+        candidates.extend(
+            [
+                home / "radioconda" / "bin" / "python",
+                home / "miniforge3" / "envs" / "gnuradio" / "bin" / "python",
+                home / "mambaforge" / "envs" / "gnuradio" / "bin" / "python",
+                Path("/usr/bin/python3"),
+                Path("/usr/local/bin/python3"),
+            ]
+        )
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = os.path.normcase(str(candidate.expanduser().absolute()))
+        if key not in seen:
+            unique.append(candidate.expanduser())
+            seen.add(key)
+    return unique
+
+
+def discover_gnu_radio_python() -> Path | None:
+    global GNU_RADIO_PYTHON, GNU_RADIO_DISCOVERY_ERROR
+    if GNU_RADIO_PYTHON and GNU_RADIO_PYTHON.is_file():
+        return GNU_RADIO_PYTHON
+    errors: list[str] = []
+    creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    for candidate in gnu_radio_python_candidates():
+        if not candidate.is_file():
+            continue
+        try:
+            check = subprocess.run(
+                [
+                    str(candidate),
+                    "-c",
+                    "from gnuradio import gr, blocks, channels, qtgui; import PyQt5, numpy",
+                ],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                timeout=8,
+                check=False,
+                creationflags=creation_flags,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            errors.append(f"{candidate}: {error}")
+            continue
+        if check.returncode == 0:
+            GNU_RADIO_PYTHON = candidate.resolve()
+            GNU_RADIO_DISCOVERY_ERROR = ""
+            return GNU_RADIO_PYTHON
+        detail = check.stderr.decode("utf-8", errors="replace").strip().splitlines()
+        errors.append(f"{candidate}: {detail[-1] if detail else 'GNU Radio imports failed'}")
+    GNU_RADIO_DISCOVERY_ERROR = (
+        "No GNU Radio Python runtime was found. Install GNU Radio/Radioconda or set "
+        "SIGNAL_FORGE_GNURADIO_PYTHON to its Python executable."
+    )
+    if errors:
+        GNU_RADIO_DISCOVERY_ERROR += f" Checked {len(errors)} Python installation(s)."
+    return None
+
+
+def gnu_radio_process_status(challenge_id: str) -> dict:
+    with GNU_RADIO_PROCESS_LOCK:
+        entry = GNU_RADIO_PROCESSES.get(challenge_id)
+        if not entry:
+            error = GNU_RADIO_START_ERRORS.get(challenge_id) or GNU_RADIO_DISCOVERY_ERROR
+            return {
+                "state": "unavailable" if error else "not_started",
+                "error": error,
+            }
+        process: subprocess.Popen = entry["process"]
+        return_code = process.poll()
+        if return_code is None:
+            return {
+                "state": "running",
+                "pid": process.pid,
+                "script": entry["script"],
+                "python": entry["python"],
+            }
+        log_handle = entry.get("log_handle")
+        if log_handle and not log_handle.closed:
+            log_handle.close()
+        log_path = Path(entry["log_path"])
+        detail = ""
+        try:
+            detail = log_path.read_text(encoding="utf-8", errors="replace")[-2000:].strip()
+        except OSError:
+            pass
+        return {
+            "state": "exited",
+            "pid": process.pid,
+            "return_code": return_code,
+            "script": entry["script"],
+            "python": entry["python"],
+            "error": detail or f"GNU Radio flowgraph exited with code {return_code}",
+        }
+
+
+def stop_gnu_radio_processes(except_challenge_id: str | None = None) -> None:
+    with GNU_RADIO_PROCESS_LOCK:
+        for challenge_id, entry in list(GNU_RADIO_PROCESSES.items()):
+            if challenge_id == except_challenge_id:
+                continue
+            process: subprocess.Popen = entry["process"]
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+            log_handle = entry.get("log_handle")
+            if log_handle and not log_handle.closed:
+                log_handle.close()
+            GNU_RADIO_PROCESSES.pop(challenge_id, None)
+
+
+def start_gnu_radio_flowgraph(challenge_id: str) -> dict:
+    if challenge_id not in LIVE_GNU_RADIO_TASKS:
+        return {"state": "not_applicable"}
+    current = gnu_radio_process_status(challenge_id)
+    if current.get("state") == "running":
+        return current
+    python_path = discover_gnu_radio_python()
+    if not python_path:
+        GNU_RADIO_START_ERRORS[challenge_id] = GNU_RADIO_DISCOVERY_ERROR
+        return {"state": "unavailable", "error": GNU_RADIO_DISCOVERY_ERROR}
+    capture = gnu_radio_capture_for(challenge_id) or {}
+    relative_script = str(capture.get("python_path", "")).strip()
+    if not relative_script:
+        error = f"No generated Python flowgraph is mapped for {challenge_id}"
+        GNU_RADIO_START_ERRORS[challenge_id] = error
+        return {"state": "unavailable", "error": error}
+    script_path = bounded_project_path(relative_script)
+    if not script_path.is_file():
+        error = f"Generated Python flowgraph not found: {relative_script}"
+        GNU_RADIO_START_ERRORS[challenge_id] = error
+        return {"state": "unavailable", "error": error}
+
+    stop_gnu_radio_processes(except_challenge_id=challenge_id)
+    GNU_RADIO_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    cache_dir = GNU_RADIO_RUNTIME_DIR / ".cache"
+    config_dir = GNU_RADIO_RUNTIME_DIR / ".config"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    config_dir.mkdir(parents=True, exist_ok=True)
+    log_path = GNU_RADIO_RUNTIME_DIR / f"{challenge_id}.log"
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "SIGNAL_INGEST_HOST": str(EXTERNAL_INGEST["host"]),
+            "SIGNAL_INGEST_PORT": str(EXTERNAL_INGEST["port"]),
+            "SIGNAL_FORGE_CHALLENGE_ID": challenge_id,
+            "SIGNAL_FORGE_HEADLESS": "1",
+            "QT_QPA_PLATFORM": environment.get("QT_QPA_PLATFORM", "offscreen"),
+            "XDG_CACHE_HOME": str(cache_dir),
+            "XDG_CONFIG_HOME": str(config_dir),
+        }
+    )
+    if os.name == "nt":
+        environment["APPDATA"] = str(GNU_RADIO_RUNTIME_DIR)
+    creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    log_handle = log_path.open("wb")
+    with EXTERNAL_FEED_LOCK:
+        EXTERNAL_FEEDS[challenge_id] = default_external_feed(challenge_id)
+    try:
+        process = subprocess.Popen(
+            [str(python_path), str(script_path)],
+            cwd=str(script_path.parent),
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            creationflags=creation_flags,
+        )
+    except OSError as error:
+        log_handle.close()
+        message = f"Could not start {relative_script}: {error}"
+        GNU_RADIO_START_ERRORS[challenge_id] = message
+        return {"state": "unavailable", "error": message}
+    with GNU_RADIO_PROCESS_LOCK:
+        GNU_RADIO_START_ERRORS.pop(challenge_id, None)
+        GNU_RADIO_PROCESSES[challenge_id] = {
+            "process": process,
+            "script": relative_script.replace("\\", "/"),
+            "python": str(python_path),
+            "log_path": str(log_path),
+            "log_handle": log_handle,
+        }
+    return gnu_radio_process_status(challenge_id)
+
+
+def bounded_project_path(relative_path: str | Path) -> Path:
+    path = Path(str(relative_path))
+    target = path if path.is_absolute() else ROOT / path
+    target = target.resolve()
+    try:
+        target.relative_to(ROOT)
+    except ValueError as error:
+        raise ValueError("Artifact path must remain inside the project") from error
+    return target
+
+
+def fft_in_place(values: list[complex]) -> None:
+    """Dependency-free radix-2 FFT used for local GNU Radio capture previews."""
+    size = len(values)
+    target = 0
+    for source in range(1, size):
+        bit = size >> 1
+        while target & bit:
+            target ^= bit
+            bit >>= 1
+        target ^= bit
+        if source < target:
+            values[source], values[target] = values[target], values[source]
+
+    length = 2
+    while length <= size:
+        angle = -2.0 * math.pi / length
+        step = complex(math.cos(angle), math.sin(angle))
+        half = length // 2
+        for start in range(0, size, length):
+            phase = 1.0 + 0.0j
+            for index in range(start, start + half):
+                even = values[index]
+                odd = values[index + half] * phase
+                values[index] = even + odd
+                values[index + half] = even - odd
+                phase *= step
+        length <<= 1
+
+
+def nearest_power_of_two(value: int) -> int:
+    value = max(1, int(value))
+    return 1 << (value.bit_length() - 1)
+
+
+def resample_row(row: list[float], bins: int) -> list[float]:
+    if not row:
+        return [0.0] * bins
+    if len(row) == bins:
+        return [round(max(0.0, min(1.0, float(value))), 4) for value in row]
+    return [
+        round(max(0.0, min(1.0, float(row[round(index * (len(row) - 1) / max(1, bins - 1))]))), 4)
+        for index in range(bins)
+    ]
+
+
+def fft_row_from_complex(samples: list[complex], requested_bins: int = 384) -> tuple[list[float], list[float], int]:
+    fft_size = nearest_power_of_two(min(len(samples), max(64, min(2048, requested_bins))))
+    if len(samples) < fft_size:
+        raise ValueError(f"Need at least {fft_size} complete complex samples")
+    window = [0.5 - 0.5 * math.cos(2.0 * math.pi * index / max(1, fft_size - 1)) for index in range(fft_size)]
+    values = [samples[index] * window[index] for index in range(fft_size)]
+    fft_in_place(values)
+    shifted = values[fft_size // 2 :] + values[: fft_size // 2]
+    power_db = [20.0 * math.log10(max(1e-12, abs(value))) for value in shifted]
+    peak_db = max(power_db)
+    floor_db = max(min(power_db), peak_db - 80)
+    dynamic_range = max(1.0, peak_db - floor_db)
+    row = [round(max(0.0, min(1.0, (value - floor_db) / dynamic_range)), 4) for value in power_db]
+    time_peak = max(1e-9, max(abs(value.real) for value in samples[: min(len(samples), 256)]))
+    time_samples = [
+        round(max(-1.0, min(1.0, samples[round(index * (min(len(samples), 256) - 1) / 159)].real / time_peak)), 4)
+        for index in range(160)
+    ]
+    return row, time_samples, fft_size
+
+
+def public_external_feed_meta(feed: dict) -> dict:
+    live_gnuradio = feed.get("source_mode") == "live_gnuradio_stream"
+    metadata = {
+        "challenge_id": feed["challenge_id"],
+        "scheme_id": feed["scheme_id"],
+        "center_hz": feed["center_hz"],
+        "span_hz": feed["span_hz"],
+        "sample_rate_hz": feed["sample_rate_hz"],
+        "bins": feed["bins"],
+        "frames": feed["frames"],
+        "sources": feed["sources"],
+        "annotations": feed["annotations"],
+        "protocol_notes": feed["protocol_notes"],
+        "parser": feed["parser"],
+        "source_mode": feed.get("source_mode", "external"),
+        "external_ingest": {
+            "host": EXTERNAL_INGEST["host"],
+            "port": EXTERNAL_INGEST["port"],
+            "enabled": EXTERNAL_INGEST["enabled"],
+            "error": EXTERNAL_INGEST["error"],
+            "protocol": "json-lines+rawiq/v1",
+        },
+        "last_seen": feed["last_seen"],
+        "pending_frames": len(feed["pending"]),
+        "buffered_rows": len(feed["rows"]),
+        "client": feed.get("client", ""),
+        "description": (
+            "Live post-channel-model CF32 samples supplied directly by the generated GNU Radio Python flowgraph."
+            if live_gnuradio
+            else "Live frames supplied by an external script, GNU Radio bridge, or C/C++ client over TCP JSON-lines or framed raw IQ."
+        ),
+    }
+    if live_gnuradio:
+        metadata["flowgraph_process"] = gnu_radio_process_status(feed["challenge_id"])
+    return metadata
+
+
+def ingest_external_signal(payload: dict, client: str = "") -> dict:
+    message_type = str(payload.get("type", "fft")).lower()
+    challenge_id = str(payload.get("challenge_id") or payload.get("channel") or "external").strip()[:80] or "external"
+    if message_type == "reset":
+        with EXTERNAL_FEED_LOCK:
+            EXTERNAL_FEEDS[challenge_id] = default_external_feed(challenge_id)
+        return {"ok": True, "challenge_id": challenge_id, "message": "feed reset"}
+
+    with EXTERNAL_FEED_LOCK:
+        feed = EXTERNAL_FEEDS.setdefault(challenge_id, default_external_feed(challenge_id))
+        if "center_hz" in payload:
+            feed["center_hz"] = float(payload["center_hz"])
+        if "span_hz" in payload:
+            feed["span_hz"] = max(1.0, float(payload["span_hz"]))
+        if "sample_rate_hz" in payload:
+            feed["sample_rate_hz"] = max(1.0, float(payload["sample_rate_hz"]))
+            feed["span_hz"] = float(payload.get("span_hz", feed["sample_rate_hz"]))
+        if "scheme_id" in payload:
+            feed["scheme_id"] = str(payload["scheme_id"])[:120]
+        if "modulation" in payload:
+            feed["protocol_notes"]["modulation"] = str(payload["modulation"])[:120]
+        if "framing" in payload:
+            feed["protocol_notes"]["framing"] = str(payload["framing"])[:120]
+        if "integrity" in payload:
+            feed["protocol_notes"]["integrity"] = str(payload["integrity"])[:120]
+        if "crc_check" in payload:
+            feed["protocol_notes"]["crc_check"] = str(payload["crc_check"])[:80]
+        if "source_label" in payload:
+            source_kind = "gnu_radio_live" if feed.get("source_mode") == "live_gnuradio_stream" else "external"
+            feed["sources"] = [{"label": str(payload["source_label"])[:80], "kind": source_kind, "offset_hz": 0, "bandwidth_hz": max(1000, feed["span_hz"] / 16)}]
+        requested_bins = int(payload.get("bins", feed.get("bins", 384)))
+
+    if message_type in {"meta", "hello"}:
+        with EXTERNAL_FEED_LOCK:
+            feed["last_seen"] = time.time()
+            feed["client"] = client
+            return {"ok": True, "challenge_id": challenge_id, "meta": public_external_feed_meta(feed)}
+
+    parser = payload.get("parser") if isinstance(payload.get("parser"), dict) else None
+    if message_type in {"fft", "row"}:
+        row_values = payload.get("row")
+        if not isinstance(row_values, list):
+            raise ValueError("fft message requires row: [0.0..1.0]")
+        bins = max(16, min(2048, requested_bins or len(row_values)))
+        row = resample_row([float(value) for value in row_values], bins)
+        samples = payload.get("samples") if isinstance(payload.get("samples"), list) else []
+        samples = [round(max(-1.0, min(1.0, float(value))), 4) for value in samples[:512]]
+    elif message_type == "iq":
+        with EXTERNAL_FEED_LOCK:
+            feed["protocol_notes"]["source"] = (
+                "Live CF32 from the generated GNU Radio Python flowgraph"
+                if feed.get("source_mode") == "live_gnuradio_stream"
+                else "External TCP framed raw IQ ingest"
+            )
+        data = payload.get("data") or payload.get("iq_base64")
+        if not isinstance(data, str):
+            raise ValueError("iq message requires base64 cf32_le data")
+        raw = base64.b64decode(data, validate=True)
+        complete = len(raw) - len(raw) % 8
+        if complete < 512:
+            raise ValueError("iq message needs at least 64 cf32_le samples")
+        samples_complex = [complex(real, imag) for real, imag in struct.iter_unpack("<ff", raw[:complete])]
+        row, samples, bins = fft_row_from_complex(samples_complex, requested_bins=requested_bins)
+    else:
+        raise ValueError(f"Unsupported external signal message type: {message_type}")
+
+    with EXTERNAL_FEED_LOCK:
+        feed = EXTERNAL_FEEDS.setdefault(challenge_id, default_external_feed(challenge_id))
+        feed["bins"] = len(row)
+        feed["frames"] = max(feed["frames"], feed["sequence"] + 1)
+        feed["last_seen"] = time.time()
+        feed["client"] = client
+        feed["parser"] = parser or {
+            "stage": "fft" if message_type in {"fft", "row"} else "raw_iq",
+            "confidence": float(payload.get("confidence", 0.7 if message_type in {"fft", "row"} else 0.76)),
+            "bit_buffer": str(payload.get("bit_buffer", "external frame")),
+            "fields": {
+                "message_type": message_type,
+                "sequence": feed["sequence"],
+                "bins": len(row),
+                "sample_count": len(samples),
+                **(
+                    {
+                        "framing": str(payload["framing"]),
+                        "integrity": str(payload["integrity"]),
+                        "crc_check": str(payload.get("crc_check", "not supplied")),
+                    }
+                    if payload.get("framing") and payload.get("integrity")
+                    else {}
+                ),
+            },
+            "note": (
+                "Frame accepted from the running generated GNU Radio Python flowgraph; any CRC status shown is its live source self-check."
+                if feed.get("source_mode") == "live_gnuradio_stream"
+                else "Frame accepted from external signal ingest."
+            ),
+        }
+        frame = {
+            "frame": feed["sequence"],
+            "row": row,
+            "samples": samples,
+            "parser": feed["parser"],
+            "external": True,
+        }
+        feed["rows"].append(row)
+        feed["pending"].append(frame)
+        feed["sequence"] += 1
+        return {"ok": True, "challenge_id": challenge_id, "sequence": feed["sequence"] - 1, "bins": len(row)}
+
+
+def external_feed_snapshot(challenge_id: str) -> dict:
+    with EXTERNAL_FEED_LOCK:
+        feed = EXTERNAL_FEEDS.get(challenge_id) or EXTERNAL_FEEDS.get("external")
+        if feed is None:
+            feed = EXTERNAL_FEEDS.setdefault(challenge_id, default_external_feed(challenge_id))
+        return public_external_feed_meta(feed)
+
+
+def external_feed_next_frame(challenge_id: str, last_sequence: int) -> dict | None:
+    with EXTERNAL_FEED_LOCK:
+        feed = EXTERNAL_FEEDS.get(challenge_id) or EXTERNAL_FEEDS.get("external")
+        if feed is None:
+            return None
+        for frame in feed["pending"]:
+            if int(frame.get("frame", -1)) > last_sequence:
+                return dict(frame)
+    return None
+
+
+def parse_ingest_options(line: str) -> dict:
+    options: dict[str, str] = {}
+    for token in line.strip().split()[2:]:
+        key, separator, value = token.partition("=")
+        if separator and key:
+            options[key.strip()] = value.strip()
+    return options
+
+
+def ingest_external_iq_bytes(options: dict, raw: bytes, client: str = "") -> dict:
+    payload = dict(options)
+    payload["type"] = "iq"
+    payload["data"] = base64.b64encode(raw).decode("ascii")
+    return ingest_external_signal(payload, client=client)
+
+
+class SignalIngestTCPServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+
+class SignalIngestHandler(socketserver.StreamRequestHandler):
+    def handle(self) -> None:
+        client = f"{self.client_address[0]}:{self.client_address[1]}"
+        while True:
+            try:
+                raw_line = self.rfile.readline(MAX_EXTERNAL_LINE_BYTES + 1)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                return
+            if not raw_line:
+                return
+            if len(raw_line) > MAX_EXTERNAL_LINE_BYTES:
+                self.write_ingest_response({"ok": False, "error": "ingest line too large"})
+                return
+            line = raw_line.decode("utf-8", errors="replace").strip()
+            if not line:
+                continue
+            try:
+                upper = line.upper()
+                if line.startswith("{"):
+                    result = ingest_external_signal(json.loads(line), client=client)
+                    self.write_ingest_response(result)
+                elif upper.startswith("SFORGE IQCF32 "):
+                    result = self.handle_single_iq_frame(line, client)
+                    self.write_ingest_response(result)
+                elif upper.startswith("SFORGE RAWIQ "):
+                    self.handle_raw_iq_stream(line, client)
+                    return
+                else:
+                    self.write_ingest_response(
+                        {
+                            "ok": False,
+                            "error": "unknown ingest record; use JSON-lines, SFORGE IQCF32, or SFORGE RAWIQ",
+                        }
+                    )
+            except (json.JSONDecodeError, ValueError, OSError, struct.error) as error:
+                self.write_ingest_response({"ok": False, "error": str(error)})
+
+    def handle_single_iq_frame(self, line: str, client: str) -> dict:
+        options = parse_ingest_options(line)
+        sample_count = int(options.get("samples", "0"))
+        if sample_count <= 0 or sample_count > MAX_EXTERNAL_IQ_SAMPLES:
+            raise ValueError(f"samples must be between 1 and {MAX_EXTERNAL_IQ_SAMPLES}")
+        raw = self.rfile.read(sample_count * 8)
+        if len(raw) != sample_count * 8:
+            raise ValueError(f"expected {sample_count * 8} IQ bytes, received {len(raw)}")
+        return ingest_external_iq_bytes(options, raw, client=client)
+
+    def handle_raw_iq_stream(self, line: str, client: str) -> None:
+        options = parse_ingest_options(line)
+        block_samples = int(options.get("block_samples", options.get("samples", "2048")))
+        if block_samples <= 0 or block_samples > MAX_EXTERNAL_IQ_SAMPLES:
+            raise ValueError(f"block_samples must be between 1 and {MAX_EXTERNAL_IQ_SAMPLES}")
+        options["samples"] = str(block_samples)
+        self.write_ingest_response({"ok": True, "mode": "rawiq", "block_samples": block_samples})
+        block_bytes = block_samples * 8
+        while True:
+            raw = self.rfile.read(block_bytes)
+            if not raw:
+                return
+            if len(raw) < 512:
+                return
+            ingest_external_iq_bytes(options, raw, client=client)
+
+    def write_ingest_response(self, payload: dict) -> None:
+        try:
+            self.wfile.write((json.dumps(payload, separators=(",", ":")) + "\n").encode("utf-8"))
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
+
+
+def start_external_ingest_server() -> None:
+    global EXTERNAL_INGEST_SERVER
+    host = os.environ.get("SIGNAL_INGEST_HOST", "127.0.0.1")
+    try:
+        port = int(os.environ.get("SIGNAL_INGEST_PORT", "9100"))
+    except ValueError:
+        port = 9100
+    EXTERNAL_INGEST.update({"host": host, "port": port, "enabled": False, "error": ""})
+    try:
+        EXTERNAL_INGEST_SERVER = SignalIngestTCPServer((host, port), SignalIngestHandler)
+        thread = threading.Thread(target=EXTERNAL_INGEST_SERVER.serve_forever, daemon=True, name="signal-ingest")
+        thread.start()
+        EXTERNAL_INGEST.update({"enabled": True, "error": ""})
+        print(f"Signal ingest listening on {host}:{port} (Signal Forge ingest v1)")
+    except OSError as error:
+        EXTERNAL_INGEST_SERVER = None
+        EXTERNAL_INGEST.update({"enabled": False, "error": str(error)})
+        print(f"Signal ingest unavailable on {host}:{port}: {error}")
+
+
+def configured_gnu_radio_path(settings: dict | None = None) -> tuple[Path, Path]:
+    settings = settings or load_config().get("gnu_radio_capture", {})
+    configured_path = str(settings.get("path", "")).strip()
+    if not configured_path:
+        raise ValueError("No file-backed GNU Radio source is configured")
+    relative_path = Path(configured_path)
+    capture_path = bounded_project_path(relative_path)
+    return capture_path, relative_path
+
+
+def parse_number_literal(value: str, fallback: float = 0.0) -> float:
+    try:
+        return float(value.replace("_", ""))
+    except (AttributeError, ValueError):
+        return fallback
+
+
+def payload_bits_msb(payload: bytes) -> str:
+    return "".join(f"{byte:08b}" for byte in payload)
+
+
+def symbols_from_bits(bits: str, bits_per_symbol: int) -> list[int]:
+    bits_per_symbol = max(1, bits_per_symbol)
+    if bits_per_symbol == 1:
+        return [1 if bit == "1" else 0 for bit in bits]
+    return [
+        int(bits[index : index + bits_per_symbol].ljust(bits_per_symbol, "0"), 2)
+        for index in range(0, len(bits), bits_per_symbol)
+    ]
+
+
+def generated_flowgraph_config(settings: dict) -> dict:
+    capture_info = settings.get("capture", {})
+    relative = capture_info.get("python_path")
+    if not relative:
+        raise FileNotFoundError("No generated GNU Radio Python script is mapped for this challenge")
+    script_path = bounded_project_path(relative)
+    if not script_path.is_file():
+        raise FileNotFoundError(f"Generated GNU Radio Python script not found: {relative}")
+    cache_key = (str(script_path), script_path.stat().st_mtime_ns)
+    cached = FLOWGRAPH_CONFIG_CACHE.get(cache_key)
+    if cached:
+        return cached
+
+    source = script_path.read_text(encoding="utf-8", errors="replace")
+    source_sha256 = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    flowgraph_blocks = list(
+        dict.fromkeys(
+            re.findall(
+                r"self\.[A-Za-z_][A-Za-z0-9_]*\s*=\s*"
+                r"((?:[A-Za-z_][A-Za-z0-9_]*\.)+[A-Za-z_][A-Za-z0-9_]*)\s*\(",
+                source,
+            )
+        )
+    )
+    payload_match = re.search(r"vector_source_b\(list\((b(?:\"(?:\\.|[^\"])*\"|'(?:\\.|[^'])*'))\)", source)
+    if not payload_match:
+        raise ValueError(f"Could not find vector_source_b byte payload in {relative}")
+    payload = ast.literal_eval(payload_match.group(1))
+    if not isinstance(payload, (bytes, bytearray)):
+        raise ValueError(f"GNU Radio vector payload in {relative} is not a bytes literal")
+    payload = bytes(payload)
+
+    sample_rate_match = re.search(r"self\.samp_rate\s*=\s*samp_rate\s*=\s*([0-9_]+(?:\.[0-9_]+)?)", source)
+    repeat_match = re.search(r"blocks\.repeat\(gr\.sizeof_char\*1,\s*([0-9_]+)\)", source)
+    carrier_match = re.search(r"analog\.sig_source_c\([^,]+,\s*analog\.GR_COS_WAVE,\s*([0-9_]+(?:\.[0-9_]+)?)", source)
+    noise_match = re.search(r"noise_voltage\s*=\s*([0-9_]+(?:\.[0-9_]+)?)", source)
+    repack_match = re.search(r"repack_bits_bb\(\s*([0-9_]+)\s*,\s*([0-9_]+)", source)
+    interleaved_match = re.search(
+        r"interleaved_char_to_complex\(\s*(?:True|False)\s*,\s*"
+        r"([0-9_]+(?:\.[0-9_]+)?)",
+        source,
+    )
+
+    repeat = int(parse_number_literal(repeat_match.group(1), settings.get("samples_per_symbol", 500) * 2)) if repeat_match else int(settings.get("samples_per_symbol", 500)) * 2
+    bits_per_symbol = int(parse_number_literal(repack_match.group(2), 1)) if repack_match else int(settings.get("bits_per_symbol", 1))
+    bits = payload_bits_msb(payload)
+    symbols = symbols_from_bits(bits, bits_per_symbol)
+    samples_per_symbol = max(1, repeat // 2)
+    script_hash_seed = int(source_sha256[:8], 16)
+    config = {
+        "source_mode": "generated_python_flowgraph",
+        "source_script": str(relative).replace("\\", "/"),
+        "script_size_bytes": script_path.stat().st_size,
+        "source_sha256": source_sha256,
+        "flowgraph_blocks": flowgraph_blocks,
+        "flowgraph_block_count": len(flowgraph_blocks),
+        "sample_rate": parse_number_literal(sample_rate_match.group(1), float(settings.get("sample_rate", 44_200))) if sample_rate_match else float(settings.get("sample_rate", 44_200)),
+        "carrier_offset_hz": parse_number_literal(carrier_match.group(1), float(capture_info.get("carrier_offset_hz", 10_000))) if carrier_match else float(capture_info.get("carrier_offset_hz", 10_000)),
+        "repeat": repeat,
+        "samples_per_symbol": samples_per_symbol,
+        "bits_per_symbol": bits_per_symbol,
+        "bit_order": "msb" if "GR_MSB_FIRST" in source or str(settings.get("bit_order", "msb")).lower() == "msb" else "lsb",
+        "payload": payload,
+        "payload_text": payload.decode("latin-1", errors="replace"),
+        "bits": bits,
+        "symbols": symbols or [0],
+        "period_samples": max(1, len(symbols) * samples_per_symbol),
+        "noise_voltage": parse_number_literal(noise_match.group(1), 0.0) if noise_match else 0.0,
+        "interleaved_char_to_complex": bool(interleaved_match),
+        "interleaved_scale": parse_number_literal(interleaved_match.group(1), 1.0) if interleaved_match else 1.0,
+        "seed": script_hash_seed,
+        "has_repack_bits": bool(repack_match),
+    }
+    FLOWGRAPH_CONFIG_CACHE.clear()
+    FLOWGRAPH_CONFIG_CACHE[cache_key] = config
+    return config
+
+
+def gnu_radio_runtime_settings(settings: dict) -> dict:
+    runtime = dict(settings)
+    source_mode = runtime.get("source_mode")
+    if source_mode in {"weather_wav_pair", "weather_alarm_wav_pair"}:
+        capture = runtime.get("capture", {})
+        real_path = bounded_project_path(capture["real_wav_path"])
+        imag_path = bounded_project_path(capture["imag_wav_path"])
+        with wave.open(str(real_path), "rb") as real_wav, wave.open(str(imag_path), "rb") as imag_wav:
+            source_frames = min(real_wav.getnframes(), imag_wav.getnframes())
+        expansion = 32 if source_mode == "weather_alarm_wav_pair" else 1
+        runtime["sample_count"] = max(1, source_frames * expansion)
+        return runtime
+    if source_mode != "generated_python_flowgraph":
+        return runtime
+    flowgraph = generated_flowgraph_config(runtime)
+    runtime.update(
+        {
+            "flowgraph": flowgraph,
+            "sample_rate": flowgraph["sample_rate"],
+            "samples_per_symbol": flowgraph["samples_per_symbol"],
+            "bits_per_symbol": flowgraph["bits_per_symbol"],
+            "bit_order": flowgraph["bit_order"],
+        }
+    )
+    capture = dict(runtime.get("capture", {}))
+    capture["carrier_offset_hz"] = flowgraph["carrier_offset_hz"]
+    capture["source_mode"] = flowgraph["source_mode"]
+    runtime["capture"] = capture
+    return runtime
+
+
+def deterministic_noise(seed: int, value: int) -> float:
+    mixed = (value ^ seed) & 0xFFFFFFFF
+    mixed ^= (mixed << 13) & 0xFFFFFFFF
+    mixed ^= mixed >> 17
+    mixed ^= (mixed << 5) & 0xFFFFFFFF
+    return (mixed & 0xFFFFFFFF) / 0xFFFFFFFF - 0.5
+
+
+def read_wav_mono_samples(path: Path, start_frame: int, frame_count: int) -> list[float]:
+    """Read one channel from a PCM WAV file, looping when a request crosses EOF."""
+    if frame_count <= 0:
+        return []
+    with wave.open(str(path), "rb") as source:
+        channels = source.getnchannels()
+        sample_width = source.getsampwidth()
+        total_frames = source.getnframes()
+        if total_frames <= 0:
+            return [0.0] * frame_count
+        if sample_width not in {1, 2, 3, 4}:
+            raise ValueError(f"Unsupported WAV sample width {sample_width} in {path.name}")
+
+        output: list[float] = []
+        frame = start_frame % total_frames
+        while len(output) < frame_count:
+            source.setpos(frame)
+            take = min(frame_count - len(output), total_frames - frame)
+            raw = source.readframes(take)
+            frame_bytes = channels * sample_width
+            for offset in range(0, len(raw) - frame_bytes + 1, frame_bytes):
+                sample = raw[offset : offset + sample_width]
+                if sample_width == 1:
+                    value = (sample[0] - 128) / 128.0
+                else:
+                    signed = int.from_bytes(sample, "little", signed=True)
+                    value = signed / float(1 << (sample_width * 8 - 1))
+                output.append(max(-1.0, min(1.0, value)))
+            frame = 0
+            if not raw:
+                break
+        if len(output) < frame_count:
+            output.extend([0.0] * (frame_count - len(output)))
+        return output
+
+
+def alarm_encode_packet(data: int, emergency: int = 0xB) -> int:
+    """Mirror the GNU Radio alarm encoder: data MSB-first, alarm LSB-first."""
+    packet = 0
+    packet_length = 0
+    pair_count = 0
+    emergency_index = 0
+    data &= 0xFFFF
+    emergency &= 0x0F
+    for bit_index in range(15, -1, -1):
+        data_bit = (data >> bit_index) & 1
+        packet = (packet << 1) | data_bit
+        packet_length += 1
+        if data_bit:
+            pair_count += 1
+        if pair_count == 2 and emergency_index < 4:
+            packet = (packet << 1) | ((emergency >> emergency_index) & 1)
+            packet_length += 1
+            emergency_index += 1
+            pair_count = 0
+    while emergency_index < 4:
+        packet = (packet << 1) | ((emergency >> emergency_index) & 1)
+        packet_length += 1
+        emergency_index += 1
+    return (packet << (32 - packet_length)) & 0xFFFFFFFF
+
+
+def alarm_decode_packet(packet: int) -> int:
+    """Mirror AlarmDecoder in MyEmbeddedAlarmSystem.c exactly."""
+    packet &= 0xFFFFFFFF
+    input_mask = 1 << 31
+    output_mask = 1
+    emergency = 0
+    pair_count = 0
+    recovered = 0
+    for _ in range(16):
+        if packet & input_mask:
+            pair_count += 1
+        input_mask >>= 1
+        if pair_count == 2 and recovered < 4:
+            if packet & input_mask:
+                emergency |= output_mask
+            output_mask <<= 1
+            recovered += 1
+            pair_count = 0
+            input_mask >>= 1
+    while recovered < 4:
+        if packet & input_mask:
+            emergency |= output_mask
+        input_mask >>= 1
+        output_mask <<= 1
+        recovered += 1
+    return emergency
+
+
+def parse_u32_packet(value: object) -> int:
+    text = str(value).strip().replace("_", "")
+    if not text:
+        raise ValueError("Enter one 32-bit packet as hexadecimal or decimal.")
+    try:
+        packet = int(text, 0)
+    except ValueError as error:
+        raise ValueError("Packet must be a number such as 0x1234ABCD.") from error
+    if packet < 0 or packet > 0xFFFFFFFF:
+        raise ValueError("Packet must fit in an unsigned 32-bit value.")
+    return packet
+
+
+def randu_state_at_chip(chip_index: int, seed: int = 1) -> int:
+    state = (int(seed) & 0x7FFFFFFF) or 1
+    if state % 2 == 0:
+        state += 1
+    return (state * pow(65_539, max(0, chip_index) + 1, 1 << 31)) & 0x7FFFFFFF
+
+
+def weather_hop_offset(capture: dict, hop_index: int) -> float:
+    offsets = [float(value) for value in capture.get("carrier_offsets_hz", [capture.get("carrier_offset_hz", 0)])]
+    if not offsets:
+        return 0.0
+    if str(capture.get("hop_mode", "")).lower() == "keyed random":
+        hop_key = str(capture.get("hop_key", "weather-hop"))
+        digest = hashlib.sha256(f"{hop_key}:{max(0, hop_index)}".encode("utf-8")).digest()
+        return offsets[int.from_bytes(digest[:4], "big") % len(offsets)]
+    return offsets[hop_index % len(offsets)]
+
+
+def weather_carrier_phase(capture: dict, sample_rate: float, sample_index: int, hop_samples: int) -> float:
+    """Return a phase-continuous carrier position for arbitrary sample access."""
+    sample_index = max(0, int(sample_index))
+    complete_hops, partial_samples = divmod(sample_index, hop_samples)
+    accumulated_cycles = sum(
+        weather_hop_offset(capture, hop_index) * hop_samples
+        for hop_index in range(complete_hops)
+    )
+    accumulated_cycles += weather_hop_offset(capture, complete_hops) * partial_samples
+    return 2.0 * math.pi * accumulated_cycles / sample_rate
+
+
+def weather_wav_iq_samples(settings: dict, start_sample: int, sample_count: int) -> list[complex]:
+    capture = settings.get("capture", {})
+    real_path = bounded_project_path(capture["real_wav_path"])
+    imag_path = bounded_project_path(capture["imag_wav_path"])
+    source_mode = settings.get("source_mode")
+    alarm_mode = source_mode == "weather_alarm_wav_pair"
+    expansion = 32 if alarm_mode else 1
+    first_frame = start_sample // expansion
+    last_sample = start_sample + max(0, sample_count - 1)
+    required_frames = last_sample // expansion - first_frame + 1 if sample_count else 0
+    real_values = read_wav_mono_samples(real_path, first_frame, required_frames)
+    imag_values = read_wav_mono_samples(imag_path, first_frame, required_frames)
+    sample_rate = max(1.0, float(settings.get("sample_rate", 44_100)))
+    hop_samples = max(1, int(capture.get("hop_samples", 1_000)))
+    randu_samples = int(capture.get("randu_samples_per_chip", 0))
+    emergency = int(capture.get("emergency", 0xB))
+    square_signal = bool(capture.get("square_signal", False))
+    noise_scale = 0.008
+    samples: list[complex] = []
+    phase_table = (1.0 + 0.0j, 0.0 + 1.0j, -1.0 + 0.0j, 0.0 - 1.0j)
+    current_chip_index = start_sample // randu_samples if randu_samples else -1
+    randu_state = (
+        randu_state_at_chip(current_chip_index, int(capture.get("phase_seed", 1)))
+        if randu_samples
+        else 0
+    )
+    current_hop_index = start_sample // hop_samples
+    current_carrier_offset = weather_hop_offset(capture, current_hop_index)
+    carrier_phase = weather_carrier_phase(capture, sample_rate, start_sample, hop_samples)
+
+    packet_cache: dict[int, tuple[int, int]] = {}
+    for local_index in range(sample_count):
+        absolute_index = start_sample + local_index
+        frame_index = absolute_index // expansion
+        source_index = frame_index - first_frame
+        if alarm_mode:
+            cached = packet_cache.get(source_index)
+            if cached is None:
+                real_word = int(round(real_values[source_index] * 32767.0)) & 0xFFFF
+                imag_word = int(round(imag_values[source_index] * 32767.0)) & 0xFFFF
+                cached = (
+                    alarm_encode_packet(real_word, emergency),
+                    alarm_encode_packet(imag_word, emergency),
+                )
+                packet_cache[source_index] = cached
+            bit_index = absolute_index % 32
+            source_value = complex((cached[0] >> (31 - bit_index)) & 1, (cached[1] >> (31 - bit_index)) & 1)
+        else:
+            source_value = complex(real_values[source_index], imag_values[source_index])
+
+        if randu_samples:
+            chip_index = absolute_index // randu_samples
+            while current_chip_index < chip_index:
+                randu_state = (65_539 * randu_state) & 0x7FFFFFFF
+                current_chip_index += 1
+            shifted = source_value * phase_table[(randu_state >> 28) & 0x03]
+            source_value = source_value * shifted if square_signal else shifted
+
+        hop_index = absolute_index // hop_samples
+        if hop_index != current_hop_index:
+            current_hop_index = hop_index
+            current_carrier_offset = weather_hop_offset(capture, current_hop_index)
+        carrier = complex(math.cos(carrier_phase), math.sin(carrier_phase))
+        carrier_phase += 2.0 * math.pi * current_carrier_offset / sample_rate
+        if abs(carrier_phase) > math.pi * 4_096:
+            carrier_phase = math.fmod(carrier_phase, 2.0 * math.pi)
+        noise = complex(
+            deterministic_noise(0x6841, absolute_index * 2),
+            deterministic_noise(0x6841, absolute_index * 2 + 1),
+        ) * noise_scale
+        samples.append(source_value * carrier + noise)
+    return samples
+
+
+def generated_flowgraph_iq_samples(settings: dict, start_sample: int, sample_count: int) -> list[complex]:
+    flowgraph = settings.get("flowgraph") or generated_flowgraph_config(settings)
+    sample_rate = max(1.0, float(flowgraph["sample_rate"]))
+    carrier_offset = float(flowgraph["carrier_offset_hz"])
+    samples_per_symbol = max(1, int(flowgraph["samples_per_symbol"]))
+    symbols = flowgraph["symbols"] or [0]
+    phase_step = 2.0 * math.pi * carrier_offset / sample_rate
+    carrier = complex(math.cos(phase_step * start_sample), math.sin(phase_step * start_sample))
+    rotation = complex(math.cos(phase_step), math.sin(phase_step))
+    noise_scale = max(0.0, float(flowgraph.get("noise_voltage", 0.0))) * 2.0
+    interleaved_complex = bool(flowgraph.get("interleaved_char_to_complex", False))
+    interleaved_scale = max(1e-9, float(flowgraph.get("interleaved_scale", 1.0)))
+    seed = int(flowgraph.get("seed", 0))
+    samples: list[complex] = []
+    for offset in range(sample_count):
+        sample_index = start_sample + offset
+        symbol = symbols[(sample_index // samples_per_symbol) % len(symbols)]
+        value = float(symbol) / interleaved_scale
+        baseband = complex(value, value) if interleaved_complex else complex(value, 0.0)
+        sample = carrier * baseband
+        if noise_scale:
+            sample += complex(
+                deterministic_noise(seed, sample_index * 2) * noise_scale,
+                deterministic_noise(seed, sample_index * 2 + 1) * noise_scale,
+            )
+        samples.append(sample)
+        carrier *= rotation
+    return samples
+
+
+def gnu_radio_iq_samples(settings: dict, start_sample: int, sample_count: int) -> list[complex]:
+    runtime = gnu_radio_runtime_settings(settings)
+    if runtime.get("source_mode") == "generated_python_flowgraph":
+        return generated_flowgraph_iq_samples(runtime, start_sample, sample_count)
+    if runtime.get("source_mode") in {"weather_wav_pair", "weather_alarm_wav_pair"}:
+        return weather_wav_iq_samples(runtime, start_sample, sample_count)
+    capture_path, _ = configured_gnu_radio_path(runtime)
+    if not capture_path.is_file():
+        raise FileNotFoundError(f"GNU Radio capture not found: {capture_path.name}")
+    with capture_path.open("rb") as handle:
+        handle.seek(max(0, start_sample) * 8)
+        raw = handle.read(max(0, sample_count) * 8)
+    complete_bytes = len(raw) - len(raw) % 8
+    return [complex(real, imag) for real, imag in struct.iter_unpack("<ff", raw[:complete_bytes])]
+
+
+def gnu_radio_magnitudes(settings: dict, max_samples: int) -> list[float]:
+    return [abs(sample) for sample in gnu_radio_iq_samples(settings, 0, max_samples)]
+
+
+def pack_cf32_le(samples: list[complex]) -> bytes:
+    data = bytearray(len(samples) * 8)
+    for index, sample in enumerate(samples):
+        struct.pack_into("<ff", data, index * 8, float(sample.real), float(sample.imag))
+    return bytes(data)
+
+
+def decode_bits_to_ascii(bits: str, bit_orders: tuple[str, ...] = ("msb", "lsb")) -> dict:
+    best = {"text": "", "flag": "", "score": -1.0, "bit_offset": 0, "bit_order": "msb"}
+    if len(bits) < 8:
+        return best
+    for bit_order in bit_orders:
+        for bit_offset in range(8):
+            values: list[int] = []
+            for index in range(bit_offset, len(bits) - 7, 8):
+                chunk = bits[index : index + 8]
+                if bit_order == "lsb":
+                    chunk = chunk[::-1]
+                values.append(int(chunk, 2))
+            if not values:
+                continue
+            printable = sum(1 for value in values if value in {9, 10, 13} or 32 <= value <= 126)
+            text = bytes(values).decode("latin-1", errors="ignore")
+            flag = extract_flag_from_text(text)
+            score = printable / len(values)
+            if flag:
+                score += 4.0
+            if "FLAG{" in text:
+                score += 1.0
+            if score > best["score"]:
+                best = {
+                    "text": text,
+                    "flag": flag,
+                    "score": score,
+                    "bit_offset": bit_offset,
+                    "bit_order": bit_order,
+                }
+    return best
+
+
+def extract_flag_from_text(text: str) -> str:
+    start = text.find("FLAG{")
+    if start < 0:
+        return ""
+    end = text.find("}", start)
+    if end < 0:
+        return ""
+    return text[start : end + 1]
+
+
+def cluster_amplitude_levels(values: list[float], level_count: int = 4) -> tuple[list[int], list[float], float]:
+    if not values:
+        return [], [], 0.0
+    ordered = sorted(values)
+    centers = [
+        ordered[min(len(ordered) - 1, max(0, round((index + 0.5) * (len(ordered) - 1) / level_count)))]
+        for index in range(level_count)
+    ]
+    for _ in range(12):
+        buckets = [[] for _ in range(level_count)]
+        for value in values:
+            bucket_index = min(range(level_count), key=lambda index: abs(value - centers[index]))
+            buckets[bucket_index].append(value)
+        next_centers = [
+            sum(bucket) / len(bucket) if bucket else centers[index]
+            for index, bucket in enumerate(buckets)
+        ]
+        if max(abs(next_centers[index] - centers[index]) for index in range(level_count)) < 1e-9:
+            centers = next_centers
+            break
+        centers = next_centers
+    ordered_centers = sorted(centers)
+    symbols = [min(range(level_count), key=lambda index: abs(value - ordered_centers[index])) for value in values]
+    separations = [
+        ordered_centers[index + 1] - ordered_centers[index]
+        for index in range(level_count - 1)
+    ]
+    contrast = min(separations) / max(1e-9, ordered_centers[-1] - ordered_centers[0]) if separations else 0.0
+    return symbols, ordered_centers, max(0.0, min(1.0, contrast))
+
+
+def decode_gnu_radio_ask2(settings: dict) -> dict:
+    """Recover 2-bit ASK symbols from GNU Radio complex-float samples."""
+    settings = gnu_radio_runtime_settings(settings)
+    samples_per_symbol = max(8, int(settings.get("samples_per_symbol", 500)))
+    max_samples = max(samples_per_symbol * 32, min(1_000_000, int(settings.get("decode_max_samples", 500000))))
+    magnitudes = gnu_radio_magnitudes(settings, max_samples)
+    if len(magnitudes) < samples_per_symbol * 16:
+        return {"ok": False, "note": "Not enough IQ samples for 2-bit ASK symbol recovery."}
+
+    prefix = [0.0]
+    for magnitude in magnitudes:
+        prefix.append(prefix[-1] + magnitude)
+
+    best: dict = {"score": -1.0, "bits": "", "confidence": 0.0}
+    phase_step = max(1, samples_per_symbol // 50)
+    for phase in range(0, samples_per_symbol, phase_step):
+        symbol_count = (len(magnitudes) - phase) // samples_per_symbol
+        if symbol_count < 16:
+            continue
+        means = [
+            (prefix[phase + (index + 1) * samples_per_symbol] - prefix[phase + index * samples_per_symbol]) / samples_per_symbol
+            for index in range(symbol_count)
+        ]
+        symbols, centers, contrast = cluster_amplitude_levels(means, 4)
+        if len(set(symbols[: min(len(symbols), 256)])) < 2:
+            continue
+        for level_map in ((0, 1, 2, 3), (3, 2, 1, 0)):
+            bit_text = "".join(format(level_map[symbol], "02b") for symbol in symbols[:1024])
+            bit_order = str(settings.get("bit_order", "msb")).lower()
+            bit_orders = ("msb",) if bit_order == "msb" else ("lsb",) if bit_order == "lsb" else ("msb", "lsb")
+            ascii_candidate = decode_bits_to_ascii(bit_text, bit_orders)
+            score = contrast + max(0.0, float(ascii_candidate.get("score", 0.0)))
+            if ascii_candidate.get("flag"):
+                score += 4.0
+            if score > best["score"]:
+                best = {
+                    "score": score,
+                    "bits": bit_text,
+                    "confidence": max(0.0, min(0.99, 0.45 + contrast * 0.54)),
+                    "samples_per_symbol": samples_per_symbol,
+                    "bits_per_symbol": 2,
+                    "phase": phase,
+                    "level_centers": [round(center, 6) for center in centers],
+                    "decoded_text": ascii_candidate.get("text", ""),
+                    "decoded_flag": ascii_candidate.get("flag", ""),
+                    "byte_offset": ascii_candidate.get("bit_offset", 0),
+                    "bit_order": ascii_candidate.get("bit_order", "msb"),
+                    "symbol_encoding": "4-level ASK, MSB-first natural binary level order" if level_map[0] == 0 else "4-level ASK, MSB-first reversed level order",
+                }
+    return {"ok": bool(best["bits"]), **best, "note": "Recovered from four ASK amplitude levels; each symbol contributes two bits."}
+
+
+def decode_gnu_radio_ook(settings: dict | None = None) -> dict:
+    """Recover OOK bits from IQ amplitude without assuming byte or payload content."""
+    settings = settings or load_config().get("gnu_radio_capture", {})
+    settings = gnu_radio_runtime_settings(settings)
+    if int(settings.get("bits_per_symbol", 1)) == 2:
+        return decode_gnu_radio_ask2(settings)
+    samples_per_symbol = max(8, int(settings.get("samples_per_symbol", 500)))
+    max_samples = max(samples_per_symbol * 32, min(1_000_000, int(settings.get("decode_max_samples", 500000))))
+    magnitudes = gnu_radio_magnitudes(settings, max_samples)
+    if len(magnitudes) < samples_per_symbol * 16:
+        return {"ok": False, "note": "Not enough IQ samples for symbol recovery."}
+
+    prefix = [0.0]
+    for magnitude in magnitudes:
+        prefix.append(prefix[-1] + magnitude)
+
+    best: dict = {"score": -1.0, "bits": "", "confidence": 0.0}
+    phase_step = max(1, samples_per_symbol // 50)
+    for phase in range(0, samples_per_symbol, phase_step):
+        symbol_count = (len(magnitudes) - phase) // samples_per_symbol
+        if symbol_count < 16:
+            continue
+        means = [
+            (prefix[phase + (index + 1) * samples_per_symbol] - prefix[phase + index * samples_per_symbol]) / samples_per_symbol
+            for index in range(symbol_count)
+        ]
+        ordered = sorted(means)
+        low_seed = ordered[max(0, len(ordered) // 8)]
+        high_seed = ordered[min(len(ordered) - 1, len(ordered) * 7 // 8)]
+        threshold = (low_seed + high_seed) / 2.0
+        low_values = [value for value in means if value < threshold]
+        high_values = [value for value in means if value >= threshold]
+        if not low_values or not high_values:
+            continue
+        low_mean = sum(low_values) / len(low_values)
+        high_mean = sum(high_values) / len(high_values)
+        low_variance = sum((value - low_mean) ** 2 for value in low_values) / len(low_values)
+        high_variance = sum((value - high_mean) ** 2 for value in high_values) / len(high_values)
+        contrast = (high_mean - low_mean) / max(1e-9, high_mean)
+        spread = (math.sqrt(low_variance) + math.sqrt(high_variance)) / max(1e-9, high_mean - low_mean)
+        score = contrast / max(0.02, spread)
+        bits = [1 if value >= threshold else 0 for value in means]
+        bit_text = "".join(str(bit) for bit in bits[:512])
+        ascii_candidate = decode_bits_to_ascii(bit_text)
+        combined_score = score + max(0.0, float(ascii_candidate.get("score", 0.0)))
+        if combined_score > best["score"]:
+            best = {
+                "score": combined_score,
+                "bits": bit_text,
+                "confidence": max(0.0, min(0.99, contrast * (1.0 - min(0.8, spread)))),
+                "samples_per_symbol": samples_per_symbol,
+                "phase": phase,
+                "threshold": threshold,
+                "decoded_text": ascii_candidate.get("text", ""),
+                "decoded_flag": ascii_candidate.get("flag", ""),
+                "byte_offset": ascii_candidate.get("bit_offset", 0),
+                "bit_order": ascii_candidate.get("bit_order", "msb"),
+            }
+    return {"ok": bool(best["bits"]), **best, "note": "Recovered from IQ amplitude without byte or payload assumptions."}
+
+
+def gnu_radio_capture_preview(challenge_id: str | None = None, reveal_payload: bool = False) -> dict:
+    """Convert a GNU Radio Python flowgraph stream or cf32 capture to web FFT rows."""
+    if challenge_id in LIVE_GNU_RADIO_TASKS:
+        raise ValueError(
+            f"{challenge_id} is live-only: start its generated GNU Radio Python flowgraph and use /api/rf/live"
+        )
+    settings = tunnel_gnu_radio_settings(challenge_id) or load_config().get("gnu_radio_capture", {})
+    settings = gnu_radio_runtime_settings(settings)
+    capture_info = settings.get("capture", {})
+    generated_source = settings.get("source_mode") == "generated_python_flowgraph"
+    virtual_source = settings.get("source_mode") in {
+        "generated_python_flowgraph",
+        "weather_wav_pair",
+        "weather_alarm_wav_pair",
+    }
+    if not virtual_source:
+        raise ValueError("Recorded GNU Radio captures are disabled; use the live GNU Radio stream")
+    capture_path, relative_path = configured_gnu_radio_path(settings)
+    flowgraph = settings.get("flowgraph", {})
+    source_relative_path = Path(str(flowgraph.get("source_script") or relative_path.as_posix()))
+    if not virtual_source and not capture_path.is_file():
+        raise FileNotFoundError(f"GNU Radio capture not found: {relative_path.as_posix()}")
+
+    datatype = str(settings.get("datatype", "cf32_le"))
+    if datatype != "cf32_le":
+        raise ValueError(f"Unsupported GNU Radio datatype: {datatype}; expected cf32_le")
+    sample_rate = float(settings.get("sample_rate", 44200))
+    center_hz = float(settings.get("center_hz", 915000000))
+    carrier_offset_hz = float(capture_info.get("carrier_offset_hz", 0))
+    fft_bins = int(settings.get("fft_bins", 512))
+    max_frames = int(settings.get("max_frames", 120))
+    if fft_bins < 64 or fft_bins > 2048 or fft_bins & (fft_bins - 1):
+        raise ValueError("fft_bins must be a power of two between 64 and 2048")
+    max_frames = max(1, min(512, max_frames))
+
+    bytes_per_sample = 8
+    sample_count = (
+        int(flowgraph.get("period_samples", settings.get("sample_count", 0)))
+        if virtual_source
+        else capture_path.stat().st_size // bytes_per_sample
+    )
+    if sample_count < fft_bins:
+        sample_count = fft_bins if virtual_source else sample_count
+    if sample_count < fft_bins:
+        raise ValueError(f"Capture needs at least {fft_bins} complete complex-float samples")
+    weather_source = settings.get("source_mode") in {"weather_wav_pair", "weather_alarm_wav_pair"}
+    audio_weather_source = settings.get("source_mode") == "weather_wav_pair"
+    decoder = (
+        {
+            "ok": False,
+            "bits": "",
+            "confidence": 0.0,
+            "note": "Audio capture: inspect hop timing and demodulate the tuned complex audio instead of amplitude-slicing it as OOK.",
+        }
+        if audio_weather_source
+        else decode_gnu_radio_ook(settings)
+    )
+    symbol_phase = int(decoder.get("phase", 0))
+    samples_per_symbol = int(decoder.get("samples_per_symbol", settings.get("samples_per_symbol", 500)))
+    if audio_weather_source:
+        hop_samples = max(fft_bins, int(capture_info.get("hop_samples", fft_bins)))
+        frame_stride = max(fft_bins, hop_samples // 4)
+        frame_count = max(1, min(max_frames, 1 + max(0, sample_count - fft_bins) // frame_stride))
+        starts = [index * frame_stride for index in range(frame_count)]
+    elif decoder.get("ok") and symbol_phase + fft_bins <= sample_count:
+        available_frames = max_frames if virtual_source else 1 + max(0, (sample_count - symbol_phase - fft_bins) // samples_per_symbol)
+        frame_count = max(1, min(max_frames, available_frames, max(1, len(str(decoder.get("bits", ""))))))
+        starts = [symbol_phase + index * samples_per_symbol for index in range(frame_count)]
+    else:
+        frame_count = min(max_frames, max(1, sample_count // fft_bins))
+        last_start = max(0, sample_count - fft_bins)
+        starts = [round(index * last_start / max(1, frame_count - 1)) for index in range(frame_count)]
+    window = [0.5 - 0.5 * math.cos(2.0 * math.pi * index / max(1, fft_bins - 1)) for index in range(fft_bins)]
+    power_rows: list[list[float]] = []
+    time_rows_raw: list[list[float]] = []
+    iq_rows_raw: list[list[complex]] = []
+
+    with capture_path.open("rb") if not virtual_source else nullcontext() as handle:
+        for start in starts:
+            if virtual_source:
+                unwindowed = gnu_radio_iq_samples(settings, start, fft_bins)
+            else:
+                handle.seek(start * bytes_per_sample)
+                raw = handle.read(fft_bins * bytes_per_sample)
+                if len(raw) != fft_bins * bytes_per_sample:
+                    continue
+                unpacked = struct.iter_unpack("<ff", raw)
+                unwindowed = [complex(real, imag) for real, imag in unpacked]
+            iq_rows_raw.append(unwindowed[:256])
+            time_rows_raw.append([unwindowed[round(index * (fft_bins - 1) / 159)].real for index in range(160)])
+            samples = [value * window[index] for index, value in enumerate(unwindowed)]
+            fft_in_place(samples)
+            shifted = samples[fft_bins // 2 :] + samples[: fft_bins // 2]
+            power_rows.append([20.0 * math.log10(max(1e-12, abs(value))) for value in shifted])
+
+    if not power_rows:
+        raise ValueError("Capture changed while it was being read; stop GNU Radio briefly and reload")
+    floor_db = min(min(row) for row in power_rows)
+    peak_db = max(max(row) for row in power_rows)
+    display_floor = max(floor_db, peak_db - 80.0)
+    dynamic_range = max(1.0, peak_db - display_floor)
+    rows = [[max(0.0, min(1.0, (value - display_floor) / dynamic_range)) for value in row] for row in power_rows]
+    time_peak = max(1e-9, max(abs(value) for row in time_rows_raw for value in row))
+    time_rows = [[max(-1.0, min(1.0, value / time_peak)) for value in row] for row in time_rows_raw]
+    iq_peak = max(1e-9, max(abs(value) for row in iq_rows_raw for value in row))
+    iq_rows = [[[value.real / iq_peak, value.imag / iq_peak] for value in row] for row in iq_rows_raw]
+    average_power = [sum(row[index] for row in power_rows) / len(power_rows) for index in range(fft_bins)]
+    peak_bin = max(range(fft_bins), key=average_power.__getitem__)
+    detected_frequency_hz = center_hz + (peak_bin - fft_bins / 2) * sample_rate / fft_bins
+    recovered_bits = decoder.get("bits", "")
+    decoded_text = str(decoder.get("decoded_text", ""))
+    decoded_flag = str(decoder.get("decoded_flag", ""))
+    public_payload = bool(capture_info.get("public_payload", True))
+    payload_revealed = reveal_payload and public_payload
+    expected_flag = str(capture_info.get("flag", "") or decoded_flag)
+    payload_preview = decoded_text[:160] if payload_revealed else "withheld; use the radio receive workflow to recover payload ASCII"
+    modulation_label = str(capture_info.get("modulation") or ("4-level ASK / 2-bit symbols" if int(decoder.get("bits_per_symbol", 1)) == 2 else "OOK/ASK amplitude"))
+    parser = {
+        "stage": "bit_slice",
+        "confidence": decoder.get("confidence", 0.0),
+        "bit_buffer": recovered_bits or "no stable symbols recovered",
+        "fields": {
+            "detected_frequency_hz": round(detected_frequency_hz, 3),
+            "modulation": modulation_label,
+            "samples_per_symbol": decoder.get("samples_per_symbol", settings.get("samples_per_symbol", 500)),
+            "bits_per_symbol": decoder.get("bits_per_symbol", settings.get("bits_per_symbol", 1)),
+            "recovered_bit_count": len(recovered_bits),
+            "byte_offset": decoder.get("byte_offset", 0),
+            "bit_order": decoder.get("bit_order", "msb"),
+            "symbol_encoding": decoder.get("symbol_encoding", "binary amplitude"),
+            "level_centers": decoder.get("level_centers", []),
+            "integrity": "no CRC or framing field present in the GNU Radio generator",
+        },
+        "note": str(decoder.get("note") or "Binary symbols recovered from IQ amplitude; byte alignment is estimated from printable payload structure."),
+    }
+    if generated_source:
+        parser["fields"].update(
+            {
+                "flowgraph_source": str(flowgraph.get("source_script", "")),
+                "flowgraph_sha256": str(flowgraph.get("source_sha256", "")),
+                "flowgraph_block_count": int(flowgraph.get("flowgraph_block_count", 0)),
+                "flowgraph_blocks": flowgraph.get("flowgraph_blocks", []),
+                "source_payload_bytes": len(flowgraph.get("payload", b"")),
+                "source_period_samples": int(flowgraph.get("period_samples", 0)),
+            }
+        )
+    if audio_weather_source:
+        parser["stage"] = "energy_detect"
+        parser["fields"].update(
+            {
+                "payload": "complex weather voice audio",
+                "hop_mode": capture_info.get("hop_mode", "repeating pattern"),
+                "hop_period_ms": round(float(capture_info.get("hop_samples", 1_000)) / sample_rate * 1_000, 3),
+                "hop_offsets_hz": capture_info.get("carrier_offsets_hz", [carrier_offset_hz]),
+                "phase_mode": capture_info.get("phase_prng", "none"),
+                "phase_symbol_samples": capture_info.get("randu_samples_per_chip", 0),
+            }
+        )
+    if payload_revealed:
+        parser["fields"]["payload_ascii"] = payload_preview
+        parser["fields"]["payload_state"] = "revealed_by_receiver"
+    else:
+        parser["fields"]["payload_state"] = "withheld_in_artifact_preview"
+    source_files = {}
+    for label, key in (
+        ("grc", "grc_path"),
+        ("python", "python_path"),
+        ("raw_iq", "path"),
+        ("file_meta", "meta_path"),
+        ("real_wav", "real_wav_path"),
+        ("imag_wav", "imag_wav_path"),
+    ):
+        relative = capture_info.get(key)
+        if not relative:
+            continue
+        source_path = bounded_project_path(relative)
+        source_files[label] = {
+            "path": str(relative).replace("\\", "/"),
+            "size_bytes": source_path.stat().st_size if source_path.exists() else 0,
+        }
+    if generated_source and flowgraph:
+        source_files["generated_python"] = {
+            "path": str(flowgraph.get("source_script", "")).replace("\\", "/"),
+            "size_bytes": int(flowgraph.get("script_size_bytes", 0)),
+            "sha256": str(flowgraph.get("source_sha256", "")),
+        }
+        source_files.pop("raw_iq", None)
+        source_files.pop("file_meta", None)
+    if settings.get("source_mode") in {"weather_wav_pair", "weather_alarm_wav_pair"}:
+        source_mode_label = "paired weather-report WAV sources processed by the backend flowgraph model"
+        source_files.pop("raw_iq", None)
+    elif generated_source:
+        source_mode_label = "generated GNU Radio Python flowgraph"
+    else:
+        source_mode_label = "raw GNU Radio cf32 File Sink capture"
+    preview_sources = [
+        {
+            "label": (
+                capture_info.get("title", "GNU Radio tunnel capture")
+                if weather_source
+                else f"{capture_info.get('stem', 'GNU Radio')} File Sink output"
+            ),
+            "kind": (
+                "weather_complex"
+                if weather_source
+                else "gnu_radio_cf32_ask2"
+                if int(decoder.get("bits_per_symbol", 1)) == 2
+                else "gnu_radio_cf32_ook"
+            ),
+            "offset_hz": round(detected_frequency_hz - center_hz, 3),
+            "bandwidth_hz": min(sample_rate / 4, 50_000) if weather_source else 2_000,
+        }
+    ]
+    if weather_source and capture_info.get("carrier_offsets_hz"):
+        preview_sources = [
+            {
+                "label": f"Weather audio hop {index + 1}",
+                "kind": "random_audio_hop" if capture_info.get("hop_mode") else "patterned_audio_hop",
+                "offset_hz": float(offset),
+                "bandwidth_hz": min(5_000, sample_rate / 10),
+            }
+            for index, offset in enumerate(capture_info["carrier_offsets_hz"])
+        ]
+    preview_annotations = [
+        {
+            "label": f"hop {index + 1}",
+            "offset_hz": float(offset),
+            "color": "#73f2a6" if index % 2 == 0 else "#ffc766",
+        }
+        for index, offset in enumerate(capture_info.get("carrier_offsets_hz", []))
+    ] if weather_source else [
+        {
+            "label": "GNU Radio File Sink output",
+            "offset_hz": round(detected_frequency_hz - center_hz, 3),
+            "color": "#73f2a6",
+        },
+    ]
+    return {
+        "challenge_id": challenge_id or "configured-gnu-radio-capture",
+        "scheme_id": f"GNU-RADIO-{str(capture_info.get('stem', 'LOCAL-CAPTURE')).upper()}",
+        "center_hz": center_hz,
+        "span_hz": sample_rate,
+        "sample_rate_hz": sample_rate,
+        "bins": fft_bins,
+        "frames": len(rows),
+        "rows": rows,
+        "time_rows": time_rows,
+        "iq_rows": iq_rows,
+        "symbol_bits": recovered_bits[:len(rows)],
+        "symbol_phase_samples": symbol_phase,
+        "time_component": "normalized real (I) samples aligned with each FFT frame",
+        "detected_frequency_hz": detected_frequency_hz,
+        "lock_frequency_hz": center_hz if capture_info.get("lock_to_center") else detected_frequency_hz,
+        "parser": parser,
+        "description": f"Waterfall generated live by the backend from {capture_info.get('title', 'a local GNU Radio')} using a {source_mode_label}.",
+        "source_file": source_relative_path.as_posix(),
+        "source_mode": settings.get("source_mode", "generated_python_flowgraph"),
+        "source_files": source_files,
+        "sample_count": sample_count,
+        "duration_seconds": sample_count / sample_rate,
+        "decoded_text": decoded_text[:240] if payload_revealed else "",
+        "expected_flag": expected_flag if payload_revealed else "",
+        "sources": preview_sources,
+        "protocol_notes": {
+            "datatype": datatype,
+            "modulation": f"{modulation_label} from the {source_mode_label}",
+            "source": (
+                f"Python backend serves a looping cf32 stream interpreted from {source_mode_label}."
+                if generated_source
+                else f"Python backend reads bounded cf32 windows directly from the {source_mode_label}."
+            ),
+            "raw_path": f"/api/rf/raw?challenge_id={challenge_id or 'tunnel-reading-signals'}&bytes=2097152",
+            "metadata": (
+                "The challenge signal source is the editable generated Python flowgraph."
+                if generated_source
+                else "The challenge signal is the recorded output written by the mapped GNU Radio File Sink."
+            ),
+        },
+        "annotations": preview_annotations,
+    }
+
+
+def gnu_radio_live_frame(preview: dict, frame: int) -> dict:
+    rows = preview.get("rows") or []
+    if not rows:
+        return {"frame": frame, "row": [], "samples": [], "parser": preview.get("parser", {})}
+    index = frame % len(rows)
+    parser = dict(preview.get("parser", {}))
+    bit_buffer = str(parser.get("bit_buffer", ""))
+    if bit_buffer and set(bit_buffer) <= {"0", "1"}:
+        visible_bits = max(16, min(len(bit_buffer), int((index + 1) / max(1, len(rows)) * len(bit_buffer))))
+        parser["bit_buffer"] = bit_buffer[:visible_bits]
+        parser["stage"] = "bit_slice" if visible_bits < len(bit_buffer) else "field_decode"
+    return {
+        "frame": frame,
+        "row": rows[index],
+        "samples": (preview.get("time_rows") or [[]])[index] if preview.get("time_rows") else [],
+        "iq": (preview.get("iq_rows") or [[]])[index] if preview.get("iq_rows") else [],
+        "parser": parser,
+    }
+
+
+def read_gnu_radio_raw_sample(challenge_id: str, byte_count: int = 2_097_152, byte_offset: int = 0) -> tuple[bytes, dict]:
+    if challenge_id in LIVE_GNU_RADIO_TASKS:
+        raise ValueError(
+            f"{challenge_id} has no recorded IQ download; samples are streamed live by GNU Radio"
+        )
+    settings = tunnel_gnu_radio_settings(challenge_id)
+    if not settings:
+        raise FileNotFoundError(f"No GNU Radio capture is mapped for {challenge_id}")
+    settings = gnu_radio_runtime_settings(settings)
+    virtual_source = settings.get("source_mode") in {
+        "generated_python_flowgraph",
+        "weather_wav_pair",
+        "weather_alarm_wav_pair",
+    }
+    byte_count = max(1024, min(8_388_608, byte_count))
+    byte_offset = max(0, byte_offset)
+    byte_offset -= byte_offset % 8
+    if virtual_source:
+        flowgraph = settings.get("flowgraph", {})
+        sample_count = max(1, byte_count // 8)
+        sample_offset = byte_offset // 8
+        body = pack_cf32_le(gnu_radio_iq_samples(settings, sample_offset, sample_count))
+        source_file = (
+            str(flowgraph.get("source_script", "")).replace("\\", "/")
+            or str(settings.get("capture", {}).get("grc_path", "")).replace("\\", "/")
+        )
+        source_size = int(flowgraph.get("period_samples", settings.get("sample_count", sample_count))) * 8
+        return body, {
+            "source_file": source_file,
+            "source_size": source_size,
+            "offset": byte_offset,
+            "bytes": len(body),
+            "stem": settings.get("capture", {}).get("stem", challenge_id),
+            "source_mode": settings.get("source_mode"),
+        }
+    raise ValueError("Recorded GNU Radio captures are disabled; use the live GNU Radio stream")
 
 
 def public_task(task: dict) -> dict:
@@ -164,11 +2129,51 @@ def default_receiver_for(challenge_id: str) -> dict:
     }
 
 
-def build_rf_command_response(session_id: str, challenge_id: str, action: str, arguments: str, receiver: dict) -> tuple[dict, HTTPStatus]:
+def transmitter_target_overlap(transmitter: dict | None, target: dict) -> tuple[bool, dict]:
+    if transmitter is None:
+        return True, {"provided": False, "note": "No TX state supplied; script terminal compatibility mode."}
+    try:
+        tx_center_hz = float(transmitter.get("center_hz"))
+        tx_bandwidth_hz = max(1000.0, float(transmitter.get("bandwidth_khz", 1)) * 1000.0)
+        tx_power_db = float(transmitter.get("power_db", -60))
+    except (TypeError, ValueError):
+        return False, {"provided": True, "reason": "transmitter center_hz, bandwidth_khz, and power_db must be numeric"}
+    target_hz = float(target["center_mhz"]) * 1_000_000.0
+    target_bandwidth_hz = 3200.0
+    distance_hz = abs(tx_center_hz - target_hz)
+    overlap_hz = max(0.0, tx_bandwidth_hz / 2.0 + target_bandwidth_hz / 2.0 - distance_hz)
+    overlap_ratio = overlap_hz / max(1.0, target_bandwidth_hz)
+    hits = overlap_ratio >= 0.35 and tx_power_db >= -45.0
+    return hits, {
+        "provided": True,
+        "tx_center_hz": round(tx_center_hz, 3),
+        "target_hz": round(target_hz, 3),
+        "distance_hz": round(distance_hz, 3),
+        "tx_bandwidth_hz": round(tx_bandwidth_hz, 3),
+        "overlap_ratio": round(overlap_ratio, 3),
+        "power_db": tx_power_db,
+    }
+
+
+def build_rf_command_response(session_id: str, challenge_id: str, action: str, arguments: str, receiver: dict, transmitter: dict | None = None) -> tuple[dict, HTTPStatus]:
     action = action.lower().strip()
     target = RF_TARGETS.get(challenge_id)
     if not target:
         return {"ok": False, "lines": ["No RF target is assigned to this subtask."]}, HTTPStatus.NOT_FOUND
+
+    imported_capture = None
+    if gnu_radio_capture_for(challenge_id) and challenge_id not in LIVE_GNU_RADIO_TASKS:
+        try:
+            imported_capture = gnu_radio_capture_preview(challenge_id, reveal_payload=action == "receive")
+            target = {
+                **target,
+                "center_mhz": float(imported_capture.get("lock_frequency_hz", imported_capture["detected_frequency_hz"])) / 1e6,
+                "span_khz": float(imported_capture["sample_rate_hz"]) / 1e3,
+                "modulations": set(target.get("modulations", {"AUTO"})) | {"AUTO"},
+                "label": str(imported_capture["scheme_id"]),
+            }
+        except (FileNotFoundError, OSError, ValueError, struct.error):
+            imported_capture = None
 
     try:
         center_mhz = float(receiver.get("center_mhz", target["center_mhz"]))
@@ -181,7 +2186,7 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
     modulation = str(receiver.get("modulation", "AUTO")).upper()
     offset_khz = abs(center_mhz - target["center_mhz"]) * 1000
     in_view = offset_khz <= span_khz / 2
-    tuned = offset_khz <= max(8.0, min(40.0, span_khz / 16))
+    tuned = offset_khz <= (span_khz * 0.48 if imported_capture else max(8.0, min(40.0, span_khz / 16)))
     demod_ok = modulation in target["modulations"]
     level_db = -72 + min(28, gain_db * 0.7)
     above_squelch = level_db >= squelch_db
@@ -203,6 +2208,9 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
         },
         "user_data": user_data_for(session_id),
     }
+    if transmitter is not None:
+        _, tx_report = transmitter_target_overlap(transmitter, target)
+        base["transmitter"] = tx_report
 
     if action == "scan":
         base["lines"] = (
@@ -231,9 +2239,35 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
         return base, HTTPStatus.BAD_REQUEST
 
     if action == "receive":
+        if imported_capture:
+            parser = imported_capture.get("parser", {})
+            bitstream = str(parser.get("bit_buffer", ""))
+            decoded_text = str(imported_capture.get("decoded_text", "") or parser.get("fields", {}).get("payload_ascii", ""))
+            base["parser"] = parser
+            lines = [
+                f"LOCK {target['label']} / measured carrier {target['center_mhz']:.6f} MHz",
+                f"GNU Radio cf32 capture parsed / {parser.get('fields', {}).get('modulation', 'ASK amplitude')} clock recovered",
+            ]
+            if bitstream and set(bitstream) <= {"0", "1"}:
+                base["bitstream"] = bitstream
+                lines += [f"BITSTREAM RECOVERED / {len(bitstream)} bits", bitstream]
+                if challenge_id in RECEIVE_FLAG_TASKS:
+                    base["decoded_text"] = decoded_text
+                    base["flag"] = expected_flag_for(session_id, challenge_id)
+                    lines += [f"PLAINTEXT PAYLOAD {decoded_text or base['flag']}", f"FLAG {base['flag']}"]
+                elif challenge_id in INTERFERENCE_FLAG_TASKS:
+                    lines += ["EXPECTED SIGN PAYLOAD BUFFERED", "Apply a controlled interference action to produce the workbook failure condition."]
+                elif challenge_id in TRANSMIT_FLAG_TASKS:
+                    lines += ["TARGET WAVEFORM PROFILE BUFFERED", "Transmit a shaped local sign message to produce the workbook success condition."]
+            else:
+                base["ok"] = False
+                lines.append("Carrier is locked, but no stable binary symbols were recovered from the IQ samples.")
+            base["lines"] = lines
+            return base, HTTPStatus.OK if base["ok"] else HTTPStatus.UNPROCESSABLE_ENTITY
+
         lines = [f"LOCK {target['label']} / sync acquired / CRC usable"]
         if challenge_id in RECEIVE_FLAG_TASKS:
-            base["flag"] = flag_for(session_id, challenge_id)
+            base["flag"] = expected_flag_for(session_id, challenge_id)
             lines += ["PLAINTEXT/CALLSIGN RECOVERED", f"FLAG {base['flag']}"]
         elif challenge_id in DECODE_FLAG_TASKS:
             lines += ["FRAME BUFFERED / additional reconstruction required", "Try `decode` with the recovered timing or PRNG state."]
@@ -252,23 +2286,106 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
     if action == "decode" and challenge_id in DECODE_FLAG_TASKS and any(
         word in lower_args for word in {"", "weak", "prng", "admin", "metadata", "packet"}
     ):
-        base["flag"] = flag_for(session_id, challenge_id)
+        base["flag"] = expected_flag_for(session_id, challenge_id)
         base["lines"] = ["DECODE accepted / recovered hidden field", f"FLAG {base['flag']}"]
-    elif action == "interfere" and MODE["value"] == "attack" and challenge_id in INTERFERENCE_FLAG_TASKS and any(
+    elif action == "interfere" and challenge_id in INTERFERENCE_FLAG_TASKS and any(
         word in lower_args for word in {"noise", "dos", "mismatch", "jam", "metadata"}
     ):
-        base["flag"] = flag_for(session_id, challenge_id)
+        tx_hits, tx_report = transmitter_target_overlap(transmitter, target)
+        base["transmitter"] = tx_report
+        if not tx_hits:
+            base["ok"] = False
+            base["lines"] = [
+                "INTERFERENCE waveform transmitted locally, but it is not overlapping the target carrier enough to corrupt the sign decoder.",
+                "Tune RX to lock the target, then retune TX centre/offset and bandwidth until the local energy collides with the detected carrier.",
+            ]
+            return base, HTTPStatus.BAD_REQUEST
+        base["flag"] = expected_flag_for(session_id, challenge_id)
         base["lines"] = ["INTERFERENCE accepted / decoded string mismatch observed", f"DISPLAY OUTPUT {base['flag']}"]
-    elif action == "transmit" and MODE["value"] == "attack" and challenge_id in TRANSMIT_FLAG_TASKS and any(
-        word in lower_args for word in {"sign", "message", "metadata", "fibonacci", "tone", "gate", "null", "theta"}
+    elif action == "transmit" and challenge_id in TRANSMIT_FLAG_TASKS and any(
+        word in lower_args for word in {"sign", "message", "metadata", "fibonacci", "tone", "gate", "null", "theta", "replay", "waveform"}
     ):
-        base["flag"] = flag_for(session_id, challenge_id)
+        tx_hits, tx_report = transmitter_target_overlap(transmitter, target)
+        base["transmitter"] = tx_report
+        if transmitter is not None and not tx_hits:
+            base["ok"] = False
+            base["lines"] = [
+                "TX waveform was generated, but the receiver did not see it at the target carrier.",
+                "Tune RX first, then set TX offset/bandwidth so the injected packet lands on the detected signal.",
+            ]
+            return base, HTTPStatus.BAD_REQUEST
+        base["flag"] = expected_flag_for(session_id, challenge_id)
         base["lines"] = ["TX waveform accepted by local target", "TARGET EFFECT matched success condition", f"FLAG {base['flag']}"]
-    elif action == "send" and MODE["value"] == "attack" and challenge_id in SEND_FLAG_TASKS and any(
+    elif action == "send" and challenge_id == "weather-boring-active-re":
+        packet_text = arguments.strip()
+        if packet_text.lower().startswith("packet "):
+            packet_text = packet_text.split(maxsplit=1)[1]
+        try:
+            packet = parse_u32_packet(packet_text)
+        except ValueError as error:
+            base["ok"] = False
+            base["lines"] = [str(error), "Send the forged receiver input as `send 0x........`."]
+            return base, HTTPStatus.BAD_REQUEST
+        emergency = alarm_decode_packet(packet)
+        base["packet"] = f"0x{packet:08X}"
+        base["decoded_emergency"] = f"0x{emergency:X}"
+        base["alarm_active"] = emergency == 0xB
+        if not base["alarm_active"]:
+            base["ok"] = False
+            base["lines"] = [
+                f"PACKET {base['packet']} decoded / emergency={base['decoded_emergency']}",
+                "Warning light remained off: AlarmCheck did not accept the supplied emergency value.",
+            ]
+            return base, HTTPStatus.UNPROCESSABLE_ENTITY
+        base["flag"] = expected_flag_for(session_id, challenge_id)
+        base["lines"] = [
+            f"PACKET {base['packet']} decoded / emergency={base['decoded_emergency']}",
+            "FORGED ALARM accepted by the extracted receiver logic",
+            "WARNING LIGHT ACTIVE",
+            f"FLAG {base['flag']}",
+        ]
+    elif action == "send" and challenge_id == "bushfire-hdl-flaw":
+        bin_match = re.search(r"\b(?:bin|azimuth)\s*[=:]?\s*(\d{1,2})\b", arguments, re.IGNORECASE)
+        correlation_match = re.search(r"\b(?:correlation|corr|score)\s*[=:]?\s*(\d{1,3})\b", arguments, re.IGNORECASE)
+        if not bin_match or not correlation_match:
+            base["ok"] = False
+            base["lines"] = [
+                "Beam-gate input requires an arrival bin and correlation score.",
+                "Use `send beam bin <0..31> correlation <0..255>` after mapping the recovered HDL response.",
+            ]
+            return base, HTTPStatus.BAD_REQUEST
+        arrival_bin = int(bin_match.group(1))
+        correlation = int(correlation_match.group(1))
+        array_gain = 255 if arrival_bin in {2, 10, 18, 26} else 0
+        hidden_lobe = arrival_bin in {10, 18, 26}
+        base["beam_pattern"] = {
+            "arrival_bin": arrival_bin,
+            "correlation": correlation,
+            "array_gain": array_gain,
+            "hidden_lobe": hidden_lobe,
+        }
+        if not 0 <= arrival_bin <= 31 or not 0 <= correlation <= 255:
+            base["ok"] = False
+            base["lines"] = ["Beam input is outside the recovered hardware field widths."]
+            return base, HTTPStatus.BAD_REQUEST
+        if not hidden_lobe or correlation < 240 or array_gain < 240:
+            base["ok"] = False
+            base["lines"] = [
+                f"BEAM GATE rejected bin={arrival_bin} correlation={correlation} gain={array_gain}",
+                "The main look direction is expected; demonstrate a separate off-axis lobe that aliases the trusted steering vector.",
+            ]
+            return base, HTTPStatus.UNPROCESSABLE_ENTITY
+        base["flag"] = expected_flag_for(session_id, challenge_id)
+        base["lines"] = [
+            f"BEAM GATE accepted off-axis bin={arrival_bin} correlation={correlation} gain={array_gain}",
+            "UNINTENDED LOBE aliases TRUST_VECTOR; relay data crossed the spatial gate",
+            f"FLAG {base['flag']}",
+        ]
+    elif action == "send" and challenge_id in SEND_FLAG_TASKS and any(
         word in lower_args
         for word in {"warning", "light", "auth", "evacuation", "anomaly", "testbench", "latch", "default", "bitstream", "superuser", "kill"}
     ):
-        base["flag"] = flag_for(session_id, challenge_id)
+        base["flag"] = expected_flag_for(session_id, challenge_id)
         base["lines"] = ["STRUCTURED INPUT accepted by local target", "SIMULATED EFFECT reached success condition", f"FLAG {base['flag']}"]
     else:
         base["ok"] = False
@@ -283,14 +2400,19 @@ def build_rf_command_response(session_id: str, challenge_id: str, action: str, a
 def script_interface_description() -> dict:
     return {
         "name": "Signal Forge Script Terminal",
-        "base_url": "http://localhost:8002",
+        "base_url": f"http://localhost:{os.environ.get('PORT', '8000')}",
         "endpoints": {
             "GET /api/script/interface": "Describe this script-facing interface.",
             "POST /api/script/terminal": "Run one terminal command against a selected subtask.",
             "GET /api/contexts": "List situations and nested subtasks.",
             "GET /api/tasks": "List all subtasks.",
-            "GET /api/rf/live": "Stream live Python-generated FFT rows, time slices, and parser events.",
-            "GET /api/rf/raw": "Download raw complex16 IQ samples generated from the same Python signal profile.",
+            "GET /api/rf/live": "Stream SSE frames. Beginner tasks wait for live post-channel-model CF32 from their generated GNU Radio Python flowgraph.",
+            "GET /api/rf/raw": "Download bounded IQ only for non-live tasks; live GNU Radio tasks intentionally expose no recording.",
+            "GET /api/rf/gnu-radio-capture": "Inspect non-live sources. Beginner GNU Radio tasks are intentionally live-only.",
+            "TCP signal ingest": f"Send JSON-lines or raw cf32_le framed IQ to {EXTERNAL_INGEST['host']}:{EXTERNAL_INGEST['port']}. Use SIGNAL_INGEST_HOST/SIGNAL_INGEST_PORT to change it.",
+            "GNU Radio ZMQ bridge": "Run tools/script_clients/zmq_signal_bridge.py against a GNU Radio ZMQ PUSH/PUB Sink, then view it with External feed.",
+            "GET /api/rf/external/status": "Describe the currently buffered external signal feed for a challenge.",
+            "GET /api/rf/external/live": "Stream externally supplied frames into the same browser waterfall with Server-Sent Events.",
         },
         "terminal_payload": {
             "session_id": "stable id chosen by your script",
@@ -303,6 +2425,8 @@ def script_interface_description() -> dict:
             "command": "tune 915.000",
         },
         "client": "/tools/script_clients/signal_terminal_client.py",
+        "signal_client": "/tools/script_clients/external_signal_sender.py",
+        "zmq_bridge": "/tools/script_clients/zmq_signal_bridge.py",
     }
 
 
@@ -515,9 +2639,28 @@ class CTFHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
+    def static_request_is_private(self, request_path: str) -> bool:
+        if request_path in {"/data/challenges.json", "/data/contexts.json", "/data/tolling.db", "/config/range.json", "/server.py"}:
+            return True
+        if request_path.startswith("/."):
+            return True
+        return (
+            request_path.startswith("/radio/GNURadio/")
+            and request_path.endswith((".py", ".grc"))
+            and request_path not in public_static_artifact_paths()
+        )
+
+    def do_HEAD(self) -> None:
+        request_path = f"/{unquote(urlparse(self.path).path).lstrip('/')}"
+        if self.static_request_is_private(request_path):
+            self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+            return
+        super().do_HEAD()
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path in {"/data/challenges.json", "/data/contexts.json", "/data/tolling.db", "/config/range.json", "/server.py"} or parsed.path.startswith("/."):
+        request_path = f"/{unquote(parsed.path).lstrip('/')}"
+        if self.static_request_is_private(request_path):
             self.send_error(HTTPStatus.NOT_FOUND, "Not found")
             return
         if parsed.path.startswith("/context/"):
@@ -543,11 +2686,11 @@ class CTFHandler(SimpleHTTPRequestHandler):
             public_config["telemetry"].pop("hmac_key", None)
             self.write_json(public_config)
             return
-        if parsed.path == "/api/mode":
-            self.write_json({"mode": MODE["value"]})
-            return
         if parsed.path == "/api/tasks":
             self.write_json({"tasks": [public_task(task) for task in load_challenges()]})
+            return
+        if parsed.path == "/config/validation.json":
+            self.write_json({"error": "server-only configuration"}, HTTPStatus.NOT_FOUND)
             return
         if parsed.path == "/api/contexts":
             self.write_json({"contexts": public_contexts()})
@@ -580,8 +2723,19 @@ class CTFHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/rf/live":
             self.handle_rf_live(parsed.query)
             return
+        if parsed.path == "/api/rf/external/live":
+            self.handle_rf_external_live(parsed.query)
+            return
+        if parsed.path == "/api/rf/external/status":
+            params = parse_qs(parsed.query)
+            challenge_id = params.get("challenge_id", ["external"])[0]
+            self.write_json(external_feed_snapshot(challenge_id))
+            return
         if parsed.path == "/api/rf/raw":
             self.handle_rf_raw(parsed.query)
+            return
+        if parsed.path == "/api/rf/gnu-radio-capture":
+            self.handle_gnu_radio_capture(parsed.query)
             return
         if parsed.path == "/api/script/interface":
             self.write_json(script_interface_description())
@@ -594,7 +2748,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
                     "path": "/api/rsu/maintenance/parse",
                     "content_type": "application/json",
                     "schema": {"type": "0x42", "declared_length": 111, "payload": "operator note"},
-                    "operator_note": "Attack Mode models the native parser's trusted-length behaviour; Secure Mode requires exact length agreement.",
+                    "operator_note": "This training endpoint models the native parser's trusted-length behaviour; compare it with the bounded parser source.",
                 }
             )
             return
@@ -608,9 +2762,6 @@ class CTFHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path == "/api/mode":
-            self.handle_mode()
-            return
         if parsed.path == "/api/flag":
             self.handle_flag()
             return
@@ -635,13 +2786,20 @@ class CTFHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/air/inject":
             self.handle_air_voice_injection()
             return
+        if parsed.path == "/api/weather/alarm":
+            self.handle_weather_alarm()
+            return
         self.write_json({"error": "unknown endpoint"}, HTTPStatus.NOT_FOUND)
 
     def translate_path(self, path: str) -> str:
         parsed = urlparse(path)
         clean_path = unquote(parsed.path).lstrip("/")
         target = (ROOT / clean_path).resolve()
-        if not str(target).startswith(str(ROOT)):
+        if target == VALIDATION_CONFIG_PATH.resolve():
+            return str(ROOT / "__server_private__")
+        try:
+            target.relative_to(ROOT)
+        except ValueError:
             return str(ROOT / "index.html")
         if target.is_dir():
             target = target / "index.html"
@@ -658,6 +2816,10 @@ class CTFHandler(SimpleHTTPRequestHandler):
     def handle_rf_live(self, query: str) -> None:
         params = parse_qs(query)
         challenge_id = params.get("challenge_id", ["tunnel-reading-signals"])[0]
+        if challenge_id in LIVE_GNU_RADIO_TASKS:
+            start_gnu_radio_flowgraph(challenge_id)
+            self.handle_rf_external_live(query)
+            return
         session_id = params.get("session_id", [session_id_from(self)])[0]
         target = RF_TARGETS.get(challenge_id, RF_TARGETS["tunnel-reading-signals"])
         try:
@@ -684,25 +2846,142 @@ class CTFHandler(SimpleHTTPRequestHandler):
         try:
             send_event("meta", profile)
             frame = 0
-            while frame < int(profile.get("frames", 720)):
-                send_event("frame", generate_live_frame(profile, frame, session_id=session_id))
+            frame_count = max(1, int(profile.get("frames", 720)))
+            while True:
+                looped_frame = frame % frame_count
+                send_event("frame", generate_live_frame(profile, looped_frame, session_id=session_id))
                 frame += 1
                 time.sleep(1 / rate)
-            send_event("complete", {"ok": True, "message": "live profile ended; reconnect to replay"})
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            return
+
+    def handle_rf_external_live(self, query: str) -> None:
+        params = parse_qs(query)
+        challenge_id = params.get("challenge_id", ["external"])[0]
+        try:
+            last_sequence = int(params.get("last_sequence", ["-1"])[0])
+        except ValueError:
+            last_sequence = -1
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+
+        def send_event(event_name: str, payload: dict) -> None:
+            encoded = json.dumps(payload, separators=(",", ":"))
+            self.wfile.write(f"event: {event_name}\n".encode("utf-8"))
+            self.wfile.write(f"data: {encoded}\n\n".encode("utf-8"))
+            self.wfile.flush()
+
+        try:
+            send_event("meta", external_feed_snapshot(challenge_id))
+            last_status = 0.0
+            while True:
+                frame = external_feed_next_frame(challenge_id, last_sequence)
+                if frame:
+                    last_sequence = int(frame.get("frame", last_sequence))
+                    send_event("frame", frame)
+                elif time.time() - last_status > 2.0:
+                    send_event("status", external_feed_snapshot(challenge_id))
+                    last_status = time.time()
+                time.sleep(0.05)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             return
 
     def handle_rf_raw(self, query: str) -> None:
         params = parse_qs(query)
         challenge_id = params.get("challenge_id", ["tunnel-reading-signals"])[0]
+        if challenge_id in LIVE_GNU_RADIO_TASKS:
+            self.write_json(
+                {
+                    "error": "This challenge is live-only. Start its generated GNU Radio Python flowgraph; no SigMF or recorded IQ is read.",
+                    "status": external_feed_snapshot(challenge_id),
+                },
+                HTTPStatus.CONFLICT,
+            )
+            return
         target = RF_TARGETS.get(challenge_id, RF_TARGETS["tunnel-reading-signals"])
-        body = raw_iq_bytes(challenge_id, target=target, frame_count=96)
+        try:
+            byte_count = int(params.get("bytes", ["2097152"])[0])
+            byte_offset = int(params.get("offset", ["0"])[0])
+        except ValueError:
+            byte_count = 2_097_152
+            byte_offset = 0
+        if gnu_radio_capture_for(challenge_id):
+            try:
+                body, source = read_gnu_radio_raw_sample(challenge_id, byte_count=byte_count, byte_offset=byte_offset)
+            except (FileNotFoundError, OSError, ValueError) as error:
+                self.write_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
+                return
+            filename = f"{source['stem']}-sample-{source['offset']}.cf32"
+        else:
+            body = raw_iq_bytes(challenge_id, target=target, frame_count=96)
+            source = None
+            filename = f"{challenge_id}-complex16.iq"
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/octet-stream")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Content-Disposition", f'attachment; filename="{challenge_id}-complex16.iq"')
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        if source:
+            self.send_header("X-Signal-Source", source["source_file"])
+            self.send_header("X-Signal-Source-Size", str(source["source_size"]))
+            self.send_header("X-Signal-Offset", str(source["offset"]))
         self.end_headers()
         self.wfile.write(body)
+
+    def handle_gnu_radio_capture(self, query: str = "") -> None:
+        params = parse_qs(query)
+        challenge_id = params.get("challenge_id", ["tunnel-reading-signals"])[0]
+        if challenge_id in LIVE_GNU_RADIO_TASKS:
+            snapshot = external_feed_snapshot(challenge_id)
+            status = HTTPStatus.OK if snapshot.get("last_seen") else HTTPStatus.SERVICE_UNAVAILABLE
+            self.write_json(snapshot, status)
+            return
+        try:
+            self.write_json(gnu_radio_capture_preview(challenge_id))
+        except FileNotFoundError as error:
+            self.write_json({"error": str(error)}, HTTPStatus.NOT_FOUND)
+        except (OSError, ValueError, struct.error) as error:
+            self.write_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+
+    def handle_weather_alarm(self) -> None:
+        try:
+            body = read_json_body(self)
+        except json.JSONDecodeError:
+            self.write_json({"ok": False, "message": "Invalid JSON."}, HTTPStatus.BAD_REQUEST)
+            return
+        challenge_id = str(body.get("challenge_id", "weather-boring-active-re"))
+        if challenge_id != "weather-boring-active-re":
+            self.write_json({"ok": False, "message": "This packet input is only connected to the warning-light task."}, HTTPStatus.NOT_FOUND)
+            return
+        try:
+            packet = parse_u32_packet(body.get("packet", ""))
+        except ValueError as error:
+            self.write_json({"ok": False, "message": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        emergency = alarm_decode_packet(packet)
+        alarm_pattern = emergency == 0xB
+        accepted = alarm_pattern
+        response = {
+            "ok": accepted,
+            "packet": f"0x{packet:08X}",
+            "decoded_emergency": f"0x{emergency:X}",
+            "alarm_active": accepted,
+            "message": (
+                "Forged packet accepted by AlarmCheck(); the emergency warning light is active."
+                if accepted
+                else "Packet decoded successfully, but its emergency nibble does not activate the light."
+            ),
+        }
+        if accepted:
+            session_id = session_id_from(self, body)
+            response["flag"] = expected_flag_for(session_id, challenge_id)
+            response["message"] += f" Flag: {response['flag']}"
+            self.write_json(response)
+            return
+        self.write_json(response, HTTPStatus.UNPROCESSABLE_ENTITY)
 
     def handle_flag(self) -> None:
         try:
@@ -719,8 +2998,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
             return
 
         session_id = session_id_from(self, body)
-        expected = flag_for(session_id, task_id).upper()
-        if submitted == expected:
+        if is_valid_flag(session_id, task_id, submitted):
             self.write_json({"ok": True, "message": "Correct. Task solved.", "points": task["points"]})
         else:
             self.write_json({"ok": False, "message": "Not quite. Re-check the signal evidence and hints."})
@@ -733,6 +3011,13 @@ class CTFHandler(SimpleHTTPRequestHandler):
             return
 
         session_id = session_id_from(self, body)
+        challenge_id = str(body.get("challenge_id", ""))
+        if challenge_id != "civilian-emergency-active-re":
+            self.write_json(
+                {"ok": False, "message": "The emergency rebroadcast input is connected only to the final civilian emergency task."},
+                HTTPStatus.NOT_FOUND,
+            )
+            return
         intercept = AIR_WEATHER_SESSIONS.get(session_id)
         if not intercept or str(body.get("intercept_id", "")) != intercept["intercept_id"]:
             self.write_json({"ok": False, "message": "Generate a current intercept before filing the report."}, HTTPStatus.BAD_REQUEST)
@@ -753,7 +3038,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
             self.write_json({
                 "ok": True,
                 "message": "Protocol accepted. The synthetic public-warning message was rebroadcast on the training net.",
-                "flag": flag_for(session_id, "civilian-emergency-intercept"),
+                "flag": expected_flag_for(session_id, challenge_id),
                 "broadcast": message,
             })
             return
@@ -763,32 +3048,7 @@ class CTFHandler(SimpleHTTPRequestHandler):
             "accepted_fields": [label for label, present in required.items() if present],
         })
 
-    def handle_mode(self) -> None:
-        try:
-            body = read_json_body(self)
-        except json.JSONDecodeError:
-            self.write_json({"error": "Invalid JSON."}, HTTPStatus.BAD_REQUEST)
-            return
-        requested = str(body.get("mode", "")).lower()
-        if requested not in {"attack", "secure"}:
-            self.write_json({"error": "mode must be attack or secure"}, HTTPStatus.BAD_REQUEST)
-            return
-        MODE["value"] = requested
-        if requested == "attack":
-            REPLAY_CACHE.clear()
-        self.write_json({"mode": MODE["value"]})
-
     def handle_vulnerable_events(self, query: str) -> None:
-        if MODE["value"] == "secure":
-            self.write_json(
-                {
-                    "mode": "secure",
-                    "blocked": True,
-                    "reason": "Secure Mode disables the intentionally vulnerable SQL endpoint. Use /api/toll/safe-events.",
-                },
-                HTTPStatus.FORBIDDEN,
-            )
-            return
         params = parse_qs(query)
         vehicle_id = params.get("vehicle_id", [""])[0]
         sql = (
@@ -857,17 +3117,6 @@ class CTFHandler(SimpleHTTPRequestHandler):
             return
 
         schedule = schedules[0]
-        if MODE["value"] == "secure" and schedule["operator_only"] and not vehicle_is_operator(vehicle_id):
-            self.write_json(
-                {
-                    "mode": "secure",
-                    "authorized_schedule": False,
-                    "decision": "rejected",
-                    "reason": "Secure Mode derives operator-only schedule entitlement server-side.",
-                },
-                HTTPStatus.FORBIDDEN,
-            )
-            return
         result = {
             "vehicle_id": vehicle_id,
             "booth_id": booth_id,
@@ -945,9 +3194,8 @@ class CTFHandler(SimpleHTTPRequestHandler):
     def handle_operator_events(self) -> None:
         self.write_json(
             {
-                "mode": MODE["value"],
                 "events": OPERATOR_COMMENTS,
-                "rendering_note": "Attack Mode intentionally renders comments as HTML in the browser. Secure Mode renders text only.",
+                "rendering_note": "The training console intentionally renders RF-origin comments as HTML so the output-boundary flaw remains observable.",
             }
         )
 
@@ -962,10 +3210,8 @@ class CTFHandler(SimpleHTTPRequestHandler):
             "route_note": str(body.get("route_note", "")),
             "operator_comment": str(body.get("operator_comment", "")),
         }
-        if MODE["value"] == "secure":
-            event = {key: html.escape(value) for key, value in event.items()}
         OPERATOR_COMMENTS.append(event)
-        self.write_json({"ok": True, "mode": MODE["value"], "event": event})
+        self.write_json({"ok": True, "event": event})
 
     def handle_maintenance_parser(self) -> None:
         try:
@@ -981,28 +3227,14 @@ class CTFHandler(SimpleHTTPRequestHandler):
         if tlv_type != 0x42:
             self.write_json({"decision": "rejected", "reason": "unsupported TLV type"}, HTTPStatus.BAD_REQUEST)
             return
-        if MODE["value"] == "secure" and declared_length != actual_length:
-            self.write_json(
-                {
-                    "mode": "secure",
-                    "decision": "rejected",
-                    "declared_length": declared_length,
-                    "actual_length": actual_length,
-                    "reason": "declared length does not equal available payload length",
-                },
-                HTTPStatus.BAD_REQUEST,
-            )
-            return
-
         result = {
-            "mode": MODE["value"],
             "decision": "parsed",
             "declared_length": declared_length,
             "actual_length": actual_length,
             "length_mismatch": declared_length != actual_length,
             "diagnostic_command_seen": "MAINT_DIAG_UNLOCK" in payload,
         }
-        if MODE["value"] == "attack" and declared_length > actual_length and "MAINT_DIAG_UNLOCK" in payload:
+        if declared_length > actual_length and "MAINT_DIAG_UNLOCK" in payload:
             result["diagnostic_access"] = "granted"
             result["flag"] = flag_for(session_id_from(self, body), "length-field-chaos")
         self.write_json(result)
@@ -1019,7 +3251,8 @@ class CTFHandler(SimpleHTTPRequestHandler):
         action = str(body.get("action", "")).lower().strip()
         arguments = str(body.get("arguments", "")).strip()
         receiver = body.get("receiver", {}) if isinstance(body.get("receiver", {}), dict) else {}
-        response, status = build_rf_command_response(session_id, challenge_id, action, arguments, receiver)
+        transmitter = body.get("transmitter") if isinstance(body.get("transmitter"), dict) else None
+        response, status = build_rf_command_response(session_id, challenge_id, action, arguments, receiver, transmitter)
         self.write_json(response, status)
         return
         target = RF_TARGETS.get(challenge_id)
@@ -1106,19 +3339,19 @@ class CTFHandler(SimpleHTTPRequestHandler):
         if action == "decode" and challenge_id == "reverse-the-decoder":
             base["flag"] = flag_for(session_id, challenge_id)
             base["lines"] = ["CHECKSUM expected=5e provided=5e valid=true", f"DECODER OUTPUT {base['flag']}"]
-        elif action == "interfere" and MODE["value"] == "attack" and challenge_id == "free-trip-logic-flaw" and any(word in arguments.lower() for word in {"replay", "maint_free", "maintenance"}):
+        elif action == "interfere" and challenge_id == "free-trip-logic-flaw" and any(word in arguments.lower() for word in {"replay", "maint_free", "maintenance"}):
             base["flag"] = flag_for(session_id, challenge_id)
             base["lines"] = ["INTERFERENCE replay aligned / schedule=MAINT_FREE", "TOLL OUTPUT price=0", f"FLAG {base['flag']}"]
         elif action == "transmit":
-            if MODE["value"] == "attack" and challenge_id == "free-trip-logic-flaw" and "replay" in arguments.lower():
+            if challenge_id == "free-trip-logic-flaw" and "replay" in arguments.lower():
                 base["flag"] = flag_for(session_id, challenge_id)
                 base["lines"] = ["TX replay waveform visible in receiver passband", "TARGET OUTPUT schedule=MAINT_FREE price=0", f"FLAG {base['flag']}"]
             else:
                 base["lines"] = ["TX burst injected into local spectrum simulation.", "No target state change was observed for this waveform."]
-        elif action == "forward" and MODE["value"] == "attack" and challenge_id == "operator-console-xss" and "console" in arguments.lower():
+        elif action == "forward" and challenge_id == "operator-console-xss" and "console" in arguments.lower():
             base["flag"] = flag_for(session_id, challenge_id)
-            base["lines"] = ["FORWARD operator_note -> console", "Console rendered RF-origin control in Attack Mode.", f"UI OUTPUT {base['flag']}"]
-        elif action == "send" and MODE["value"] == "attack" and challenge_id == "length-field-chaos" and "maint_diag_unlock" in arguments.lower():
+            base["lines"] = ["FORWARD operator_note -> console", "Console rendered the RF-origin control.", f"UI OUTPUT {base['flag']}"]
+        elif action == "send" and challenge_id == "length-field-chaos" and "maint_diag_unlock" in arguments.lower():
             base["flag"] = flag_for(session_id, challenge_id)
             base["lines"] = ["TX TLV accepted / length mismatch reached native parser", "DIAGNOSTIC ACCESS granted", f"TARGET OUTPUT {base['flag']}"]
         else:
@@ -1157,14 +3390,13 @@ def verify_telemetry_packet(packet: dict) -> dict:
         REPLAY_CACHE.add(nonce)
 
     return {
-        "mode": MODE["value"],
         "hmac_valid": hmac_valid,
         "fresh_timestamp": fresh_timestamp,
         "replay_seen": replay_seen,
         "authorized_schedule": None,
         "decision": "accepted" if accepted else "rejected",
         "reason": "packet authenticated and fresh" if accepted else "packet failed HMAC, freshness, or replay checks",
-        "expected_hmac_for_training": expected if MODE["value"] == "attack" else None,
+        "expected_hmac_for_training": expected,
     }
 
 
@@ -1245,7 +3477,7 @@ def radio_intercept(session_id: str = "anonymous") -> dict:
             f"<button onclick=\"document.querySelector('#operator-flag').textContent='{flag_for(session_id, 'operator-console-xss')}'\">"
             "Render test</button>"
         ),
-        "sink_warning": "This decoded note is untrusted RF-origin text. Attack Mode renders it as HTML; Secure Mode renders it as text.",
+        "sink_warning": "This decoded note is untrusted RF-origin text and the training console renders it as HTML.",
         "operator_action": "Correlate burst with toll event, then review trust boundary before posting to console.",
     }
 
@@ -1265,7 +3497,7 @@ def research_notes() -> dict:
             "Hard cyber stages should combine RE, memory corruption, fuzzing, protocol state-machine bugs, XSS sinks, authorization failures, and telemetry replay."
         ],
         "sota_security": [
-            "Secure Mode demonstrates HMAC, freshness checks, replay rejection, server-side authorization, and safe SQL as the baseline, not the finish line.",
+            "Defensive examples demonstrate HMAC, freshness checks, replay rejection, server-side authorization, and safe SQL as the baseline, not the finish line.",
             "SOTA hard levels should require layered assurance: hardware root of trust, secure boot, signed firmware, key separation, remote attestation, and measured boot evidence.",
             "Radio SOTA should cover adaptive hopping, spread spectrum, interference classification, MIMO/beam/null steering concepts, propagation modelling, and jamming resilience.",
             "Cyber SOTA should include memory-safe parsers, fuzzing harnesses, binary hardening, SBOM/supply-chain checks, CSP/output encoding, and backend policy enforcement.",
@@ -1284,19 +3516,31 @@ def research_notes() -> dict:
         "gnu_radio": [
             "Use GNU Radio Companion in WSL/Ubuntu to generate flowgraphs.",
             "For this project, GNU Radio should generate artifacts rather than transmit over the air.",
-            "A future bridge can publish FFT rows through ZeroMQ or a Python socket for the browser."
+            "The live bridge accepts JSON-lines FFT rows or framed raw cf32_le IQ on the local Signal Forge ingest socket.",
+            "A GNU Radio flowgraph can feed it through a Python block, a TCP/file sink plus bridge script, or a future ZeroMQ adapter."
         ]
     }
 
 
 def main() -> None:
+    validate_public_static_artifacts()
     init_db()
     os.chdir(ROOT)
     port = int(os.environ.get("PORT", "8000"))
-    mimetypes.add_type("application/json", ".sigmf-meta")
+    start_external_ingest_server()
+    gnu_radio_python = discover_gnu_radio_python()
+    if gnu_radio_python:
+        print(f"GNU Radio Python detected: {gnu_radio_python}")
+    else:
+        print(GNU_RADIO_DISCOVERY_ERROR)
     server = ThreadingHTTPServer(("localhost", port), CTFHandler)
     print(f"Signal Forge CTF serving http://localhost:{port}")
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    finally:
+        stop_gnu_radio_processes()
+        if EXTERNAL_INGEST_SERVER is not None:
+            EXTERNAL_INGEST_SERVER.shutdown()
 
 
 if __name__ == "__main__":

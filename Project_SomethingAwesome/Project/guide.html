@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Setup Guide | Signal Forge CTF</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="guide-page">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Developer Setup</p>
+        <h1>Signal Forge Guide</h1>
+      </div>
+      <nav aria-label="Guide navigation">
+        <a href="/">Home</a>
+        <a href="/#tasks">Situations</a>
+        <a href="/guide.html#quickstart">Quick Start</a>
+        <a href="/guide.html#gnuradio">GNU Radio</a>
+        <a href="/guide.html#zmq">ZMQ Bridge</a>
+        <a href="/guide.html#verify">Verify</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="guide-hero">
+        <div>
+          <p class="status-pill"><span></span> Local receive-only training stack</p>
+          <h2>Set up the tools that feed live signals into the CTF.</h2>
+          <p>
+            This page is the developer route from a fresh machine to a live GNU
+            Radio flowgraph driving the Signal Forge waterfall. The assessed
+            range still works without SDR hardware; GNU Radio and ZMQ are for
+            building better captures, stronger subtasks, and live demonstrations.
+          </p>
+        </div>
+        <aside class="guide-callout">
+          <strong>Default live path</strong>
+          <code>GNU Radio -> ZMQ PUSH -> Python bridge -> Signal Forge ingest -> External feed</code>
+        </aside>
+      </section>
+
+      <section class="guide-layout" id="quickstart">
+        <aside class="guide-index" aria-label="Guide sections">
+          <a href="#quickstart">1. Run the site</a>
+          <a href="#python">2. Python tools</a>
+          <a href="#gnuradio">3. GNU Radio</a>
+          <a href="#external">4. External feed</a>
+          <a href="#zmq">5. ZMQ bridge</a>
+          <a href="#flowgraph">6. Flowgraph pattern</a>
+          <a href="#verify">7. Verify</a>
+          <a href="#research">8. Research path</a>
+        </aside>
+
+        <article class="guide-content">
+          <section class="guide-section">
+            <p class="eyebrow">Step 1</p>
+            <h2>Run the CTF Server</h2>
+            <p>
+              Start the local Python server first. It serves the pages, validates
+              flags, parses raw IQ, and opens the local signal-ingest socket.
+            </p>
+            <pre><code>cd C:\GithubRepositories\COMP6841\Project_SomethingAwesome\Project
+$env:PORT='8002'
+python server.py</code></pre>
+            <dl class="guide-facts">
+              <dt>Website</dt>
+              <dd><a href="http://localhost:8002">http://localhost:8002</a></dd>
+              <dt>Signal ingest</dt>
+              <dd><code>127.0.0.1:9100</code></dd>
+              <dt>Browser mode</dt>
+              <dd>Open a challenge and select <strong>External feed</strong>.</dd>
+            </dl>
+          </section>
+
+          <section class="guide-section" id="python">
+            <p class="eyebrow">Step 2</p>
+            <h2>Install Python Tooling</h2>
+            <p>
+              The base CTF uses only the Python standard library. The ZMQ bridge
+              needs `pyzmq` in the environment where the bridge runs.
+            </p>
+            <pre><code>python -m pip install pyzmq</code></pre>
+            <p>On Ubuntu or WSL, the distro package is usually enough:</p>
+            <pre><code>sudo apt update
+sudo apt install python3-zmq</code></pre>
+          </section>
+
+          <section class="guide-section" id="gnuradio">
+            <p class="eyebrow">Step 3</p>
+            <h2>Install GNU Radio</h2>
+            <p>
+              On Windows, use WSL/Ubuntu for the smoothest GNU Radio Companion
+              workflow. Keep flowgraphs receive-only or file/generated for this
+              project.
+            </p>
+            <pre><code>wsl --install
+sudo apt update
+sudo apt install gnuradio python3-numpy python3-scipy python3-zmq
+gnuradio-companion</code></pre>
+            <p>
+              The beginner challenge view now consumes the generated `.py`
+              flowgraph while that flowgraph is actually running. Its built-in
+              Signal Forge sink sends the post-channel-model complex samples to
+              the server; no recording is replayed or synthesized by the browser.
+            </p>
+          </section>
+
+          <section class="guide-section" id="external">
+            <p class="eyebrow">Step 4</p>
+            <h2>Test the External Feed</h2>
+            <p>
+              Before wiring GNU Radio, prove the browser path works with the
+              included sender. This should make the waterfall update immediately
+              after the challenge page is switched to External feed.
+            </p>
+            <pre><code>python tools/script_clients/external_signal_sender.py --challenge-id tunnel-packet-injection --mode fft</code></pre>
+            <p>Raw IQ test:</p>
+            <pre><code>python tools/script_clients/external_signal_sender.py --challenge-id tunnel-packet-injection --mode iq --block-samples 2048</code></pre>
+            <p>
+              Start the site with <code>python server.py</code>. Opening a
+              beginner challenge automatically launches its mapped generated
+              flowgraph. If GNU Radio uses a custom environment, set
+              <code>SIGNAL_FORGE_GNURADIO_PYTHON</code> to that environment's
+              Python executable before starting the server.
+            </p>
+          </section>
+
+          <section class="guide-section" id="zmq">
+            <p class="eyebrow">Step 5</p>
+            <h2>Bridge GNU Radio over ZMQ</h2>
+            <p>
+              Use a GNU Radio ZMQ sink for live work. The bridge receives raw
+              GNU Radio messages and forwards them into the same ingest socket
+              used by the External feed button.
+            </p>
+            <pre><code>python tools/script_clients/zmq_signal_bridge.py --challenge-id tunnel-packet-injection --endpoint tcp://127.0.0.1:5555 --pattern pull --dtype cf32 --center-hz 915000000 --sample-rate-hz 44200 --span-hz 44200</code></pre>
+            <div class="guide-grid">
+              <article>
+                <h3>PUSH/PULL</h3>
+                <p>Best default when the website bridge is the only consumer.</p>
+                <code>GNU Radio ZMQ PUSH Sink -> bridge --pattern pull</code>
+              </article>
+              <article>
+                <h3>PUB/SUB</h3>
+                <p>Useful when several tools need the same stream.</p>
+                <code>GNU Radio ZMQ PUB Sink -> bridge --pattern sub</code>
+              </article>
+            </div>
+          </section>
+
+          <section class="guide-section" id="flowgraph">
+            <p class="eyebrow">Step 6</p>
+            <h2>Build the Flowgraph</h2>
+            <p>Recommended live block settings in GNU Radio Companion:</p>
+            <dl class="guide-facts">
+              <dt>Block</dt>
+              <dd>ZMQ PUSH Sink</dd>
+              <dt>Input type</dt>
+              <dd>Complex</dd>
+              <dt>Address</dt>
+              <dd><code>tcp://127.0.0.1:5555</code></dd>
+              <dt>Bind</dt>
+              <dd>Yes</dd>
+              <dt>Pass Tags</dt>
+              <dd>No</dd>
+              <dt>High water mark</dt>
+              <dd>8 or 16 for low-latency display</dd>
+            </dl>
+            <p>
+              For most challenge development, stream `cf32` IQ. If the flowgraph
+              already computes FFT rows, use `--dtype f32fft --bins 384`.
+            </p>
+            <p>
+              For the built-in tasks, editing the generated Python flowgraph is
+              enough: update the vector payload, repeat block, repack block, or
+              signal source frequency in `radio/GNURadio`, then reload the task.
+              The backend-generated replay will follow the script without
+              needing a new recording.
+            </p>
+          </section>
+
+          <section class="guide-section" id="verify">
+            <p class="eyebrow">Step 7</p>
+            <h2>Verify the Pipeline</h2>
+            <ol class="guide-checklist">
+              <li>The server prints that Signal Forge is serving on `localhost:8002`.</li>
+              <li>The server status endpoint reports ingest enabled on `127.0.0.1:9100`.</li>
+              <li>The bridge prints ZMQ connection status and forwards frames.</li>
+              <li>The challenge workbench shows External feed metadata.</li>
+              <li>The waterfall moves continuously and the parser panel updates.</li>
+            </ol>
+            <pre><code>Invoke-WebRequest -UseBasicParsing 'http://localhost:8002/api/rf/external/status?challenge_id=tunnel-packet-injection'</code></pre>
+          </section>
+
+          <section class="guide-section" id="research">
+            <p class="eyebrow">Developer extension path</p>
+            <h2>Where to Push the Project Further</h2>
+            <div class="guide-grid">
+              <article>
+                <h3>Signal design</h3>
+                <p>Add distinct schemes per situation: OOK signage, FSK tolling, AM voice, weak PRNG hopping, DSSS, deceptive replay, and protocol-aware jamming.</p>
+              </article>
+              <article>
+                <h3>RF realism</h3>
+                <p>Model SNR, fading, Doppler, capture effect, receiver saturation, AGC behaviour, adjacent-channel interference, and timing recovery.</p>
+              </article>
+              <article>
+                <h3>Cyber depth</h3>
+                <p>Pair RF-derived inputs with firmware reversing, native parser bugs, fuzz harnesses, signed packet checks, authorization logic, and backend telemetry correlation.</p>
+              </article>
+              <article>
+                <h3>Defence</h3>
+                <p>Build defensive paths around freshness, message authentication, server-side policy, hardened parsers, anomaly detection, and operational holdover logic.</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="guide-section">
+            <p class="eyebrow">References</p>
+            <h2>Primary Docs</h2>
+            <ul class="guide-links">
+              <li><a href="https://wiki.gnuradio.org/index.php/InstallingGR">GNU Radio installation guide</a></li>
+              <li><a href="https://wiki.gnuradio.org/index.php/Understanding_ZMQ_Blocks">GNU Radio ZMQ block guide</a></li>
+              <li><a href="https://wiki.gnuradio.org/index.php?title=ZMQ_PUSH_Sink">GNU Radio ZMQ PUSH Sink</a></li>
+              <li><a href="https://pyzmq.readthedocs.io/">PyZMQ documentation</a></li>
+              <li><a href="/docs/external-signal-ingest.md">Signal Forge external ingest protocol</a></li>
+              <li><a href="/docs/gnu-radio-workflow.md">Signal Forge GNU Radio workflow</a></li>
+            </ul>
+          </section>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

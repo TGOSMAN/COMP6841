@@ -8,26 +8,245 @@ ROOT = Path(__file__).resolve().parents[2]
 CHALLENGES_PATH = ROOT / "data" / "challenges.json"
 
 
+TUNNEL_CAPTURE_STEMS = {
+    "tunnel-reading-signals": "ReadingSignals",
+    "tunnel-tuning": "TuningSignals",
+    "tunnel-basic-dos": "DoSAttackMe",
+    "tunnel-packet-injection": "InjectionTime",
+}
+SONG_META_CAPTURE_STEMS = {
+    "broadcast-reading-signals": "ReadingSignals",
+    "broadcast-tuning": "TuningSignals",
+    "broadcast-basic-dos": "DoSAttackMe",
+    "broadcast-packet-injection": "InjectionTime",
+}
+WEATHER_CAPTURE_STEMS = {
+    "weather-boring-intercept": ("InterceptingReceiver", "InterceptingReceiver.grc", "InterceptingReceiver.py"),
+    "weather-boring-obscured": ("InterceptingReceiver_Task2", "IThinkItsSecure.grc", "InterceptingReceiver_Task2.py"),
+    "weather-boring-active-re": ("EmergencyWarningLight", "EmergencyWarningLight.grc", "EmergencyWarningLight.py"),
+}
+
+
+def gnu_radio_artifacts(task_id: str, stem: str, folder: str, label_prefix: str) -> list[dict]:
+    label = f"{label_prefix} {stem}".strip()
+    live_output = folder in {"Tunnel_Task", "Song_Meta"}
+    artifacts = [
+        {
+            "label": f"{label} live GNU Radio output" if live_output else f"{label} generated GNU Radio replay",
+            "href": f"/api/rf/external/status?challenge_id={task_id}" if live_output else f"/api/rf/gnu-radio-capture?challenge_id={task_id}",
+            "type": "live GNU Radio CF32 stream" if live_output else "generated GNU Radio Python cf32",
+            "role": "signal",
+            "source": "gnu_radio_python_live" if live_output else "generated_gnuradio_python",
+        },
+    ]
+    if not live_output:
+        artifacts.append(
+            {
+                "label": f"{label} generated raw IQ sample",
+                "href": f"/api/rf/raw?challenge_id={task_id}&bytes=2097152",
+                "type": "bounded generated cf32 IQ sample",
+                "role": "raw_iq",
+                "source": "generated_gnuradio_python",
+            }
+        )
+    if folder != "WeatherBroadcast":
+        artifacts.extend(
+            [
+                {
+                    "label": f"{label} GNU Radio flowgraph",
+                    "href": f"/radio/GNURadio/{folder}/{stem}.grc",
+                    "type": "application/x-gnuradio-grc",
+                    "role": "flowgraph_source",
+                    "source": "gnu_radio_companion",
+                },
+                {
+                    "label": f"{label} generated Python",
+                    "href": f"/radio/GNURadio/{folder}/{stem}.py",
+                    "type": "text/x-python",
+                    "role": "flowgraph_source",
+                    "source": "gnu_radio_companion",
+                },
+            ]
+        )
+    return artifacts
+
+
+def tunnel_artifacts(task_id: str) -> list[dict]:
+    return gnu_radio_artifacts(task_id, TUNNEL_CAPTURE_STEMS[task_id], "Tunnel_Task", "")
+
+
+def song_meta_artifacts(task_id: str) -> list[dict]:
+    return gnu_radio_artifacts(task_id, SONG_META_CAPTURE_STEMS[task_id], "Song_Meta", "Song metadata")
+
+
+def weather_artifacts(task_id: str) -> list[dict]:
+    stem, grc_name, python_name = WEATHER_CAPTURE_STEMS[task_id]
+    artifacts = gnu_radio_artifacts(task_id, stem, "WeatherBroadcast", "Weather report")
+    artifacts.extend(
+        [
+            {
+                "label": f"{stem} GNU Radio flowgraph",
+                "href": f"/radio/GNURadio/WeatherBroadcast/{grc_name}",
+                "type": "application/x-gnuradio-grc",
+            },
+            {
+                "label": f"{stem} generated Python",
+                "href": f"/radio/GNURadio/WeatherBroadcast/{python_name}",
+                "type": "text/x-python",
+            },
+            {
+                "label": "Weather GNU Radio resource guide",
+                "href": "/radio/GNURadio/WeatherBroadcast/README.md",
+                "type": "text/markdown",
+            },
+        ]
+    )
+    if task_id == "weather-boring-intercept":
+        artifacts.extend(
+            [
+                {
+                    "label": "InterceptingReceiver real-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_Broadcast_Re.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
+                {
+                    "label": "InterceptingReceiver imaginary-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_2_IM.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
+            ]
+        )
+    elif task_id == "weather-boring-obscured":
+        artifacts.extend(
+            [
+                {
+                    "label": "InterceptingReceiver_Task2 embedded Python block",
+                    "href": "/radio/GNURadio/WeatherBroadcast/InterceptingReceiver_Task2_epy_block_0.py",
+                    "type": "text/x-python",
+                },
+                {
+                    "label": "InterceptingReceiver_Task2 real-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T2_RE.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
+                {
+                    "label": "InterceptingReceiver_Task2 imaginary-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T2_IM.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
+            ]
+        )
+    elif task_id == "weather-boring-active-re":
+        artifacts.extend(
+            [
+                {
+                    "label": "EmergencyWarningLight hopping block",
+                    "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight_epy_block_0.py",
+                    "type": "text/x-python",
+                },
+                {
+                    "label": "EmergencyWarningLight real-channel packet block",
+                    "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight_epy_block_1.py",
+                    "type": "text/x-python",
+                },
+                {
+                    "label": "EmergencyWarningLight imaginary-channel packet block",
+                    "href": "/radio/GNURadio/WeatherBroadcast/EmergencyWarningLight_epy_block_1_0.py",
+                    "type": "text/x-python",
+                },
+                {
+                    "label": "Extracted alarm receiver C logic",
+                    "href": "/radio/GNURadio/WeatherBroadcast/MyEmbeddedAlarmSystem.c",
+                    "type": "text/x-c",
+                },
+                {
+                    "label": "Extracted alarm receiver header",
+                    "href": "/radio/GNURadio/WeatherBroadcast/MyEmbeddedAlarmSystem.h",
+                    "type": "text/x-c",
+                },
+                {
+                    "label": "EmergencyWarningLight real-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T3_RE.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
+                {
+                    "label": "EmergencyWarningLight imaginary-channel WAV source",
+                    "href": "/radio/GNURadio/WeatherBroadcast/WeatherRadio_T3_IM.wav",
+                    "type": "audio/wav",
+                    "role": "source_audio",
+                    "download_only": True,
+                },
+            ]
+        )
+    return artifacts
+
+
+def emergency_audio_artifacts(challenge_id: str, active_transmission: bool = False) -> list[dict]:
+    artifacts = [
+        {
+            "label": "Live GNU Radio CF32 stream status",
+            "href": f"/api/rf/external/status?challenge_id={challenge_id}",
+            "type": "application/json",
+            "role": "signal",
+            "source": "gnu_radio_python_live",
+        },
+        {
+            "label": "CivilianEmergencyReceiver GNU Radio flowgraph",
+            "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.grc",
+            "type": "application/x-gnuradio-grc",
+            "role": "flowgraph_source",
+        },
+        {
+            "label": "CivilianEmergencyReceiver generated Python",
+            "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver.py",
+            "type": "text/x-python",
+            "role": "flowgraph_source",
+        },
+        {
+            "label": "Barker-13 and CRC-16 live source block",
+            "href": "/radio/GNURadio/CivilianEmergency/CivilianEmergencyReceiver_epy_block_0.py",
+            "type": "text/x-python",
+            "role": "flowgraph_source",
+        },
+        {
+            "label": "Live receiver protocol notes",
+            "href": "/radio/GNURadio/CivilianEmergency/README.md",
+            "type": "text/markdown",
+        },
+    ]
+    if active_transmission:
+        artifacts.append(
+            {
+                "label": "Recovered emergency receiver C logic",
+                "href": "/radio/GNURadio/EmergencyRadioAudio/emergency_receiver.c",
+                "type": "text/x-c",
+            }
+        )
+    return artifacts
+
+
 ARTIFACTS = {
-    "tunnel": [
-        {"label": "Tunnel sign OOK capture", "href": "/captures/01-tunnel-ook-sign.json", "type": "application/json", "role": "signal"},
-        {"label": "Generated SigMF metadata", "href": "/captures/01-tunnel-ook-sign.sigmf-meta", "type": "application/json"},
-        {"label": "Live raw IQ export", "href": "/api/rf/raw?challenge_id=tunnel-reading-signals", "type": "application/octet-stream"},
-    ],
     "broadcast": [
         {"label": "Clock-recovery metadata capture", "href": "/captures/06-decoder-clock-recovery.json", "type": "application/json", "role": "signal"},
         {"label": "Frame format reference", "href": "/artifacts/telemetry-frame.txt", "type": "text/plain"},
-    ],
-    "weather": [
-        {"label": "Weather voice allocation", "href": "/captures/15-air-weather-voice.json", "type": "application/json", "role": "signal"},
-        {"label": "Generated SigMF metadata", "href": "/captures/15-council-weather-audio.sigmf-meta", "type": "application/json"},
     ],
     "bushfire": [
         {"label": "Jamming and propagation capture", "href": "/captures/12-jamming-propagation.json", "type": "application/json", "role": "signal"},
         {"label": "Firmware manifest", "href": "/tools/firmware_re/firmware_manifest.json", "type": "application/json"},
         {"label": "Bushfire node C source", "href": "/tools/re_binaries/bushfire_node.c", "type": "text/plain"},
         {"label": "Bushfire node binary image", "href": "/tools/re_binaries/bushfire_node.bin", "type": "application/octet-stream"},
-        {"label": "Frequency router HDL", "href": "/tools/hdl/bushfire_frequency_router.v", "type": "text/plain"},
+        {"label": "Recovered 12-element complex beamformer HDL", "href": "/radio/AntennaBinFormer.v", "type": "text/plain"},
+        {"label": "Complex beamformer angular sweep testbench", "href": "/radio/AntennaBinFormer_tb.v", "type": "text/plain"},
     ],
     "farm": [
         {"label": "Malformed long-range TLV burst", "href": "/captures/10-tlv-malformed-burst.json", "type": "application/json", "role": "signal"},
@@ -55,11 +274,11 @@ TASKS = [
         "details": "Ask learners to inspect the waveform and signalling, extract packets, and recover plain-text content using a simple OOK-style scheme. Provide a live waterfall view and a time-series viewer for closer analysis.",
         "flag_location": "Within plain text packets.",
         "developer_comments": "There should be a little interactive sign showing the text that gets displayed. The signal should already be tuned in.",
-        "signal_scheme": "OOK-style tunnel sign beacon in the 915 MHz training band.",
+        "signal_scheme": "GNU Radio ReadingSignals cf32 capture: repeated byte payload, unpacked to OOK/ASK amplitude on a 10 kHz training tone.",
         "concepts": ["waterfall reading", "OOK", "packet extraction", "plain-text RF"],
         "steps": ["Open the tuned signal capture.", "Use the waterfall and time-series view to identify packet boundaries.", "Receive the already tuned sign message.", "Submit the flag contained in the plain-text packet."],
         "hints": ["The first tunnel task is tuned for the learner; focus on reading the signal shape.", "Use `receive` from the terminal or script interface after lock."],
-        "artifacts": ARTIFACTS["tunnel"],
+        "artifacts": tunnel_artifacts("tunnel-reading-signals"),
         "script_commands": ["receive"],
     },
     {
@@ -77,11 +296,11 @@ TASKS = [
         "details": "Introduce why no hardware has infinite bandwidth and why the user must focus on a band of interest. Learners tune the radio, export the tuned output as a waveform, decode the packet, and recover the plain-text flag.",
         "flag_location": "Within the plain text packet radio signal.",
         "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-        "signal_scheme": "The same tunnel sign OOK packet, but acquisition requires centre/span correction.",
+        "signal_scheme": "GNU Radio TuningSignals cf32 capture: OOK/ASK amplitude on a 10 kHz tone; the useful carrier is present but the receiver starts off-centre.",
         "concepts": ["receiver bandwidth", "centre frequency", "tuning", "plain-text decode"],
         "steps": ["Start with a wide span around 915 MHz.", "Scan until tunnel sign energy appears.", "Tune centre frequency and demodulation until the receiver locks.", "Receive and submit the packet flag."],
         "hints": ["Try `scan`, then `tune 915.000`.", "AUTO demodulation is acceptable for this beginner task."],
-        "artifacts": ARTIFACTS["tunnel"],
+        "artifacts": tunnel_artifacts("tunnel-tuning"),
         "script_commands": ["scan", "tune 915.000", "receive"],
     },
     {
@@ -99,11 +318,11 @@ TASKS = [
         "details": "Introduce basic signal interference so learners can observe when the backend can no longer decode the expected string. The user gets a flag when the sign can no longer show the true message.",
         "flag_location": "Printed on the interactive sign when the decoded string does not match what was sent.",
         "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-        "signal_scheme": "Tunnel OOK packet plus a local simulated noise/interference action.",
+        "signal_scheme": "GNU Radio DoSAttackMe cf32 capture: tunnel OOK packet used as the reference receiver signal, then a local interference action corrupts the displayed sign state.",
         "concepts": ["interference", "availability", "decode failure", "CEMA"],
         "steps": ["Lock onto the tunnel sign signal.", "Apply a local interference effect.", "Observe the displayed message mismatch.", "Submit the sign's failure flag."],
         "hints": ["The action is local simulation only.", "Use `interfere noise` or `interfere mismatch` after receiver lock."],
-        "artifacts": ARTIFACTS["tunnel"],
+        "artifacts": tunnel_artifacts("tunnel-basic-dos"),
         "script_commands": ["tune 915.000", "receive", "interfere mismatch"],
     },
     {
@@ -121,11 +340,11 @@ TASKS = [
         "details": "Provide a tutorial on configuring the transmitter interface. The learner prepares a packet to be sent and accepted by the tunnelling sign board.",
         "flag_location": "Revealed when a user-written message is transmitted; the flag is appended on the end.",
         "developer_comments": "There should be a little interactive sign showing the text that gets displayed.",
-        "signal_scheme": "OOK-style sign-board packet generated through the local TX chain.",
+        "signal_scheme": "GNU Radio InjectionTime cf32 capture: tunnel sign packet profile used as the target waveform for local packet-injection practice.",
         "concepts": ["packet injection", "TX chain", "framing", "local simulation"],
         "steps": ["Lock onto the sign signal.", "Prepare a short sign message.", "Transmit the packet with the local TX chain.", "Read the appended flag from the accepted sign output."],
         "hints": ["Include the word `sign` or `message` in your transmitted packet.", "Script users can call `/api/script/terminal` with `transmit sign MESSAGE`."],
-        "artifacts": ARTIFACTS["tunnel"],
+        "artifacts": tunnel_artifacts("tunnel-packet-injection"),
         "script_commands": ["tune 915.000", "transmit sign TEST MESSAGE"],
     },
     {
@@ -143,11 +362,11 @@ TASKS = [
         "details": "Ask learners to inspect the waveform and signalling, extract packets, and recover plain-text content using an accessible FSK or ASK scheme. Provide live waterfall and time-series views.",
         "flag_location": "Within plain text packets.",
         "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-        "signal_scheme": "ASK/Manchester metadata side channel centred near 315 MHz.",
-        "concepts": ["ASK", "Manchester timing", "metadata", "console output"],
+        "signal_scheme": "GNU Radio Song_Meta ReadingSignals cf32 capture: 4-level ASK where each amplitude symbol carries 2 bits on a 10 kHz metadata tone.",
+        "concepts": ["4-level ASK", "2-bit symbols", "metadata", "console output"],
         "steps": ["Open the metadata capture.", "Identify repeated metadata frames.", "Receive the broadcast metadata.", "Submit the plain-text packet flag."],
         "hints": ["The visible side channel is deliberately low rate.", "Use `receive` after lock."],
-        "artifacts": ARTIFACTS["broadcast"],
+        "artifacts": song_meta_artifacts("broadcast-reading-signals"),
         "script_commands": ["receive"],
     },
     {
@@ -165,11 +384,11 @@ TASKS = [
         "details": "Introduce why no hardware has infinite bandwidth and why the user must focus on a band of interest. Learners tune the radio, export the tuned output, decode the packet, and recover the flag.",
         "flag_location": "Within the plain text packet radio signal.",
         "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-        "signal_scheme": "Manchester-timed ASK traffic near 315 MHz.",
-        "concepts": ["bandwidth", "tuning", "ASK", "packet decode"],
+        "signal_scheme": "GNU Radio Song_Meta TuningSignals cf32 capture: 4-level ASK/2-bit metadata symbols; useful carrier is present but the receiver starts off-centre.",
+        "concepts": ["bandwidth", "tuning", "4-level ASK", "packet decode"],
         "steps": ["Scan around 315 MHz.", "Tune until the metadata side channel locks.", "Decode the buffered frame.", "Submit the flag."],
         "hints": ["Try `tune 315.000` with AUTO or ASK demodulation.", "The useful packet begins with a recognizable metadata header."],
-        "artifacts": ARTIFACTS["broadcast"],
+        "artifacts": song_meta_artifacts("broadcast-tuning"),
         "script_commands": ["scan", "tune 315.000", "decode"],
     },
     {
@@ -187,11 +406,11 @@ TASKS = [
         "details": "Introduce basic signal interference so learners can observe when the backend can no longer decode the expected string.",
         "flag_location": "Printed on the interactive receiver display when the decoded string does not match what was sent.",
         "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-        "signal_scheme": "ASK metadata frame plus local simulated interference.",
+        "signal_scheme": "GNU Radio Song_Meta DoSAttackMe cf32 capture: 4-level ASK metadata reference signal plus local simulated interference.",
         "concepts": ["DoS", "interference", "metadata integrity", "operator display"],
         "steps": ["Lock the metadata receiver.", "Apply local interference.", "Observe the console printout mismatch.", "Submit the displayed flag."],
         "hints": ["Try `interfere metadata mismatch`.", "The flag appears when the console detects the mismatch."],
-        "artifacts": ARTIFACTS["broadcast"],
+        "artifacts": song_meta_artifacts("broadcast-basic-dos"),
         "script_commands": ["tune 315.000", "receive", "interfere metadata mismatch"],
     },
     {
@@ -209,11 +428,11 @@ TASKS = [
         "details": "Provide a tutorial on configuring the transmitter interface. The learner prepares a packet to be sent and accepted by the receiver.",
         "flag_location": "Revealed when a user-written metadata message is transmitted; the flag is appended on the end.",
         "developer_comments": "Show a console printout that illustrates the broadcast metadata.",
-        "signal_scheme": "Manchester/ASK metadata injection through the local TX chain.",
-        "concepts": ["packet injection", "metadata trust", "framing", "operator console"],
+        "signal_scheme": "GNU Radio Song_Meta InjectionTime cf32 capture: 4-level ASK metadata target waveform for local packet-injection practice.",
+        "concepts": ["packet injection", "metadata trust", "4-level ASK framing", "operator console"],
         "steps": ["Lock the metadata receiver.", "Prepare a metadata message.", "Transmit the message locally.", "Read the appended flag from the console printout."],
         "hints": ["Include `metadata` in the transmitted payload.", "This does not transmit over real RF."],
-        "artifacts": ARTIFACTS["broadcast"],
+        "artifacts": song_meta_artifacts("broadcast-packet-injection"),
         "script_commands": ["tune 315.000", "transmit metadata NOW PLAYING"],
     },
     {
@@ -234,8 +453,8 @@ TASKS = [
         "signal_scheme": "Patterned hopping audio/QAM training capture with a recoverable spoken callsign.",
         "concepts": ["frequency hopping", "audio intercept", "callsign recovery", "offline scripting"],
         "steps": ["Inspect hop timing across the waterfall.", "Predict the next frequency in the clear pattern.", "Reassemble or listen to the voice bursts.", "Submit the callsign codeword."],
-        "hints": ["The first hopping pattern is intentionally clear.", "Use the script interface to automate tune/receive cycles."],
-        "artifacts": ARTIFACTS["weather"],
+        "hints": ["The first hopping pattern is intentionally clear.", "Use the script interface to automate tune/receive cycles; a successful receive awards this subtask's callsign flag."],
+        "artifacts": weather_artifacts("weather-boring-intercept"),
         "script_commands": ["tune 169.650", "receive"],
     },
     {
@@ -248,16 +467,16 @@ TASKS = [
         "track": "signals",
         "difficulty": "Moderate",
         "points": 220,
-        "scenario": "The weather voice service moves from a clear hop pattern to a weak pseudorandom sequence.",
-        "objective": "Identify the weak generator family, predict enough hops, and recover the callsign codeword.",
-        "details": "Explain that predictable hopping is weak and that pseudorandom hopping is often used. A weak generator from a small list is used, and the learner must identify the pattern and perform the same recovery as before.",
+        "scenario": "The weather voice service now hops randomly between channels while a weak pseudorandom sequence obscures its phase symbols.",
+        "objective": "Track the random carrier hops, identify the weak phase generator, de-rotate the symbols, and recover the callsign codeword.",
+        "details": "The hop selection and phase obfuscation are independent. Follow the changing carrier, then identify RANDU from its phase-symbol sequence and remove those rotations to recover the weather audio.",
         "flag_location": "The codeword spoken as a callsign to everyone.",
         "developer_comments": "Ability to record signal with tuned receiver and download a data file of samples for offline processing.",
-        "signal_scheme": "Weak-PRNG hopping audio capture with recoverable state.",
-        "concepts": ["weak PRNG", "hop prediction", "audio recovery", "scripting"],
-        "steps": ["Collect enough observed hop offsets.", "Compare them with the provided weak-generator candidates.", "Predict remaining hops.", "Recover and submit the callsign codeword."],
-        "hints": ["The sequence is weak by design; treat it as a research exercise.", "Script command: `receive` reports candidate hop-state evidence after lock."],
-        "artifacts": ARTIFACTS["weather"],
+        "signal_scheme": "Complex weather voice audio randomly hops between six RF channels every 100 ms; fixed-seed RANDU rotates only the QPSK phase symbols.",
+        "concepts": ["frequency hopping", "weak PRNG", "phase de-rotation", "audio recovery", "scripting"],
+        "steps": ["Track the observed carrier hop for each 100 ms interval.", "Extract the QPSK phase-symbol sequence.", "Identify RANDU and predict the remaining phase rotations.", "De-rotate the audio and submit the spoken callsign codeword."],
+        "hints": ["RANDU controls phase symbols only; it does not choose the hop channel.", "After locking the receiver, `decode weak-prng` awards this subtask's own recovered callsign flag."],
+        "artifacts": weather_artifacts("weather-boring-obscured"),
         "script_commands": ["tune 169.650", "receive", "decode weak-prng"],
     },
     {
@@ -278,9 +497,9 @@ TASKS = [
         "signal_scheme": "Digital audio metadata over a keyed weather channel.",
         "concepts": ["reverse engineering", "C receiver logic", "metadata control", "warning activation"],
         "steps": ["Inspect the extracted receiver C logic.", "Identify the metadata field that controls warning priority.", "Craft a valid metadata/audio frame.", "Activate the light without breaking the receiver checks."],
-        "hints": ["Look for warning or priority metadata in the receiver source.", "Try `send warning light auth` after lock."],
-        "artifacts": ARTIFACTS["weather"],
-        "script_commands": ["tune 169.650", "send warning light auth"],
+        "hints": ["Trace the C decoder's bit order and the condition in AlarmCheck.", "After receiver lock, submit the forged uint32 as `send 0x........` or use the warning-light packet panel."],
+        "artifacts": weather_artifacts("weather-boring-active-re"),
+        "script_commands": ["tune 169.650", "send 0x........"],
     },
     {
         "id": "civilian-emergency-intercept",
@@ -292,16 +511,16 @@ TASKS = [
         "track": "signals",
         "difficulty": "Moderate",
         "points": 200,
-        "scenario": "An IQ recording contains several short public-facility audio bursts spread across frequencies.",
-        "objective": "Identify the hopping pattern, reassemble the bursts, and recover the spoken message.",
-        "details": "The participant receives an IQ recording containing short audio bursts spread across different frequencies. They must identify the hopping pattern, reassemble the bursts, and recover the spoken message.",
+        "scenario": "A live GNU Radio receiver emits public-facility alert audio and a Barker-13 synchronized metadata frame across several frequencies.",
+        "objective": "Follow the live hopping pattern, correlate the Barker-13 prefix, and verify the recovered message with CRC-16.",
+        "details": "The generated GNU Radio Python flowgraph continuously creates alert audio in memory, adds a Barker-13 metadata preamble and a CRC-16/CCITT trailer, passes it through a weather-style channel model, and streams post-channel complex samples directly to the server.",
         "flag_location": "The callsign or location mentioned in the audio is the first flag.",
-        "developer_comments": "Audio output should be a UI feature. Ability to record signal with tuned receiver and download sample files for offline processing.",
-        "signal_scheme": "AM voice bursts across a synthetic emergency-radio allocation.",
-        "concepts": ["IQ recording", "audio bursts", "hop pattern", "message recovery"],
-        "steps": ["Open the emergency audio capture.", "Identify active frequencies and burst order.", "Listen to or inspect the reassembled call.", "Submit the callsign or location."],
-        "hints": ["This is the interactive audio level in the browser.", "Generate a new intercept and use the transcript backup if audio playback is unavailable."],
-        "artifacts": ARTIFACTS["weather"],
+        "developer_comments": "Strict live GNU Radio source. No saved IQ or audio file is used and there is no synthetic server fallback.",
+        "signal_scheme": "Live GNU Radio AM alert audio with Barker-13 BPSK metadata and CRC-16/CCITT-FALSE.",
+        "concepts": ["live complex stream", "Barker-13 synchronization", "CRC-16 validation", "hop pattern", "message recovery"],
+        "steps": ["Start the receiver and observe the live GNU Radio stream.", "Identify active frequencies and correlate the Barker-13 prefix.", "Reassemble the metadata bytes and verify the trailing CRC-16.", "Submit the callsign or location."],
+        "hints": ["The frame is Barker-13, payload bytes, then a big-endian CRC-16/CCITT-FALSE value.", "Tune 169.650 MHz and run `receive`; if GNU Radio is unavailable the task reports that instead of substituting saved data."],
+        "artifacts": emergency_audio_artifacts("civilian-emergency-intercept"),
         "script_commands": ["tune 169.650", "receive"],
     },
     {
@@ -316,14 +535,14 @@ TASKS = [
         "points": 220,
         "scenario": "The emergency audio network changes to a weak pseudorandom hopping sequence.",
         "objective": "Identify which weak generator was used, recover enough state, and predict remaining hops.",
-        "details": "The system changes to a weak pseudorandom hopping sequence. The participant is told that one generator from a small list was used and must identify it, recover enough state, and predict remaining hops.",
+        "details": "The same generated Python flowgraph now selects its carrier with a weak live LCG. Every generated metadata frame still starts with Barker-13 and ends with CRC-16/CCITT, so synchronization and integrity can be distinguished from hop prediction.",
         "flag_location": "The callsign or location mentioned in the audio is the first flag.",
-        "developer_comments": "Ability to record signal with tuned receiver and download sample files for offline processing.",
-        "signal_scheme": "Weak-PRNG hopped emergency audio bursts.",
-        "concepts": ["weak PRNG", "state recovery", "hop prediction", "audio operations"],
-        "steps": ["Collect hop observations.", "Test the weak generator list.", "Predict the next burst frequency.", "Recover the callsign/location flag."],
-        "hints": ["The generator is weak enough for research and scripting.", "Use the networked terminal to automate repeated tune/status calls."],
-        "artifacts": ARTIFACTS["weather"],
+        "developer_comments": "Strict live GNU Radio source. No saved IQ or audio file is used and there is no synthetic server fallback.",
+        "signal_scheme": "Weak-LCG hopped live AM alert audio with Barker-13 BPSK metadata and CRC-16/CCITT-FALSE.",
+        "concepts": ["weak PRNG", "state recovery", "hop prediction", "Barker-13 synchronization", "CRC-16 validation", "audio operations"],
+        "steps": ["Collect hop observations from the live stream.", "Test the weak generator list.", "Predict the next burst frequency and correlate Barker-13.", "Reject frames whose trailing CRC-16 is invalid.", "Recover the callsign/location flag."],
+        "hints": ["The generator is weak enough for research and scripting; framing is independent of the hop sequence.", "After predicting the sequence, `decode weak-prng` awards this subtask's own recovery flag."],
+        "artifacts": emergency_audio_artifacts("civilian-emergency-obscured"),
         "script_commands": ["tune 169.650", "decode weak-prng"],
     },
     {
@@ -336,17 +555,17 @@ TASKS = [
         "track": "cyber",
         "difficulty": "Moderate",
         "points": 280,
-        "scenario": "Recovered digital audio contains metadata that controls normal, priority, and evacuation handling.",
-        "objective": "Reverse engineer the receiver C logic and submit a valid public warning message accepted by the simulated receiver.",
-        "details": "The recovered digital audio contains metadata for normal, priority warning, or evacuation alert handling. The participant is given a partially extracted C file from the receiver software and must reverse engineer metadata, audio frames, and integrity checks. The final task is to create and submit a valid audio warning message that activates the virtual warning light and plays the audio.",
+        "scenario": "A live GNU Radio evacuation transmission carries receiver-control metadata after a Barker-13 synchronization code and before a CRC-16 trailer.",
+        "objective": "Reverse engineer the receiver C logic and submit a complete warning message whose Barker framing and CRC-16 are valid.",
+        "details": "The generated GNU Radio Python flowgraph continuously creates evacuation audio and metadata in memory. The participant must reverse the receiver logic, preserve the Barker-13 prefix, recalculate the CRC-16/CCITT trailer, and submit a message accepted by the simulated receiver.",
         "flag_location": "Triggering the warning light alert system without setting off surrounding checks.",
-        "developer_comments": "The light is an additional UI feature. New audio signal/radio data is needed. Ability to record tuned receiver samples is required.",
-        "signal_scheme": "Digital emergency-audio metadata with integrity checks.",
-        "concepts": ["reverse engineering", "metadata integrity", "message crafting", "operator effect"],
-        "steps": ["Study the extracted receiver C file.", "Find metadata and integrity-check placement.", "Create a valid warning message.", "Activate the virtual warning light without triggering checks."],
-        "hints": ["The warning light is controlled by metadata, not by audio level alone.", "Try `send evacuation warning auth` after understanding the fields."],
-        "artifacts": ARTIFACTS["weather"],
-        "script_commands": ["tune 169.650", "send evacuation warning auth"],
+        "developer_comments": "Strict live GNU Radio source. No saved IQ or audio file is used and there is no synthetic server fallback.",
+        "signal_scheme": "Live GNU Radio evacuation audio with Barker-13 framed metadata and CRC-16/CCITT-FALSE.",
+        "concepts": ["reverse engineering", "Barker-13 framing", "CRC-16 integrity", "message crafting", "operator effect"],
+        "steps": ["Study the extracted receiver C file.", "Find the Barker prefix, metadata, and trailing CRC placement.", "Create a warning message with a recalculated CRC-16.", "Activate the virtual warning light without triggering checks."],
+        "hints": ["The warning light is controlled by metadata with a valid CRC, not by audio level alone.", "Use the emergency-transmission panel to intercept a current AUTH code and rebroadcast a complete warning."],
+        "artifacts": emergency_audio_artifacts("civilian-emergency-active-re", active_transmission=True),
+        "script_commands": ["tune 169.650", "receive"],
     },
     {
         "id": "bushfire-re-embedded",
@@ -380,17 +599,17 @@ TASKS = [
         "track": "cyber",
         "difficulty": "Advanced",
         "points": 340,
-        "scenario": "A recovered HDL block has a critical control flaw in its state handling.",
-        "objective": "Review the HDL, identify the flaw, and provide a testbench input that reaches the faulty condition.",
-        "details": "Review HDL and find the critical flaw such as no default statement or a race condition with an inferred latch.",
-        "flag_location": "Provide a live testbench input to the file that executes the faulting condition; upon failure it produces a flag.",
-        "developer_comments": "A live HDL testbench runner should be added for this advanced task.",
-        "signal_scheme": "HDL-controlled frequency-routing logic driven by decoded RF commands.",
-        "concepts": ["HDL review", "inferred latch", "testbench", "hardware security"],
-        "steps": ["Open the HDL evidence.", "Find the missing default or latch-style flaw.", "Construct a testbench input for the faulting condition.", "Submit the test input through the local interface."],
-        "hints": ["State machines without defaults often preserve stale control values.", "Try `send testbench latch default`."],
+        "scenario": "A recovered 12-element complex phased-array HDL block accepts relay data only when its quantised I/Q beam sum appears to arrive through the trusted beam.",
+        "objective": "Reverse engineer the beam gate, map its full response, and demonstrate an unintended lobe that is accepted as the trusted look direction.",
+        "details": "The design complex-multiplies every I/Q ADC channel by a quantised steering coefficient, accumulates the result, and gates data on beam magnitude. Inspect the HDL and sweep testbench to discover where the array geometry creates additional accepted lobes.",
+        "flag_location": "Submit an off-axis arrival bin and correlation score that the recovered beam gate still accepts.",
+        "developer_comments": "The advanced HDL task models a phased-array security boundary with an intended main lobe and poorly understood secondary/grating lobes.",
+        "signal_scheme": "Twelve-element complex I/Q multiply-accumulate beamformer with four-state phase weights gating decoded 433.92 MHz relay data.",
+        "concepts": ["HDL reverse engineering", "beamforming", "grating lobes", "spatial access control"],
+        "steps": ["Inspect the recovered beam-gate HDL.", "Run or reason through the 32-bin sweep testbench.", "Separate the intended main beam from off-axis accepted lobes.", "Submit one hidden lobe as `send beam bin <n> correlation <score>`."],
+        "hints": ["Do not assume a matching quantised steering vector identifies only one physical direction.", "The accepted off-axis response has correlation above the HDL threshold."],
         "artifacts": ARTIFACTS["bushfire"],
-        "script_commands": ["send testbench latch default"],
+        "script_commands": ["send beam bin <n> correlation <score>"],
     },
     {
         "id": "bushfire-rce",

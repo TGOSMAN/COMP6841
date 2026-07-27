@@ -4,6 +4,9 @@ const analysis = {
   task: null,
   meta: null,
   rows: [],
+  timeRows: [],
+  iqRows: [],
+  symbolBits: "",
   frame: 0,
   playing: false,
   timer: null,
@@ -16,7 +19,7 @@ const analysis = {
   frontendMode: "basic",
   tx: { config: null, remainingFrames: 0, history: new Map() },
   sourceMode: "live",
-  live: { stream: null, started: false, events: [], lastSamples: [], fallbackAttempted: false },
+  live: { stream: null, started: false, events: [], lastSamples: [], noDataTimer: null },
   audio: { context: null, oscillator: null, gain: null, timer: null, playing: false }
 };
 const weatherRadio = {
@@ -26,6 +29,9 @@ const weatherRadio = {
   audioContext: null,
   noiseSource: null,
   noiseGain: null,
+  initialised: false
+};
+const alarmPacketLab = {
   initialised: false
 };
 sessionStorage.setItem("signalForgeSession", analysis.sessionId);
@@ -40,17 +46,63 @@ const timeSeriesContext = timeSeries.getContext("2d");
 const nativeWaterfall = document.createElement("canvas");
 const nativeWaterfallContext = nativeWaterfall.getContext("2d");
 
+function setSignalSourceMode(mode) {
+  analysis.sourceMode = mode;
+  ["live", "artifact", "external"].forEach((source) => {
+    const button = byId(`source-${source}`);
+    if (button) button.classList.toggle("active", source === mode);
+  });
+}
+
+function describeExternalIngest(meta) {
+  const ingest = meta?.external_ingest || {};
+  const endpoint = `${ingest.host || "127.0.0.1"}:${ingest.port || 9100}`;
+  const liveGnuRadio = meta?.source_mode === "live_gnuradio_stream";
+  const sourceName = liveGnuRadio ? "GNU Radio live sink" : "External ingest";
+  const flowgraph = meta?.flowgraph_process || {};
+  if (liveGnuRadio && ["unavailable", "exited"].includes(flowgraph.state)) {
+    return flowgraph.error || "The mapped GNU Radio flowgraph could not be started";
+  }
+  if (!ingest.enabled) return `${sourceName} unavailable: ${ingest.error || endpoint}`;
+  if (!meta?.last_seen) {
+    return flowgraph.state === "running"
+      ? `Starting ${flowgraph.script || "mapped GNU Radio flowgraph"}`
+      : `Waiting for ${sourceName} CF32 samples on ${endpoint}`;
+  }
+  return `${sourceName} ${endpoint} / ${meta.buffered_rows || 0} buffered`;
+}
+
+function showSignalDataAlert(detail) {
+  byId("signal-data-alert-detail").textContent = detail;
+  byId("signal-data-alert").hidden = false;
+}
+
+function clearSignalDataAlert() {
+  clearTimeout(analysis.live.noDataTimer);
+  analysis.live.noDataTimer = null;
+  byId("signal-data-alert").hidden = true;
+}
+
+function watchForMissingLiveData() {
+  clearTimeout(analysis.live.noDataTimer);
+  analysis.live.noDataTimer = setTimeout(() => {
+    if (!analysis.rows.length) {
+      showSignalDataAlert(
+        "The server is running, but the mapped GNU Radio Python flowgraph has not supplied CF32 samples. No saved capture or synthetic fallback will be used."
+      );
+    }
+  }, 3000);
+}
+
 async function bootChallenge() {
   const sessionHeaders = { "X-Signal-Session": analysis.sessionId };
-  const [tasksResponse, contextsResponse, modeResponse, sessionResponse] = await Promise.all([
+  const [tasksResponse, contextsResponse, sessionResponse] = await Promise.all([
     fetch("/api/tasks"),
     fetch("/api/contexts"),
-    fetch("/api/mode"),
     fetch("/api/rf/session", { headers: sessionHeaders })
   ]);
   analysis.tasks = (await tasksResponse.json()).tasks;
   analysis.contexts = (await contextsResponse.json()).contexts;
-  renderMode((await modeResponse.json()).mode);
   const session = await sessionResponse.json();
   analysis.userData = session.user_data;
   byId("terminal-user").textContent = `${session.user_data.callsign} / ${session.user_data.operator_id}`;
@@ -89,7 +141,13 @@ function renderChallenge() {
     <details><summary>Hint ${hintIndex + 1}</summary><p>${escapeHtml(hint)}</p></details>
   `).join("");
   renderArtifacts();
-  byId("source-raw-download").href = `/api/rf/raw?challenge_id=${encodeURIComponent(task.id)}`;
+  const signalArtifact = task.artifacts.find((artifact) => artifact.role === "signal");
+  const rawArtifact = task.artifacts.find((artifact) => artifact.role === "raw_iq");
+  const liveGnuRadio = signalArtifact?.source === "gnu_radio_python_live";
+  byId("source-artifact").hidden = liveGnuRadio;
+  byId("source-external").hidden = liveGnuRadio;
+  byId("source-raw-download").hidden = !rawArtifact;
+  if (rawArtifact) byId("source-raw-download").href = rawArtifact.href;
   renderParserStages();
   updateEffectStage("idle", "Awaiting receiver output");
   renderPagination(index, sequence);
@@ -102,9 +160,12 @@ function renderChallenge() {
     backLink.href = "/#tasks";
     backLink.textContent = "Back to all situations";
   }
-  const isWeatherRadio = task.id === "civilian-emergency-intercept";
-  byId("weather-radio").hidden = !isWeatherRadio;
-  if (isWeatherRadio) initialiseWeatherRadio();
+  const isEmergencyTransmission = task.id === "civilian-emergency-active-re";
+  byId("weather-radio").hidden = !isEmergencyTransmission;
+  if (isEmergencyTransmission) initialiseWeatherRadio();
+  const isAlarmPacketTask = task.id === "weather-boring-active-re";
+  byId("alarm-packet-lab").hidden = !isAlarmPacketTask;
+  if (isAlarmPacketTask) initialiseAlarmPacketLab();
 }
 
 function renderScriptCommands(task) {
@@ -131,6 +192,61 @@ function initialiseWeatherRadio() {
   generateWeatherIntercept();
 }
 
+function initialiseAlarmPacketLab() {
+  if (alarmPacketLab.initialised) return;
+  alarmPacketLab.initialised = true;
+  byId("alarm-packet-form").addEventListener("submit", submitAlarmPacket);
+}
+
+async function submitAlarmPacket(event) {
+  event.preventDefault();
+  const packetInput = byId("alarm-packet-input");
+  const result = byId("alarm-packet-result");
+  const packet = packetInput.value.trim();
+  if (!packet) {
+    result.textContent = "Enter one unsigned 32-bit packet in hexadecimal or decimal.";
+    packetInput.focus();
+    return;
+  }
+
+  const submit = event.currentTarget.querySelector("button");
+  submit.disabled = true;
+  result.textContent = "Clocking forged packet into the embedded AlarmCheck path...";
+  try {
+    const response = await fetch("/api/weather/alarm", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Signal-Session": analysis.sessionId
+      },
+      body: JSON.stringify({
+        session_id: analysis.sessionId,
+        challenge_id: analysis.task.id,
+        packet
+      })
+    });
+    const data = await response.json();
+    result.textContent = `${data.packet || packet} → emergency ${data.decoded_emergency || "unknown"}. ${data.message || ""}`;
+    byId("alarm-controller-state").textContent = data.alarm_active ? "ALARM_CHECK / ACTIVE" : "ALARM_CHECK / REJECTED";
+    byId("alarm-beacon").classList.toggle("active", Boolean(data.alarm_active));
+    byId("alarm-beacon").setAttribute("aria-label", data.alarm_active ? "Warning light active" : "Warning light off");
+    byId("alarm-beacon-label").textContent = data.alarm_active ? "LIGHT ACTIVE" : "LIGHT OFF";
+    if (data.alarm_active) {
+      updateEffectStage("warning", data.flag || "Forged alarm packet accepted");
+      terminalWrite(`FORGED WEATHER PACKET ACCEPTED ${data.packet} / emergency=${data.decoded_emergency}`, "system");
+    } else {
+      updateEffectStage("idle", "Forged packet did not activate AlarmCheck");
+      terminalWrite(`WEATHER PACKET REJECTED ${data.packet || packet} / emergency=${data.decoded_emergency || "invalid"}`, "error");
+    }
+    if (data.flag) byId("challenge-flag").value = data.flag;
+  } catch (error) {
+    result.textContent = `Packet link failed: ${error.message}`;
+    updateEffectStage("idle", "Warning-light controller unavailable");
+  } finally {
+    submit.disabled = false;
+  }
+}
+
 async function generateWeatherIntercept() {
   stopWeatherPlayback();
   const generateButton = byId("weather-generate");
@@ -153,7 +269,7 @@ async function generateWeatherIntercept() {
     byId("weather-report-form").querySelector("button").disabled = false;
     byId("weather-injection").value = "";
     byId("weather-radio-status").innerHTML = "<i></i> Intercept ready";
-    byId("weather-report-result").textContent = `Intercept ready: ${weatherRadio.intercept.callsign} on ${weatherRadio.intercept.channel}. Listen for the protocol fields, then write your own warning message.`;
+    byId("weather-report-result").textContent = `Transmission captured: ${weatherRadio.intercept.callsign} on ${weatherRadio.intercept.channel}. Recover every protocol field, then compose the accepted emergency rebroadcast.`;
     terminalWrite(`VOICE INTERCEPT ${weatherRadio.intercept.intercept_id} buffered on ${weatherRadio.intercept.channel}`, "system");
   } catch (error) {
     byId("weather-radio-status").innerHTML = "<i></i> Link failed";
@@ -239,7 +355,7 @@ function stopWeatherPlayback(status = "Intercept stopped") {
   try { weatherRadio.noiseSource?.stop(); } catch { /* already stopped */ }
   weatherRadio.noiseSource = null;
   weatherRadio.noiseGain = null;
-  byId("weather-play").textContent = "2. Listen to authentic call";
+  byId("weather-play").textContent = "2. Listen to intercepted call";
   byId("weather-radio-scope").classList.remove("active");
   byId("weather-radio-status").classList.remove("transmitting");
   if (weatherRadio.intercept) byId("weather-radio-status").innerHTML = `<i></i> ${escapeHtml(status)}`;
@@ -262,6 +378,7 @@ async function submitWeatherInjection(event) {
     headers: { "Content-Type": "application/json", "X-Signal-Session": analysis.sessionId },
     body: JSON.stringify({
       session_id: analysis.sessionId,
+      challenge_id: analysis.task.id,
       intercept_id: weatherRadio.intercept.intercept_id,
       message: injectionMessage
     })
@@ -316,14 +433,16 @@ function renderArtifacts() {
   const list = byId("challenge-artifacts");
   list.innerHTML = "";
   analysis.task.artifacts.forEach((artifact) => {
-    const href = artifact.href.startsWith("/api/rf/raw") ? `/api/rf/raw?challenge_id=${encodeURIComponent(analysis.task.id)}` : artifact.href;
+    const href = artifact.href.startsWith("/api/rf/raw") && !artifact.href.includes("challenge_id=")
+      ? `/api/rf/raw?challenge_id=${encodeURIComponent(analysis.task.id)}`
+      : artifact.href;
     const item = document.createElement("div");
     item.className = "resource-item";
-    item.innerHTML = `
-      <button type="button"><span><strong>${escapeHtml(artifact.label)}</strong><small>${escapeHtml(artifact.type || "artifact")}</small></span><i>Inspect</i></button>
-      <a href="${escapeHtml(href)}" download>Download</a>
-    `;
-    item.querySelector("button").addEventListener("click", () => inspectArtifact({ ...artifact, href }));
+    const resourceSummary = `<span><strong>${escapeHtml(artifact.label)}</strong><small>${escapeHtml(artifact.type || "artifact")}</small></span>`;
+    item.innerHTML = artifact.download_only
+      ? `<div class="resource-file">${resourceSummary}<i>Source file</i></div><a href="${escapeHtml(href)}" download>Download</a>`
+      : `<button type="button">${resourceSummary}<i>Inspect</i></button><a href="${escapeHtml(href)}" download>Download</a>`;
+    item.querySelector("button")?.addEventListener("click", () => inspectArtifact({ ...artifact, href }));
     list.appendChild(item);
   });
 }
@@ -361,11 +480,16 @@ async function loadSignalCapture() {
     startLiveStream();
     return;
   }
+  if (analysis.sourceMode === "external") {
+    startExternalStream();
+    return;
+  }
   await loadArtifactCapture(artifact);
 }
 
 async function loadArtifactCapture(artifact = analysis.task.artifacts.find((candidate) => candidate.role === "signal")) {
   stopLiveStream(false);
+  setSignalSourceMode("artifact");
   if (!artifact) {
     byId("capture-status").textContent = "No signal artifact";
     renderEmptyPlots();
@@ -376,6 +500,9 @@ async function loadArtifactCapture(artifact = analysis.task.artifacts.find((cand
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     analysis.meta = await response.json();
     analysis.rows = rowsForArtifact(analysis.meta) || [];
+    analysis.timeRows = Array.isArray(analysis.meta.time_rows) ? analysis.meta.time_rows : [];
+    analysis.iqRows = Array.isArray(analysis.meta.iq_rows) ? analysis.meta.iq_rows : [];
+    analysis.symbolBits = String(analysis.meta.symbol_bits || "");
     analysis.frame = Math.max(0, analysis.rows.length - 1);
     analysis.captureCenter = Number(analysis.meta.center_hz || 0);
     analysis.captureSpan = Number(analysis.meta.span_hz || 0);
@@ -385,8 +512,11 @@ async function loadArtifactCapture(artifact = analysis.task.artifacts.find((cand
     resetAnalysisView();
     renderCaptureMetadata();
     renderLegend();
+    renderParserEvent(analysis.meta.parser);
     if (!analysis.playing) togglePlayback();
-    if (analysis.task.id === "civilian-emergency-intercept") await runRfCommand("tune");
+    if (["weather-broadcast-boring-voice", "civilian-emergency-radio-audio-network"].includes(analysis.task.context_id)) {
+      await runRfCommand("tune");
+    }
   } catch (error) {
     byId("capture-status").textContent = "Capture failed to load";
     byId("measurement-bar").textContent = error.message;
@@ -396,18 +526,21 @@ async function loadArtifactCapture(artifact = analysis.task.artifacts.find((cand
 
 function startLiveStream() {
   stopLiveStream(false);
+  clearSignalDataAlert();
+  setSignalSourceMode("live");
   const artifact = analysis.task.artifacts.find((candidate) => candidate.role === "signal");
   analysis.rows = [];
+  analysis.timeRows = [];
+  analysis.iqRows = [];
+  analysis.symbolBits = "";
   analysis.frame = 0;
   analysis.live.events = [];
   analysis.live.lastSamples = [];
-  analysis.live.fallbackAttempted = false;
   analysis.playing = true;
   byId("analysis-play").textContent = "Pause";
-  byId("source-live").classList.add("active");
-  byId("source-artifact").classList.remove("active");
   byId("capture-status").textContent = "Connecting live parser";
   byId("live-stream-status").textContent = "Connecting to Python stream";
+  watchForMissingLiveData();
   byId("signal-title").textContent = artifact?.label || "Live RF stream";
   const params = new URLSearchParams({
     challenge_id: analysis.task.id,
@@ -420,22 +553,62 @@ function startLiveStream() {
   stream.addEventListener("meta", (event) => {
     analysis.meta = JSON.parse(event.data);
     analysis.captureCenter = Number(analysis.meta.center_hz || 0);
-    analysis.captureSpan = Number(analysis.meta.span_hz || 0);
-    byId("capture-status").textContent = `${analysis.meta.scheme_id} / live`;
-    byId("live-stream-status").textContent = "Streaming raw samples into parser";
+    analysis.captureSpan = Number(analysis.meta.span_hz || analysis.meta.sample_rate_hz || 0);
+    const liveGnuRadio = analysis.meta.source_mode === "live_gnuradio_stream";
+    const flowgraphState = analysis.meta.flowgraph_process?.state;
+    byId("capture-status").textContent = analysis.meta.last_seen
+      ? `${analysis.meta.scheme_id} / live`
+      : liveGnuRadio ? "GNU Radio flowgraph idle" : `${analysis.meta.scheme_id} / live`;
+    byId("live-stream-status").textContent = liveGnuRadio
+      ? describeExternalIngest(analysis.meta)
+      : "Streaming raw samples into parser";
+    if (liveGnuRadio && ["unavailable", "exited"].includes(flowgraphState)) {
+      showSignalDataAlert(
+        analysis.meta.flowgraph_process?.error ||
+        "The mapped GNU Radio Python flowgraph could not be started, so there is no live signal data."
+      );
+    }
     resetAnalysisView();
+    renderCaptureMetadata();
+    renderLegend();
+    renderParserEvent(analysis.meta.parser);
+  });
+  stream.addEventListener("status", (event) => {
+    const status = JSON.parse(event.data);
+    analysis.meta = { ...(analysis.meta || {}), ...status };
+    analysis.captureCenter = Number(analysis.meta.center_hz || analysis.captureCenter || 0);
+    analysis.captureSpan = Number(analysis.meta.span_hz || analysis.captureSpan || 0);
+    byId("capture-status").textContent = status.last_seen
+      ? `${status.scheme_id} / live`
+      : "GNU Radio flowgraph idle";
+    byId("live-stream-status").textContent = describeExternalIngest(status);
+    const flowgraphState = status.flowgraph_process?.state;
+    if (!status.last_seen && ["unavailable", "exited"].includes(flowgraphState)) {
+      showSignalDataAlert(
+        status.flowgraph_process?.error ||
+        "The mapped GNU Radio Python flowgraph could not be started, so there is no live signal data."
+      );
+    }
     renderCaptureMetadata();
     renderLegend();
   });
   stream.addEventListener("frame", (event) => {
     const payload = JSON.parse(event.data);
+    clearSignalDataAlert();
+    recordTransmissionForFrame(analysis.rows.length);
     analysis.rows.push(payload.row);
-    if (analysis.rows.length > 180) analysis.rows.shift();
+    if (analysis.rows.length > 180) {
+      analysis.rows.shift();
+      shiftTransmissionHistory();
+    }
     analysis.frame = Math.max(0, analysis.rows.length - 1);
     analysis.live.lastSamples = payload.samples || [];
     byId("analysis-frame").max = Math.max(0, analysis.rows.length - 1);
     byId("analysis-frame").value = analysis.frame;
-    byId("capture-status").textContent = `${analysis.rows.length} live frames / ${payload.row.length} FFT bins`;
+    byId("capture-status").textContent = `${analysis.rows.length} GNU Radio live frames / ${payload.row.length} FFT bins`;
+    byId("live-stream-status").textContent = analysis.meta?.source_mode === "live_gnuradio_stream"
+      ? "GNU Radio generated Python stream active"
+      : "Live Python stream active";
     renderParserEvent(payload.parser);
     renderAnalysis();
   });
@@ -444,16 +617,82 @@ function startLiveStream() {
     stopLiveStream(false);
   });
   stream.onerror = () => {
-    byId("live-stream-status").textContent = "Live parser unavailable";
-    if (!analysis.rows.length && !analysis.live.fallbackAttempted) {
-      analysis.live.fallbackAttempted = true;
-      analysis.sourceMode = "artifact";
-      loadArtifactCapture();
+    byId("live-stream-status").textContent = "GNU Radio live stream unavailable; no recording fallback is permitted";
+    showSignalDataAlert(
+      "The live stream connection failed. Start the mapped GNU Radio generated Python flowgraph and confirm that it can reach the server ingest port."
+    );
+  };
+}
+
+function startExternalStream() {
+  stopLiveStream(false);
+  setSignalSourceMode("external");
+  analysis.rows = [];
+  analysis.timeRows = [];
+  analysis.iqRows = [];
+  analysis.symbolBits = "";
+  analysis.frame = 0;
+  analysis.live.events = [];
+  analysis.live.lastSamples = [];
+  analysis.playing = true;
+  byId("analysis-play").textContent = "Pause";
+  byId("capture-status").textContent = "Connecting external feed";
+  byId("live-stream-status").textContent = "Waiting for external signal metadata";
+  byId("signal-title").textContent = "External signal feed";
+  const params = new URLSearchParams({
+    challenge_id: analysis.task.id,
+    bins: "384"
+  });
+  const stream = new EventSource(`/api/rf/external/live?${params.toString()}`);
+  analysis.live.stream = stream;
+  stream.addEventListener("meta", (event) => {
+    analysis.meta = JSON.parse(event.data);
+    analysis.captureCenter = Number(analysis.meta.center_hz || 0);
+    analysis.captureSpan = Number(analysis.meta.span_hz || analysis.meta.sample_rate_hz || 0);
+    byId("capture-status").textContent = analysis.meta.last_seen ? `${analysis.meta.scheme_id} / external` : "External feed idle";
+    byId("live-stream-status").textContent = describeExternalIngest(analysis.meta);
+    resetAnalysisView();
+    renderCaptureMetadata();
+    renderLegend();
+    renderParserEvent(analysis.meta.parser);
+  });
+  stream.addEventListener("status", (event) => {
+    const status = JSON.parse(event.data);
+    analysis.meta = { ...(analysis.meta || {}), ...status };
+    analysis.captureCenter = Number(analysis.meta.center_hz || analysis.captureCenter || 0);
+    analysis.captureSpan = Number(analysis.meta.span_hz || analysis.captureSpan || 0);
+    byId("capture-status").textContent = status.last_seen ? `${status.scheme_id} / external` : "External feed idle";
+    byId("live-stream-status").textContent = describeExternalIngest(status);
+    renderCaptureMetadata();
+    renderLegend();
+  });
+  stream.addEventListener("frame", (event) => {
+    const payload = JSON.parse(event.data);
+    const row = Array.isArray(payload.row) ? payload.row : [];
+    if (!row.length) return;
+    recordTransmissionForFrame(analysis.rows.length);
+    analysis.rows.push(row);
+    if (analysis.rows.length > 180) {
+      analysis.rows.shift();
+      shiftTransmissionHistory();
     }
+    analysis.frame = Math.max(0, analysis.rows.length - 1);
+    analysis.live.lastSamples = payload.samples || [];
+    byId("analysis-frame").max = Math.max(0, analysis.rows.length - 1);
+    byId("analysis-frame").value = analysis.frame;
+    byId("capture-status").textContent = `${analysis.rows.length} external frames / ${row.length} FFT bins`;
+    byId("live-stream-status").textContent = describeExternalIngest(analysis.meta);
+    renderParserEvent(payload.parser);
+    renderAnalysis();
+  });
+  stream.onerror = () => {
+    byId("live-stream-status").textContent = "External feed disconnected";
   };
 }
 
 function stopLiveStream(updateStatus = true) {
+  clearTimeout(analysis.live.noDataTimer);
+  analysis.live.noDataTimer = null;
   if (analysis.live.stream) {
     analysis.live.stream.close();
     analysis.live.stream = null;
@@ -462,7 +701,10 @@ function stopLiveStream(updateStatus = true) {
   analysis.timer = null;
   analysis.playing = false;
   byId("analysis-play").textContent = "Play";
-  if (updateStatus) byId("live-stream-status").textContent = analysis.sourceMode === "live" ? "Live parser paused" : "Artifact replay paused";
+  if (updateStatus) {
+    const status = analysis.sourceMode === "live" ? "Live parser paused" : analysis.sourceMode === "external" ? "External feed paused" : "Artifact replay paused";
+    byId("live-stream-status").textContent = status;
+  }
 }
 
 function resetAnalysisView() {
@@ -473,6 +715,7 @@ function resetAnalysisView() {
   byId("analysis-center").value = (initialCenter / 1e6).toFixed(6);
   byId("analysis-span").value = Math.round(analysis.captureSpan / 1e3);
   byId("receiver-modulation").value = preferredDemodulation();
+  setInitialTransmitterPreset();
   byId("analysis-floor").value = "-88";
   byId("analysis-range").value = "70";
   byId("analysis-frame").max = Math.max(0, analysis.rows.length - 1);
@@ -483,12 +726,31 @@ function resetAnalysisView() {
   byId("receiver-lock").textContent = alreadyTuned ? "Receiver centred on live profile" : "Survey preset / acquire signal from evidence";
 }
 
+function setInitialTransmitterPreset() {
+  const taskId = analysis.task?.id || "";
+  if (taskId === "tunnel-basic-dos") {
+    byId("tx-waveform").value = "noise";
+    byId("tx-offset").value = "-18";
+    byId("tx-bandwidth").value = "8";
+    byId("tx-power").value = "-12";
+    byId("tx-duration").value = "1800";
+  } else if (taskId === "tunnel-packet-injection") {
+    byId("tx-waveform").value = "replay";
+    byId("tx-offset").value = "14";
+    byId("tx-bandwidth").value = "8";
+    byId("tx-power").value = "-14";
+    byId("tx-duration").value = "1500";
+  }
+}
+
 function isIntroductorySignalTask(task) {
   if (!task) return false;
   return task.source_task_id && !String(task.source_task_id).includes(".");
 }
 
 function preferredDemodulation() {
+  const selected = byId("receiver-modulation")?.value?.toUpperCase();
+  if (selected && selected !== "AUTO") return selected;
   const modulation = String(analysis.meta?.protocol_notes?.modulation || analysis.task?.signal_scheme || "").toUpperCase();
   if (modulation.includes("4-FSK")) return "4-FSK";
   if (modulation.includes("GFSK")) return "GFSK";
@@ -542,7 +804,7 @@ function renderAnalysis() {
   const image = nativeWaterfallContext.createImageData(viewport.binCount, visibleFrames);
   for (let y = 0; y < visibleFrames; y += 1) {
     const frame = (firstFrame + y) % analysis.rows.length;
-    const row = analysis.rows[frame];
+    const row = rowWithTransmissions(analysis.rows[frame], frame);
     for (let x = 0; x < viewport.binCount; x += 1) {
       const bin = viewport.startBin + x;
       const [red, green, blue] = analysisRgb(row[bin]);
@@ -566,7 +828,47 @@ function renderAnalysis() {
   drawMeasurementCursor(analysis.cursorB, "B", "#ffc766", viewport);
   drawSpectrum(viewport);
   drawTimeSeries(viewport);
+  renderArtifactParserForTuning(viewport);
+  renderReceiverQualityForTransmission(viewport);
   updateReadouts(viewport);
+}
+
+function renderArtifactParserForTuning(viewport) {
+  if (analysis.sourceMode !== "artifact" || !analysis.symbolBits) return;
+  const detectedFrequency = Number(analysis.meta?.detected_frequency_hz || 0);
+  const inPassband = detectedFrequency >= viewport.startHz && detectedFrequency <= viewport.endHz;
+  const demodulation = preferredDemodulation();
+  const demodulationValid = ["AUTO", "ASK", "OOK", "MANCHESTER"].includes(demodulation);
+  if (!inPassband || !demodulationValid) {
+    renderParserEvent({
+      stage: "energy_detect",
+      confidence: 0,
+      bit_buffer: "no symbols in tuned passband",
+      fields: {
+        tuned_center_hz: Math.round(viewport.center),
+        tuned_span_hz: Math.round(viewport.span),
+        detected_frequency_hz: Math.round(detectedFrequency),
+        state: inPassband ? `unsupported demodulation ${demodulation}` : "carrier outside selected span"
+      },
+      note: "Bit slicer waiting for an in-band OOK/ASK carrier."
+    });
+    return;
+  }
+  const symbolIndex = Math.max(0, Math.min(analysis.symbolBits.length - 1, analysis.frame));
+  const bufferStart = Math.max(0, symbolIndex - 127);
+  const bitBuffer = analysis.symbolBits.slice(bufferStart, symbolIndex + 1);
+  renderParserEvent({
+    ...analysis.meta.parser,
+    stage: "bit_slice",
+    bit_buffer: bitBuffer,
+    fields: {
+      ...analysis.meta.parser?.fields,
+      symbol_index: symbolIndex,
+      current_symbol: analysis.symbolBits[symbolIndex],
+      buffered_bit_count: bitBuffer.length
+    },
+    note: `Bit slicer following artifact frame ${symbolIndex + 1}.`
+  });
 }
 
 function drawGrid(context, width, height, columns, rows) {
@@ -617,7 +919,7 @@ function drawOwnTransmissions(viewport, firstFrame, visibleFrames) {
     const frame = (firstFrame + visibleRow) % analysis.rows.length;
     const tx = analysis.tx.history.get(frame);
     if (!tx) continue;
-    const transmitterCenter = Number(byId("analysis-center").value) * 1e6 + tx.offset_khz * 1e3;
+    const transmitterCenter = txCenterHz(tx);
     const bandwidthHz = Math.max(1000, tx.bandwidth_khz * 1e3);
     let waveformOffset = 0;
     if (tx.waveform === "2-FSK") waveformOffset = (frame % 2 ? 1 : -1) * bandwidthHz * 0.24;
@@ -646,11 +948,71 @@ function drawOwnTransmissions(viewport, firstFrame, visibleFrames) {
   waterfallContext.restore();
 }
 
+function rowWithTransmissions(row, frame) {
+  const tx = analysis.tx.history.get(frame);
+  if (!tx || !Array.isArray(row)) return row || [];
+  const received = row.slice();
+  injectTransmissionEnergy(received, tx, frame);
+  return received;
+}
+
+function injectTransmissionEnergy(row, tx, frame) {
+  if (!row.length || !analysis.captureSpan) return;
+  const captureStart = analysis.captureCenter - analysis.captureSpan / 2;
+  const binHz = analysis.captureSpan / Math.max(1, row.length);
+  const centerBin = (txCenterHz(tx) - captureStart) / binHz;
+  const bandwidthBins = Math.max(1, Math.round(Math.max(1000, Number(tx.bandwidth_khz || 1) * 1000) / binHz));
+  const amplitude = txAmplitude(tx);
+  const sequence = Number(tx.sequenceIndex || 0);
+  const halfWidth = tx.waveform === "noise" ? bandwidthBins * 0.65 : Math.max(1.2, bandwidthBins * 0.22);
+  const start = Math.max(0, Math.floor(centerBin - Math.max(2, bandwidthBins)));
+  const end = Math.min(row.length - 1, Math.ceil(centerBin + Math.max(2, bandwidthBins)));
+  for (let bin = start; bin <= end; bin += 1) {
+    const distance = Math.abs(bin - centerBin);
+    let shape;
+    if (tx.waveform === "noise") {
+      shape = distance <= bandwidthBins ? 0.58 + 0.42 * deterministicNoise(bin, frame + sequence, 91) : 0;
+    } else if (tx.waveform === "2-FSK") {
+      const symbolCenter = centerBin + (sequence % 2 ? 0.24 : -0.24) * bandwidthBins;
+      shape = Math.exp(-0.5 * ((bin - symbolCenter) / Math.max(1, halfWidth)) ** 2);
+    } else if (tx.waveform === "4-FSK") {
+      const symbolCenter = centerBin + [-0.36, -0.12, 0.12, 0.36][sequence % 4] * bandwidthBins;
+      shape = Math.exp(-0.5 * ((bin - symbolCenter) / Math.max(1, halfWidth)) ** 2);
+    } else if (tx.waveform === "GFSK" || tx.waveform === "AFSK") {
+      const wobble = Math.sin(sequence * 0.72) * bandwidthBins * (tx.waveform === "GFSK" ? 0.18 : 0.28);
+      shape = Math.exp(-0.5 * ((bin - centerBin - wobble) / Math.max(1, halfWidth)) ** 2);
+    } else if (tx.waveform === "replay") {
+      const gate = ((sequence + Math.floor(bin / 3)) % 11) < 7 ? 1 : 0.2;
+      shape = gate * Math.exp(-0.5 * (distance / Math.max(1, halfWidth)) ** 2);
+    } else {
+      shape = Math.exp(-0.5 * (distance / Math.max(1, halfWidth)) ** 2);
+    }
+    row[bin] = Math.max(row[bin] || 0, Math.min(1, amplitude * shape));
+  }
+}
+
+function txCenterHz(tx) {
+  return Number(tx.center_hz || 0) || (Number(byId("analysis-center").value || 0) * 1e6 + Number(tx.offset_khz || 0) * 1e3);
+}
+
+function txAmplitude(tx) {
+  const powerDb = Number(tx.power_db ?? -18);
+  return Math.max(0.18, Math.min(0.98, 1.05 + powerDb / 55));
+}
+
+function targetCarrierHz() {
+  return Number(analysis.meta?.detected_frequency_hz || 0) || analysis.captureCenter;
+}
+
+function defaultTunnelTxCenterHz(offsetKhz, receiverCenterHz) {
+  return receiverCenterHz + offsetKhz * 1e3;
+}
+
 function drawMeasurementCursor(cursor, label, color, viewport) {
   if (!cursor) return;
   const frequency = viewport.startHz + cursor.x / waterfall.width * viewport.span;
   const bin = Math.max(viewport.startBin, Math.min(viewport.endBin - 1, Math.round(viewport.startBin + cursor.x / waterfall.width * viewport.binCount)));
-  const power = analysis.rows[analysis.frame]?.[bin] || 0;
+  const power = rowWithTransmissions(analysis.rows[analysis.frame], analysis.frame)?.[bin] || 0;
   const callout = `${label}  ${formatAxisHz(frequency)}  ${powerToDb(power).toFixed(1)} dBFS`;
   waterfallContext.save();
   waterfallContext.strokeStyle = color;
@@ -668,7 +1030,7 @@ function drawMeasurementCursor(cursor, label, color, viewport) {
 }
 
 function drawSpectrum(viewport) {
-  const row = analysis.rows[analysis.frame] || analysis.rows[0];
+  const row = rowWithTransmissions(analysis.rows[analysis.frame] || analysis.rows[0], analysis.frame);
   spectrumContext.fillStyle = "#020607";
   spectrumContext.fillRect(0, 0, spectrum.width, spectrum.height);
   drawGrid(spectrumContext, spectrum.width, spectrum.height, 10, 4);
@@ -707,7 +1069,7 @@ function drawTimeSeries(viewport) {
   timeSeriesContext.fillStyle = "#020607";
   timeSeriesContext.fillRect(0, 0, timeSeries.width, timeSeries.height);
   drawGrid(timeSeriesContext, timeSeries.width, timeSeries.height, 10, 4);
-  const samples = analysis.live.lastSamples.length ? analysis.live.lastSamples : samplesFromCurrentRow(viewport);
+  const samples = samplesForCurrentFrame(viewport);
   if (!samples.length) {
     timeSeriesContext.fillStyle = "#a8b4ae";
     timeSeriesContext.font = "16px system-ui";
@@ -736,6 +1098,193 @@ function drawTimeSeries(viewport) {
   timeSeriesContext.stroke();
   byId("timeseries-readout").textContent = `Samples: ${samples.length}`;
   byId("symbol-readout").textContent = `Symbols: ${byId("parser-bit-buffer").textContent.slice(0, 12) || "--"}`;
+}
+
+function samplesForCurrentFrame(viewport) {
+  if (analysis.live.lastSamples.length) return samplesWithTransmission(analysis.live.lastSamples, analysis.frame, viewport);
+  const iqSamples = analysis.iqRows[analysis.frame];
+  if (Array.isArray(iqSamples) && iqSamples.length) return samplesWithTransmission(tunedSamplesFromIq(iqSamples, viewport), analysis.frame, viewport);
+  const artifactSamples = analysis.timeRows[analysis.frame];
+  if (Array.isArray(artifactSamples) && artifactSamples.length) return samplesWithTransmission(artifactSamples, analysis.frame, viewport);
+  return samplesWithTransmission(samplesFromCurrentRow(viewport), analysis.frame, viewport);
+}
+
+function samplesWithTransmission(samples, frame, viewport) {
+  const tx = analysis.tx.history.get(frame);
+  if (!tx || !samples.length) return samples;
+  const centerHz = txCenterHz(tx);
+  const bandwidthHz = Math.max(1000, Number(tx.bandwidth_khz || 1) * 1000);
+  const inPassband = centerHz + bandwidthHz / 2 >= viewport.startHz && centerHz - bandwidthHz / 2 <= viewport.endHz;
+  if (!inPassband) return samples;
+  const amplitude = txAmplitude(tx) * 0.85;
+  const sequence = Number(tx.sequenceIndex || 0);
+  return samples.map((sample, index) => {
+    const t = index / Math.max(1, samples.length - 1);
+    let injected;
+    if (tx.waveform === "noise") {
+      injected = (deterministicNoise(index, frame + sequence, 133) - 0.5) * 2;
+    } else if (tx.waveform === "replay") {
+      const bit = ((Math.floor((index + sequence * 7) / 9) % 11) < 7) ? 1 : -0.15;
+      injected = bit * Math.sin(2 * Math.PI * (12 + sequence % 5) * t);
+    } else if (tx.waveform === "2-FSK" || tx.waveform === "4-FSK") {
+      const tone = tx.waveform === "4-FSK" ? [9, 13, 18, 23][sequence % 4] : (sequence % 2 ? 20 : 11);
+      injected = Math.sin(2 * Math.PI * tone * t);
+    } else if (tx.waveform === "GFSK" || tx.waveform === "AFSK") {
+      injected = Math.sin(2 * Math.PI * (14 + Math.sin(sequence * 0.4) * 5) * t);
+    } else {
+      injected = Math.sin(2 * Math.PI * 16 * t);
+    }
+    return Math.max(-1, Math.min(1, Number(sample) * 0.72 + injected * amplitude * 0.45));
+  });
+}
+
+function renderReceiverQualityForTransmission(viewport) {
+  const tx = analysis.tx.history.get(analysis.frame);
+  if (!tx) return;
+  const impact = decoderImpactForTx(tx, viewport);
+  if (impact.overlap <= 0.02) return;
+  const baseBits = currentParserBits();
+  const corruptedBits = corruptBitBuffer(baseBits, impact.bitErrorRate, analysis.frame + Number(tx.sequenceIndex || 0));
+  const failed = impact.bitErrorRate >= 0.12 || tx.waveform === "noise";
+  renderParserEvent({
+    stage: failed ? "field_decode" : "bit_slice",
+    confidence: impact.confidence,
+    bit_buffer: corruptedBits,
+    fields: {
+      target_carrier_hz: Math.round(targetCarrierHz()),
+      local_tx_center_hz: Math.round(txCenterHz(tx)),
+      overlap_percent: `${Math.round(impact.overlap * 100)}%`,
+      jammer_to_signal_db: impact.jammerToSignalDb.toFixed(1),
+      estimated_ber: impact.bitErrorRate.toFixed(3),
+      estimated_bit_errors: impact.bitErrors,
+      packet_crc: failed ? "failed" : "marginal",
+      decoder_state: failed ? "sign payload corrupted" : "recovering with bit errors"
+    },
+    note: failed
+      ? "Local TX is inside the receiver passband; bit errors exceed the sign decoder threshold."
+      : "Local TX is visible in-band and reducing bit-slicer margin."
+  });
+  if (analysis.task?.id === "tunnel-basic-dos" && failed) {
+    const awardedFlag = extractOutputFlag(byId("challenge-flag").value);
+    updateEffectStage(
+      "interference",
+      awardedFlag
+        ? `${awardedFlag} / BER ${impact.bitErrorRate.toFixed(3)} / confidence ${(impact.confidence * 100).toFixed(0)}%`
+        : `Sign decode failed: BER ${impact.bitErrorRate.toFixed(3)} / confidence ${(impact.confidence * 100).toFixed(0)}%`
+    );
+  }
+}
+
+function decoderImpactForTx(tx, viewport) {
+  const targetHz = targetCarrierHz();
+  const txHz = txCenterHz(tx);
+  const bandwidthHz = Math.max(1000, Number(tx.bandwidth_khz || 1) * 1000);
+  const signalBandwidthHz = Math.max(2200, Number(analysis.meta?.sources?.[0]?.bandwidth_hz || 2200));
+  const collisionWidth = bandwidthHz / 2 + signalBandwidthHz / 2;
+  const overlap = Math.max(0, Math.min(1, 1 - Math.abs(txHz - targetHz) / Math.max(1, collisionWidth)));
+  const targetPower = targetPowerAtHz(targetHz);
+  const txPower = txAmplitude(tx) * (tx.waveform === "noise" ? 1.18 : tx.waveform === "replay" ? 0.86 : 0.72);
+  const jammerToSignal = overlap * txPower / Math.max(0.04, targetPower);
+  const jammerToSignalDb = 20 * Math.log10(Math.max(1e-3, jammerToSignal));
+  const sequence = Number(tx.sequenceIndex || 0);
+  const ramp = Math.min(1, (sequence + 1) / Math.max(3, Number(tx.totalFrames || 12) * 0.35));
+  const waveformWeight = tx.waveform === "noise" ? 1.18 : tx.waveform === "replay" ? 0.64 : 0.8;
+  const bitErrorRate = Math.max(0, Math.min(0.48, (jammerToSignal / (1 + jammerToSignal)) * 0.42 * ramp * waveformWeight));
+  const bitErrors = Math.round(bitErrorRate * Math.max(64, currentParserBits().length || 128));
+  const confidence = Math.max(0.02, Math.min(0.98, 0.96 - bitErrorRate * 2.2 - overlap * 0.28));
+  return { overlap, jammerToSignalDb, bitErrorRate, bitErrors, confidence };
+}
+
+function targetPowerAtHz(frequencyHz) {
+  const row = analysis.rows[analysis.frame] || analysis.rows[0] || [];
+  if (!row.length || !analysis.captureSpan) return 0.35;
+  const captureStart = analysis.captureCenter - analysis.captureSpan / 2;
+  const bin = Math.max(0, Math.min(row.length - 1, Math.round((frequencyHz - captureStart) / analysis.captureSpan * row.length)));
+  return Math.max(0.04, Number(row[bin] || 0.04));
+}
+
+function currentParserBits() {
+  const visible = byId("parser-bit-buffer").textContent || "";
+  const cleaned = visible.replace(/[^01]/g, "");
+  if (cleaned.length >= 24) return cleaned.slice(-160);
+  if (analysis.symbolBits) {
+    const symbolIndex = Math.max(0, Math.min(analysis.symbolBits.length - 1, analysis.frame));
+    return analysis.symbolBits.slice(Math.max(0, symbolIndex - 159), symbolIndex + 1);
+  }
+  return "1011010011100101110001001010111100110101100111010010110010111010";
+}
+
+function corruptBitBuffer(bits, bitErrorRate, seed) {
+  const clean = bits && /^[01]+$/.test(bits) ? bits : currentParserBits();
+  return clean.split("").map((bit, index) => {
+    const shouldFlip = deterministicNoise(index, seed, 177) < bitErrorRate;
+    return shouldFlip ? (bit === "1" ? "0" : "1") : bit;
+  }).join("");
+}
+
+function tunedSamplesFromIq(iqSamples, viewport) {
+  const sampleRate = Number(analysis.meta?.sample_rate_hz || analysis.captureSpan || 1);
+  const tunedCenter = (viewport.startHz + viewport.endHz) / 2;
+  const offsetHz = tunedCenter - analysis.captureCenter;
+  const mixed = iqSamples.map((pair, index) => {
+    const real = Number(pair[0] || 0);
+    const imag = Number(pair[1] || 0);
+    const phase = -2 * Math.PI * offsetHz * index / sampleRate;
+    const cosine = Math.cos(phase);
+    const sine = Math.sin(phase);
+    return [real * cosine - imag * sine, real * sine + imag * cosine];
+  });
+  const filtered = lowPassComplex(mixed, Math.min(viewport.span / 2, sampleRate * 0.475), sampleRate);
+  const demodulation = preferredDemodulation();
+  let demodulated;
+  if (["ASK", "OOK", "MANCHESTER", "AUTO"].includes(demodulation)) {
+    demodulated = filtered.map(([real, imag]) => Math.hypot(real, imag));
+  } else if (demodulation === "AM") {
+    const envelope = filtered.map(([real, imag]) => Math.hypot(real, imag));
+    const mean = envelope.reduce((sum, value) => sum + value, 0) / Math.max(1, envelope.length);
+    demodulated = envelope.map((value) => value - mean);
+  } else if (demodulation.includes("FSK")) {
+    demodulated = filtered.map(([real, imag], index) => {
+      if (!index) return 0;
+      const [previousReal, previousImag] = filtered[index - 1];
+      return Math.atan2(imag * previousReal - real * previousImag, real * previousReal + imag * previousImag) / Math.PI;
+    });
+  } else {
+    demodulated = filtered.map(([real]) => real);
+  }
+
+  const rms = Math.sqrt(demodulated.reduce((sum, value) => sum + value * value, 0) / Math.max(1, demodulated.length));
+  const levelDb = 20 * Math.log10(Math.max(1e-9, rms));
+  const squelchDb = Number(byId("receiver-squelch").value || -80);
+  if (levelDb < squelchDb) return Array(160).fill(0);
+  const gain = Math.pow(10, (Number(byId("receiver-gain").value || 24) - 24) / 20);
+  return Array.from({ length: 160 }, (_, index) => {
+    const sourceIndex = Math.round(index * (demodulated.length - 1) / 159);
+    return Math.max(-1, Math.min(1, demodulated[sourceIndex] * gain));
+  });
+}
+
+function lowPassComplex(samples, cutoffHz, sampleRate) {
+  const halfLength = 16;
+  const normalizedCutoff = Math.max(0.001, Math.min(0.475, cutoffHz / sampleRate));
+  const taps = [];
+  for (let offset = -halfLength; offset <= halfLength; offset += 1) {
+    const sinc = offset === 0 ? 2 * normalizedCutoff : Math.sin(2 * Math.PI * normalizedCutoff * offset) / (Math.PI * offset);
+    const window = 0.54 + 0.46 * Math.cos(Math.PI * offset / halfLength);
+    taps.push(sinc * window);
+  }
+  const tapSum = taps.reduce((sum, value) => sum + value, 0);
+  return samples.map((_, index) => {
+    let real = 0;
+    let imag = 0;
+    taps.forEach((tap, tapIndex) => {
+      const sampleIndex = index + tapIndex - halfLength;
+      if (sampleIndex < 0 || sampleIndex >= samples.length) return;
+      real += samples[sampleIndex][0] * tap / tapSum;
+      imag += samples[sampleIndex][1] * tap / tapSum;
+    });
+    return [real, imag];
+  });
 }
 
 function samplesFromCurrentRow(viewport) {
@@ -924,12 +1473,29 @@ function deterministicNoise(x, y, seed) {
 async function inspectArtifact(artifact) {
   const inspector = byId("artifact-inspector");
   const visual = byId("artifact-visual");
+  const rawPanel = inspector.querySelector(".artifact-raw");
   byId("artifact-title").textContent = artifact.label;
   byId("artifact-content").textContent = "Loading artifact...";
   visual.innerHTML = `<div class="artifact-loading">Building visual preview...</div>`;
   inspector.hidden = false;
+  rawPanel.open = artifact.role !== "signal";
   inspector.scrollIntoView({ behavior: "smooth", block: "start" });
   try {
+    if (artifact.role === "signal") {
+      if (artifact.source === "gnu_radio_python_live") {
+        inspector.hidden = true;
+        setSignalSourceMode("live");
+        startLiveStream();
+        document.querySelector(".analyser-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      setSignalSourceMode("artifact");
+      await loadArtifactCapture(artifact);
+      renderSignalArtifactPreview(visual, analysis.meta);
+      byId("artifact-content").textContent = JSON.stringify(compactSignalMeta(analysis.meta), null, 2);
+      document.querySelector(".analyser-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
     const response = await fetch(artifact.href, { headers: { "X-Signal-Session": analysis.sessionId } });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const bytes = new Uint8Array(await response.arrayBuffer());
@@ -937,6 +1503,12 @@ async function inspectArtifact(artifact) {
     if (contentType.startsWith("image/")) {
       const url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
       visual.innerHTML = `<img class="artifact-image" src="${url}" alt="${escapeHtml(artifact.label)} preview">`;
+      byId("artifact-content").textContent = `${bytes.length} byte ${contentType} artifact`;
+      return;
+    }
+    if (contentType.startsWith("audio/")) {
+      const url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
+      visual.innerHTML = `<div class="artifact-preview-heading"><strong>Audio reference</strong><span>${escapeHtml(contentType)}</span></div><audio controls preload="metadata" src="${url}"></audio>`;
       byId("artifact-content").textContent = `${bytes.length} byte ${contentType} artifact`;
       return;
     }
@@ -951,6 +1523,15 @@ async function inspectArtifact(artifact) {
   } catch (error) {
     byId("artifact-content").textContent = `Unable to preview this artifact: ${error.message}\n\nOpen directly: ${artifact.href}`;
   }
+}
+
+function compactSignalMeta(meta) {
+  if (!meta || typeof meta !== "object") return meta;
+  const compact = { ...meta };
+  delete compact.rows;
+  delete compact.time_rows;
+  delete compact.iq_rows;
+  return compact;
 }
 
 function renderSignalArtifactPreview(container, meta) {
@@ -1063,24 +1644,66 @@ function receiverConfig() {
 }
 
 function transmitterConfig() {
+  const receiverCenterHz = Number(byId("analysis-center").value || 0) * 1e6;
+  const rawOffsetKhz = Number(byId("tx-offset").value || 0);
+  const centerHz = defaultTunnelTxCenterHz(rawOffsetKhz, receiverCenterHz);
   return {
     waveform: byId("tx-waveform").value,
-    offset_khz: Number(byId("tx-offset").value),
+    offset_khz: (centerHz - receiverCenterHz) / 1e3,
     bandwidth_khz: Number(byId("tx-bandwidth").value),
     power_db: Number(byId("tx-power").value),
-    duration_ms: Number(byId("tx-duration").value)
+    duration_ms: Number(byId("tx-duration").value),
+    center_hz: centerHz
   };
 }
 
 function activateTransmission(preview = false) {
   const config = transmitterConfig();
   const frameRate = Number(byId("analysis-rate").value || 30);
-  analysis.tx.config = config;
-  analysis.tx.remainingFrames = preview ? Math.max(8, Math.round(frameRate * 0.55)) : Math.max(3, Math.round(config.duration_ms / 1000 * frameRate));
-  byId("tx-status").textContent = preview ? "Previewing" : `Transmitting ${config.waveform}`;
-  terminalWrite(`${preview ? "TX PREVIEW" : "TX ACTIVE"} ${config.waveform} offset=${config.offset_khz}kHz bw=${config.bandwidth_khz}kHz power=${config.power_db}dB`, "system");
+  const frameCount = preview ? Math.max(8, Math.round(frameRate * 0.55)) : Math.max(3, Math.round(config.duration_ms / 1000 * frameRate));
+  analysis.tx.config = { ...config, totalFrames: frameCount, preview };
+  analysis.tx.remainingFrames = frameCount;
+  byId("tx-status").textContent = preview ? "Previewing in receiver" : `Injecting ${config.waveform}`;
+  terminalWrite(`${preview ? "TX PREVIEW" : "TX ACTIVE"} ${config.waveform} center=${formatHz(config.center_hz)} offset=${config.offset_khz.toFixed(2)}kHz bw=${config.bandwidth_khz}kHz power=${config.power_db}dB`, "system");
   if (!analysis.playing) togglePlayback();
   return config;
+}
+
+function activateMissionTransmission(action) {
+  if (analysis.tx.remainingFrames > 0 && action !== "interfere") return;
+  const receiverCenterHz = Number(byId("analysis-center").value || 0) * 1e6;
+  const targetOffsetKhz = (targetCarrierHz() - receiverCenterHz) / 1e3;
+  if (action === "interfere") {
+    byId("tx-waveform").value = "noise";
+    byId("tx-offset").value = targetOffsetKhz.toFixed(2);
+    byId("tx-bandwidth").value = "12";
+    byId("tx-power").value = "-4";
+    byId("tx-duration").value = "1800";
+  } else if (action === "transmit") {
+    byId("tx-waveform").value = "replay";
+    byId("tx-offset").value = targetOffsetKhz.toFixed(2);
+    byId("tx-bandwidth").value = "14";
+    byId("tx-power").value = "-9";
+    byId("tx-duration").value = "1500";
+  }
+  return activateTransmission(false);
+}
+
+function recordTransmissionForFrame(frame) {
+  analysis.tx.history.delete(frame);
+  if (analysis.tx.remainingFrames <= 0 || !analysis.tx.config) return;
+  const sequenceIndex = Number(analysis.tx.config.totalFrames || analysis.tx.remainingFrames) - analysis.tx.remainingFrames;
+  analysis.tx.history.set(frame, { ...analysis.tx.config, sequenceIndex });
+  analysis.tx.remainingFrames -= 1;
+  if (analysis.tx.remainingFrames === 0) byId("tx-status").textContent = "Standby";
+}
+
+function shiftTransmissionHistory() {
+  const shifted = new Map();
+  for (const [frame, tx] of analysis.tx.history.entries()) {
+    if (frame > 0) shifted.set(frame - 1, tx);
+  }
+  analysis.tx.history = shifted;
 }
 
 function showTerminalHelp(topic = "") {
@@ -1105,8 +1728,8 @@ function showTerminalHelp(topic = "") {
     tx: [
       "TX / TRANSMITTER (LOCAL SIMULATION)",
       "Use the TX Chain controls for waveform, offset, bandwidth, power, and duration.",
-      "Preview waveform draws a short uncommitted trace on the live waterfall.",
-      "Transmit burst injects the configured waveform and reports target effects.",
+      "Preview waveform mixes a short uncommitted trace into the active receiver.",
+      "Transmit burst injects the configured waveform into the received waterfall, spectrum, and time-series.",
       "transmit <text>      transmit using the current TX Chain configuration",
       "Your energy is magenta; received target energy uses the selected waterfall palette."
     ],
@@ -1156,7 +1779,8 @@ async function runRfCommand(action, argumentsText = "") {
         challenge_id: analysis.task.id,
         action,
         arguments: argumentsText,
-        receiver: receiverConfig()
+        receiver: receiverConfig(),
+        transmitter: transmitterConfig()
       })
     });
     const data = await response.json();
@@ -1164,6 +1788,7 @@ async function runRfCommand(action, argumentsText = "") {
     byId("receiver-lock").textContent = data.locked ? `LOCKED / ${data.target}` : "Receiver unlocked";
     byId("receiver-lock").classList.toggle("locked", Boolean(data.locked));
     if (data.flag) byId("challenge-flag").value = data.flag;
+    if (data.parser) renderParserEvent(data.parser);
     updateEffectFromRf(action, data);
     return data;
   } catch (error) {
@@ -1191,21 +1816,62 @@ function setActionFeedback(action, active) {
 function updateEffectFromRf(action, data) {
   if (!data) return;
   if (!data.ok) {
-    updateEffectStage("idle", "No accepted target state change");
+    const text = (data.lines || []).join(" / ");
+    if (action === "interfere") {
+      renderTransmissionParser("interference", analysis.tx.config || activateMissionTransmission("interfere"));
+      updateEffectStage("interference", text || "Interference missed the target carrier");
+    } else {
+      updateEffectStage("idle", "No accepted target state change");
+    }
     return;
   }
   const text = (data.lines || []).join(" / ");
+  const outputFlag = extractOutputFlag(text);
   if (action === "receive") {
-    updateEffectStage("success", data.locked ? "Decoded receiver output buffered" : "Receiver output unavailable");
+    updateEffectStage("success", data.bitstream ? `Receiver bitstream buffered (${data.bitstream.length} bits)` : data.locked ? "Receiver locked; no stable bits recovered" : "Receiver output unavailable");
   } else if (action === "interfere") {
-    updateEffectStage("interference", text.includes("FLAG") ? text.match(/FLAG\s+CTF\{[^}]+\}/)?.[0] || "Mismatch produced task output" : "Interference visible in local spectrum");
+    renderTransmissionParser("interference", analysis.tx.config || activateMissionTransmission("interfere"));
+    updateEffectStage("interference", outputFlag || "Interference visible in local spectrum");
   } else if (action === "transmit") {
-    updateEffectStage("transmit", text.includes("FLAG") ? text.match(/FLAG\s+CTF\{[^}]+\}/)?.[0] || "Transmission accepted" : "Local transmission drawn on spectrum");
+    if (analysis.tx.remainingFrames <= 0) activateMissionTransmission("transmit");
+    renderTransmissionParser("packet_injection", analysis.tx.config);
+    updateEffectStage("transmit", outputFlag || "Local transmission drawn on spectrum");
   } else if (action === "send") {
-    updateEffectStage("warning", text.includes("FLAG") ? text.match(/FLAG\s+CTF\{[^}]+\}/)?.[0] || "Structured input accepted" : "Structured input accepted");
+    updateEffectStage("warning", outputFlag || "Structured input accepted");
   } else if (action === "scan" || action === "tune" || action === "status") {
     updateEffectStage(data.locked ? "success" : "idle", data.locked ? "Receiver lock achieved" : "Signal not yet locked");
   }
+}
+
+function extractOutputFlag(text) {
+  return String(text || "").match(/\b(?:CTF|FLAG)\{[^}]+\}/)?.[0] || "";
+}
+
+function renderTransmissionParser(stageLabel, config) {
+  if (!config) return;
+  const viewport = currentViewport();
+  const impact = decoderImpactForTx(config, viewport);
+  const interference = stageLabel === "interference";
+  const confidence = interference ? Math.min(0.34, impact.confidence) : Math.max(0.74, impact.confidence);
+  const bitErrorRate = interference ? Math.max(0.18, impact.bitErrorRate) : impact.bitErrorRate;
+  renderParserEvent({
+    stage: interference ? "field_decode" : "energy_detect",
+    confidence,
+    bit_buffer: interference ? corruptBitBuffer(currentParserBits(), bitErrorRate, analysis.frame) : "RX + LOCAL_TX",
+    fields: {
+      injected_waveform: config.waveform,
+      injected_center_hz: Math.round(config.center_hz),
+      injected_bandwidth_hz: Math.round(config.bandwidth_khz * 1000),
+      injected_power_db: config.power_db,
+      receive_chain: "base capture plus local transmitter energy",
+      estimated_ber: bitErrorRate.toFixed(3),
+      estimated_bit_errors: Math.round(bitErrorRate * Math.max(64, currentParserBits().length || 128)),
+      packet_crc: interference ? "failed" : "candidate frame"
+    },
+    note: interference
+      ? "Interference mixed into the active receiver passband; bit slicer margin collapsed."
+      : `${stageLabel} mixed into the active receiver passband.`
+  });
 }
 
 async function runTerminalCommand(rawCommand) {
@@ -1262,6 +1928,7 @@ async function runTerminalCommand(rawCommand) {
     return;
   }
   if (["scan", "status", "receive", "decode", "interfere", "forward", "send", "transmit"].includes(command)) {
+    if (command === "interfere") activateMissionTransmission("interfere");
     if (command === "transmit") activateTransmission(false);
     await runRfCommand(command, argumentsText);
     return;
@@ -1278,9 +1945,10 @@ function setFrontendMode(mode) {
 }
 
 function togglePlayback() {
-  if (analysis.sourceMode === "live") {
+  if (analysis.sourceMode === "live" || analysis.sourceMode === "external") {
     if (analysis.live.stream) stopLiveStream(true);
-    else startLiveStream();
+    else if (analysis.sourceMode === "live") startLiveStream();
+    else startExternalStream();
     return;
   }
   analysis.playing = !analysis.playing;
@@ -1290,27 +1958,10 @@ function togglePlayback() {
   const framesPerSecond = Number(byId("analysis-rate").value || 30);
   analysis.timer = setInterval(() => {
     analysis.frame = (analysis.frame + 1) % analysis.rows.length;
-    analysis.tx.history.delete(analysis.frame);
-    if (analysis.tx.remainingFrames > 0 && analysis.tx.config) {
-      analysis.tx.history.set(analysis.frame, { ...analysis.tx.config });
-      analysis.tx.remainingFrames -= 1;
-      if (analysis.tx.remainingFrames === 0) byId("tx-status").textContent = "Standby";
-    }
+    recordTransmissionForFrame(analysis.frame);
     byId("analysis-frame").value = analysis.frame;
     renderAnalysis();
   }, 1000 / framesPerSecond);
-}
-
-function renderMode(mode) {
-  byId("attack-mode").classList.toggle("active", mode === "attack");
-  byId("secure-mode").classList.toggle("active", mode === "secure");
-  byId("mode-status").textContent = mode === "attack" ? "Attack Mode" : "Secure Mode";
-  byId("mode-status").style.color = mode === "attack" ? "var(--amber)" : "var(--green)";
-}
-
-async function setMode(mode) {
-  const response = await fetch("/api/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) });
-  renderMode((await response.json()).mode);
 }
 
 function toggleTunedAudio() {
@@ -1339,9 +1990,9 @@ function toggleTunedAudio() {
   byId("analysis-audio").setAttribute("aria-pressed", "true");
   byId("analysis-audio").textContent = "Stop tuned audio";
   analysis.audio.timer = setInterval(() => {
-    const samples = analysis.live.lastSamples.length ? analysis.live.lastSamples : samplesFromCurrentRow(currentViewport());
+    const samples = samplesForCurrentFrame(currentViewport());
     const average = samples.reduce((sum, sample) => sum + Math.abs(Number(sample)), 0) / Math.max(1, samples.length);
-    const targetGain = Math.min(0.08, Math.max(0.006, average * 0.075));
+    const targetGain = average < 0.08 ? 0 : Math.min(0.08, (average - 0.08) * 0.09);
     analysis.audio.gain.gain.setTargetAtTime(targetGain, analysis.audio.context.currentTime, 0.025);
     analysis.audio.oscillator.frequency.setTargetAtTime(preferredDemodulation() === "AM" ? 620 + average * 820 : 880 + average * 540, analysis.audio.context.currentTime, 0.04);
   }, 55);
@@ -1362,23 +2013,22 @@ function stopTunedAudio() {
 byId("analysis-play").addEventListener("click", togglePlayback);
 byId("analysis-rate").addEventListener("change", () => {
   if (analysis.sourceMode === "live" && analysis.live.stream) startLiveStream();
+  else if (analysis.sourceMode === "external" && analysis.live.stream) startExternalStream();
   else if (analysis.playing) { analysis.playing = false; togglePlayback(); }
 });
 byId("analysis-reset").addEventListener("click", resetAnalysisView);
 byId("analysis-cursors").addEventListener("click", () => { analysis.cursorA = null; analysis.cursorB = null; renderAnalysis(); });
 byId("analysis-frame").addEventListener("input", (event) => { analysis.frame = Number(event.target.value); renderAnalysis(); });
-["analysis-center", "analysis-span", "analysis-floor", "analysis-range", "analysis-palette"].forEach((id) => byId(id).addEventListener("input", renderAnalysis));
+["analysis-center", "analysis-span", "analysis-floor", "analysis-range", "analysis-palette", "receiver-gain", "receiver-squelch"].forEach((id) => byId(id).addEventListener("input", renderAnalysis));
+byId("receiver-modulation").addEventListener("change", renderAnalysis);
 byId("source-live").addEventListener("click", () => {
-  analysis.sourceMode = "live";
-  byId("source-live").classList.add("active");
-  byId("source-artifact").classList.remove("active");
   startLiveStream();
 });
 byId("source-artifact").addEventListener("click", async () => {
-  analysis.sourceMode = "artifact";
-  byId("source-live").classList.remove("active");
-  byId("source-artifact").classList.add("active");
   await loadArtifactCapture();
+});
+byId("source-external").addEventListener("click", () => {
+  startExternalStream();
 });
 byId("analysis-audio").addEventListener("click", toggleTunedAudio);
 waterfall.addEventListener("click", (event) => {
@@ -1399,8 +2049,6 @@ waterfall.addEventListener("dblclick", async (event) => {
   await runRfCommand("tune");
 });
 byId("artifact-close").addEventListener("click", () => { byId("artifact-inspector").hidden = true; });
-byId("attack-mode").addEventListener("click", () => setMode("attack"));
-byId("secure-mode").addEventListener("click", () => setMode("secure"));
 byId("frontend-basic").addEventListener("click", () => setFrontendMode("basic"));
 byId("frontend-advanced").addEventListener("click", () => setFrontendMode("advanced"));
 byId("receiver-scan").addEventListener("click", () => runRfCommand("scan"));

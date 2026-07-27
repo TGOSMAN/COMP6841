@@ -8,13 +8,11 @@
   </head>
   <body class="challenge-page">
     <header class="challenge-topbar">
-      <a class="back-link" href="/#tasks">&larr; All situations</a>
-      <div class="challenge-progress" id="challenge-progress" aria-label="Challenge navigation"></div>
-      <div class="mode-switch compact" aria-label="Security mode">
-        <button id="attack-mode" class="active" type="button">Attack</button>
-        <button id="secure-mode" type="button">Secure</button>
-        <strong id="mode-status">Attack Mode</strong>
+      <div class="challenge-nav-links">
+        <a class="back-link" href="/#tasks">&larr; All situations</a>
+        <a href="/guide.html">Setup Guide</a>
       </div>
+      <div class="challenge-progress" id="challenge-progress" aria-label="Challenge navigation"></div>
     </header>
 
     <main class="challenge-shell">
@@ -63,8 +61,13 @@
             <div>
               <button id="source-live" class="active" type="button">Live parser</button>
               <button id="source-artifact" type="button">Artifact replay</button>
+              <button id="source-external" type="button">External feed</button>
               <a id="source-raw-download" href="/api/rf/raw" download>Raw IQ</a>
             </div>
+          </div>
+          <div class="signal-data-alert" id="signal-data-alert" role="status" hidden>
+            <strong>No live signal data received</strong>
+            <span id="signal-data-alert-detail">Waiting for the mapped GNU Radio Python flowgraph to stream samples.</span>
           </div>
 
           <div class="analyser-controls receiver-basic" aria-label="Receiver controls">
@@ -180,6 +183,7 @@
               </div>
               <canvas id="time-series" width="1100" height="220" aria-label="Live tuned sample time series"></canvas>
             </div>
+            <div class="waterfall-axis-label">Waterfall frequency axis</div>
             <div class="axis-scale analysis-axis" id="analysis-axis"></div>
             <div class="plot-frame">
               <canvas id="analysis-waterfall" width="1100" height="700" aria-label="Configurable signal waterfall"></canvas>
@@ -219,22 +223,47 @@
             <div class="effect-meter" id="effect-meter"><i></i><i></i><i></i><i></i></div>
           </section>
 
+          <section class="alarm-packet-lab" id="alarm-packet-lab" hidden aria-labelledby="alarm-packet-title">
+            <header>
+              <div>
+                <p class="eyebrow">Embedded receiver target</p>
+                <h2 id="alarm-packet-title">Emergency warning-light controller</h2>
+              </div>
+              <span id="alarm-controller-state">ALARM_CHECK / STANDBY</span>
+            </header>
+            <div class="alarm-lab-body">
+              <div class="alarm-beacon" id="alarm-beacon" aria-label="Warning light off">
+                <i></i>
+                <strong>WARNING</strong>
+                <span id="alarm-beacon-label">LIGHT OFF</span>
+              </div>
+              <form id="alarm-packet-form">
+                <label for="alarm-packet-input">Forged receiver packet (`uint32_t`)</label>
+                <div>
+                  <input id="alarm-packet-input" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x........">
+                  <button type="submit">Send packet</button>
+                </div>
+                <output id="alarm-packet-result" aria-live="polite">Reverse the supplied C decoder, then submit a packet that activates AlarmCheck.</output>
+              </form>
+            </div>
+          </section>
+
           <section class="weather-radio" id="weather-radio" hidden aria-labelledby="weather-radio-title">
             <header>
               <div>
-                <p class="eyebrow">Interactive voice intercept</p>
-                <h2 id="weather-radio-title">Council warning audio net</h2>
+                <p class="eyebrow">Active reverse-engineering target</p>
+                <h2 id="weather-radio-title">Civilian emergency transmission lab</h2>
               </div>
               <span class="radio-live" id="weather-radio-status"><i></i> Standby</span>
             </header>
             <div class="radio-howto" id="weather-radio-help">
               <strong>How this level works</strong>
-              <span><b>1</b> Intercept a legitimate randomized radio call.</span>
-              <span><b>2</b> Extract its callsign, zone, action, and AUTH code.</span>
-              <span><b>3</b> Write a valid public-warning message and submit it.</span>
+              <span><b>1</b> Intercept a current legitimate emergency-network call.</span>
+              <span><b>2</b> Recover its callsign, zone, alert, action, and rotating AUTH code.</span>
+              <span><b>3</b> Rebroadcast a complete warning that the simulated receiver accepts.</span>
             </div>
             <div class="radio-frequency">
-              <span>COUNCIL AUX / AM</span>
+              <span>CIVIL EMERGENCY AUX / AM</span>
               <strong>169.650</strong>
               <small>MHz</small>
             </div>
@@ -242,8 +271,8 @@
               <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
             </div>
             <div class="radio-controls">
-              <button id="weather-generate" type="button">1. New intercept</button>
-              <button id="weather-play" class="radio-listen-button" type="button" disabled>2. Listen to authentic call</button>
+              <button id="weather-generate" type="button">1. Capture transmission</button>
+              <button id="weather-play" class="radio-listen-button" type="button" disabled>2. Listen to intercepted call</button>
               <button id="weather-transcript-toggle" type="button" disabled>Show text backup</button>
               <label>Radio noise <input id="weather-noise" type="range" min="0" max="100" value="32"></label>
             </div>
@@ -253,9 +282,9 @@
               <code>&lt;TARGET SITE&gt;, ZONE &lt;ID&gt;, ALERT &lt;REASON&gt;, ACTION &lt;INSTRUCTION&gt;, AUTH &lt;CODE&gt;</code>
             </div>
             <form class="weather-report injection-report" id="weather-report-form">
-              <label for="weather-injection">3. Compose your warning message</label>
+              <label for="weather-injection">3. Compose the emergency transmission</label>
               <textarea id="weather-injection" aria-describedby="weather-report-result" placeholder="Example structure: SITE, ZONE NORTH, ALERT flood warning, ACTION SHELTER, AUTH CODE" disabled></textarea>
-              <button type="submit" disabled>Inject and play message</button>
+              <button type="submit" disabled>Rebroadcast and play message</button>
               <output id="weather-report-result" aria-live="polite">Preparing your first intercept...</output>
             </form>
           </section>
@@ -327,7 +356,7 @@
           <h2>Submit your finding</h2>
         </div>
         <form class="flag-form" id="challenge-flag-form">
-          <input id="challenge-flag" aria-label="Flag input" placeholder="CTF{YOUR_FLAG}" autocomplete="off">
+          <input id="challenge-flag" aria-label="Flag input" placeholder="FLAG{...} or CTF{...}" autocomplete="off">
           <button type="submit">Submit flag</button>
         </form>
         <p class="flag-result" id="challenge-flag-result" aria-live="polite"></p>
