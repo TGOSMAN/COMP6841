@@ -24,14 +24,8 @@ from PyQt5 import Qt
 from argparse import ArgumentParser
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio import eng_notation
-from gnuradio import gr, blocks
-import pmt
 import sip
 import threading
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from signal_forge_live_sink import SignalForgeLiveSink
 
 
 
@@ -77,13 +71,6 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
         # Blocks
         ##################################################
 
-        self.signal_forge_live_sink_0 = SignalForgeLiveSink(
-            challenge_id="broadcast-reading-signals",
-            center_hz=315_000_000,
-            sample_rate_hz=samp_rate,
-            source_label="Song_Meta ReadingSignals.py post-channel-model CF32",
-            modulation="4-level ASK",
-        )
         self.qtgui_waterfall_sink_x_0 = qtgui.waterfall_sink_c(
             1024, #size
             window.WIN_BLACKMAN_hARRIS, #wintype
@@ -208,7 +195,6 @@ class ReadingSignals(gr.top_block, Qt.QWidget):
         self.connect((self.blocks_vector_source_x_0, 0), (self.blocks_unpack_k_bits_bb_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_time_sink_x_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_waterfall_sink_x_0, 0))
-        self.connect((self.channels_channel_model_0, 0), (self.signal_forge_live_sink_0, 0))
         self.connect((self.low_pass_filter_0, 0), (self.blocks_multiply_xx_0, 0))
 
 

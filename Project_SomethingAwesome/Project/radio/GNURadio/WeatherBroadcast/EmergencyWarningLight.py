@@ -25,13 +25,8 @@ from gnuradio import eng_notation
 import EmergencyWarningLight_epy_block_0 as epy_block_0  # embedded python block
 import EmergencyWarningLight_epy_block_1 as epy_block_1  # embedded python block
 import EmergencyWarningLight_epy_block_1_0 as epy_block_1_0  # embedded python block
-from pathlib import Path
 import sip
 import threading
-
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from signal_forge_live_sink import SignalForgeLiveSink
 
 
 
@@ -77,13 +72,6 @@ class EmergencyWarningLight(gr.top_block, Qt.QWidget):
         # Blocks
         ##################################################
 
-        self.signal_forge_live_sink_0 = SignalForgeLiveSink(
-            challenge_id="weather-boring-active-re",
-            center_hz=169_650_000,
-            sample_rate_hz=samp_rate,
-            source_label="EmergencyWarningLight.py post-channel-model CF32",
-            modulation="live generated alarm metadata",
-        )
         self.qtgui_waterfall_sink_x_0 = qtgui.waterfall_sink_c(
             1024, #size
             window.WIN_BLACKMAN_hARRIS, #wintype
@@ -189,19 +177,19 @@ class EmergencyWarningLight(gr.top_block, Qt.QWidget):
         self.blocks_float_to_short_0_0 = blocks.float_to_short(1, 1)
         self.blocks_float_to_short_0 = blocks.float_to_short(1, 1)
         self.blocks_float_to_complex_0 = blocks.float_to_complex(1)
-        self.analog_packet_q_0 = analog.sig_source_f(samp_rate, analog.GR_COS_WAVE, 1730, 12000, 18000)
-        self.analog_packet_i_0 = analog.sig_source_f(samp_rate, analog.GR_SIN_WAVE, 970, 14000, 20000)
         self.analog_sig_source_x_0_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 500000, 1, 0, 0)
         self.analog_sig_source_x_0 = analog.sig_source_c(samp_rate, analog.GR_COS_WAVE, 500000, 1, 0, 0)
+        self.analog_packet_q_0 = analog.sig_source_f(samp_rate, analog.GR_COS_WAVE, 1730, 12000, 18000, 0)
+        self.analog_packet_i_0 = analog.sig_source_f(samp_rate, analog.GR_SIN_WAVE, 970, 14000, 20000, 0)
 
 
         ##################################################
         # Connections
         ##################################################
-        self.connect((self.analog_sig_source_x_0, 0), (self.blocks_stream_mux_0, 0))
-        self.connect((self.analog_sig_source_x_0_0, 0), (self.blocks_stream_mux_0, 1))
         self.connect((self.analog_packet_i_0, 0), (self.blocks_float_to_short_0, 0))
         self.connect((self.analog_packet_q_0, 0), (self.blocks_float_to_short_0_0, 0))
+        self.connect((self.analog_sig_source_x_0, 0), (self.blocks_stream_mux_0, 0))
+        self.connect((self.analog_sig_source_x_0_0, 0), (self.blocks_stream_mux_0, 1))
         self.connect((self.blocks_float_to_complex_0, 0), (self.epy_block_0, 0))
         self.connect((self.blocks_float_to_short_0, 0), (self.epy_block_1, 0))
         self.connect((self.blocks_float_to_short_0_0, 0), (self.epy_block_1_0, 0))
@@ -212,7 +200,6 @@ class EmergencyWarningLight(gr.top_block, Qt.QWidget):
         self.connect((self.blocks_packed_to_unpacked_xx_0, 0), (self.blocks_int_to_float_0, 0))
         self.connect((self.blocks_packed_to_unpacked_xx_0_0, 0), (self.blocks_int_to_float_0_0, 0))
         self.connect((self.blocks_stream_mux_0, 0), (self.blocks_multiply_xx_0, 1))
-        self.connect((self.channels_channel_model_0, 0), (self.signal_forge_live_sink_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_time_sink_x_0, 0))
         self.connect((self.channels_channel_model_0, 0), (self.qtgui_waterfall_sink_x_0, 0))
         self.connect((self.epy_block_0, 0), (self.blocks_multiply_xx_0, 0))
