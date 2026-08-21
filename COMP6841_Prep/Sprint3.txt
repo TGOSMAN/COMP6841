@@ -1,0 +1,29 @@
+Q1: RSA
+
+Encrypt: BOA
+
+Steps I took:
+1. I made each letter the position in the alphabet making the message
+
+Message: 2151 
+
+2. Choose Primes p = 11003, 11027 and calulate modulus N = pxq = 121330081
+
+3. Calculate Eulers Tortient m =(p-1)x(q-1) = 121308052
+
+4. Pick encryption key e that has to be coprime with m, e = 35
+
+C = 2151^e mod N = 9 594 789
+
+
+
+
+Q2: Cipher Game:
+
+HQG UGC GUIPSGM LPJJ UDI XUIPSGUJJE LOQG UJJ SIOQX ASMMPTPJPIPQM OUKQ TQQG QWOUVMIQC.
+
+Steps I took:
+
+1. No 1 or two lette words so looked at double letter especially UJJ this has a low entropy because it has a high chance of either being be too or see
+2 another word ends in UJJE so I assume this to be seen otherwise no word really ends in is _t_ _ _ _too _, a lot more end in _ s _ _ _ _ seen.
+3. Tried now to decipher the first word mostly to a predictable sentence bu could not figure it out

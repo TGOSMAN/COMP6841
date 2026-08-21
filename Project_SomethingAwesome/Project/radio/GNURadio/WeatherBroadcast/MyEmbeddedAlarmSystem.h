@@ -1,9 +1,0 @@
-//
-// Created by User on 22/07/2026.
-//
-
-#ifndef WEATHERBROADCAST_MYEMBEDDEDALARMSYSTEM_H
-#define WEATHERBROADCAST_MYEMBEDDEDALARMSYSTEM_H
-#include <stdint.h>
-uint8_t AlarmCheck(uint32_t packet);
-#endif //WEATHERBROADCAST_MYEMBEDDEDALARMSYSTEM_H

@@ -1,0 +1,43 @@
+Q1: Week 8 GHOST CASE STUDY (20 Marks)
+
+
+What would you as the major do to get from Daniel his report on what to do about the crystal skull? You may want to consider:
+a) Is Nick to Be Trusted?
+b) is there anything urgent we should do about the skull based on the insights/information you know for your experience? (
+c) ... Other things Daniel might want to tell you that you might not even be expecting him to say?
+	
+
+I believe that Nick is a mostly trustworthy source and should be used as a form or translator/speak for Daniel, however that the output should be actively monitored to check for anomalous details or strange behaviours to indicate less trust. I believe Nick is trustworthy as an individual because due to his knowledge of the Majors Secrets that is a private secret and public secrets that the group knows just like the existence of the skull. However, his previous evaluations to be in a psychiatric institution by others can be misleading as you must then also place trust in the competence in the medical professionals up the chain of trust, however given that these individuals did not know the public secret that was the skulls existence they may have formed an incorrect judgement. I believe however that other factors on human behaviours that Nick displays would be evaluated. Given this there would still remain a basis for a reduced trust in Nick even if he has been validated as his intent and the integrity of what he produces cannot be authenticated which could be a large risk for the mission. 
+
+Given that the skull may not be secure to protect the two worlds, it is potentially dangerous to have it contained. With Nick not having fully garaunteed trust and other people around not to be trusted this becomes a authentication and security problem. Because if people touch the skull they may end up like Daniel did or cause other problems. A method could be to have the skull locked in a box and only opened if it reaches either the temple location or secure location of the site. This way nobody for the temporary period would be able to unlock it and they must move it back to the secure place or complete a mission in order to gain access to it again, either way an intentional decision needs to be made FIRST before anyone can touch it. 
+
+Due to daniels ability to become invisible his presence becomes undetectable which could become a problem if he is left in a room and begins to here private conversations and details which already happened. This is a threat and all highly confidential matters should avoid being discussed (assuming he can't open things and read them). This matter can become a huge security threat because you also have no idea if he has or hasn't travelled to another location or heard other people or in general human privacy concerns like going into somebodies room at night un invited. 
+
+
+
+Q2: Week 7 Breach (20 Marks)
+
+Live Data Breach Incident Response: Blackbaud Data Breach
+
+Questions To Respond To:
+
+What has Happened ? (2 Marks)
+Our data collection system has been storing useful client information as part of our services offered. However we have found that an adversary has gained access using older authentication passwords that were not removed. This gave the adversary the access to our stored data for approximately 3 months without detection. We have now removed their access and secured our data storage ability.
+
+What was lost ? (2 Marks)
+User/client personal/sensitive information including but not limited to contact details, business contacts, financial donation information, internet meta-data. Business trade secrets, financial account and transaction information.
+What about our system allowed this attack to become so damaging? (2 Marks)
+
+Our limited implementation of firewalls and poorly managed access of local administrator accounts were a key vulnerability targeted. Furthermore the data being stored as plaintext allowed for useful and meaningful information to be transferred in a very damaging manner with no decryption techniques required for the attack to be completed.
+
+What systems or organisations depend on the compromised resource? (3 Marks)
+
+All customer CRM services and analytics and data entry depend on this compromised resource. Hence our key meta data framework and information system will be impacted.
+
+Can we continue serving customers safely, or would continuing operations increase the damage? (5 Marks)
+
+Currently Continuing to server customers cannot be done in a safe manner as we are still unaware of the data that has been stolen or gone missing, this may also have data poisoning implications which may misinform corporate businesses and increase the damage further. Furthermore the current data we have will undergo an encryption process and current local admin accounts are being reviewed for higher permissions with restrictions being implemented to further reduce the level of a second attack. If we continue another attacker may use the same strategy with an unaccounted admin account and continued to cause damage. 
+
+Which customers or business partners are most commercially important and need to be contacted first? (5 Marks)
+
+Before anything all government authorities must be contacted first and then we may disclose to our business partners. Critical Business partners include our  large corporate donors and product management companies due to the loss of trading secrets being a cause for immediate financial damage that can be irreversible. Next we need to notify the public smaller businesses and the wider community that this has occurred and to watch for strange financial transactions of the coming days. 

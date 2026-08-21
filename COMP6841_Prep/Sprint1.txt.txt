@@ -1,0 +1,35 @@
+Practice Q1: Decryption Game (4 Marks) (3)
+Decrypt the message and describe your procedure
+
+1. I First look for the most common letter (source of least entropy) to determine what its most likely conversion is due to English rules. 
+2. If nothing too easy pops up for the decipher I look for conjunctions (a, am, is, an, at etc) because there is a limited number of possibilities and must contain one vowel (6 options of vowel but really 4). Enough repetitions can get me a vowel which is a core building block to most words.
+3. If I am still struggling I look for special cases (double letters) as there are only a few letters that make sense to do that with in English (SS, LL, TT) or apostrophes  usually only an s or t that follows
+
+
+Practice Q2: Two Factor Authentication TOTP,OAuth,S/Key Attacks (6 Marks) (5) (A bit more Concise)
+
+
+There are any vulnerabilities within barbaras sercurity system.
+1. Use of a limited set of single use passwords  that are to be trusted by unknown sources. If this list of 10 (not very many) passwords are leaked then a direct brute force attack will breach as there is only 10 possibilities to attempts. Furthermore, if these passwords are stored are of low entropy an attacker could just launch a rainbow table attack which tries to guess the passwords without them even being leaked. 
+
+2. The OAUTH usage can be abused by a Man in the Middle attack where the token transfer is sniffed out by a listener and decrypted the secret. Which would give an attacker open access to a range of sites to your user credentials under the name of the site you believe to have trusted. This means they would have access to your data but not your email which could be even worse.
+
+
+Practice Q3: Dam Failures (10 Marks) (70:
+
+The 2022 Jagersfontein Dam Collapse Disaster, was a recent tailings dam collapse that killed a total of 3 people with about 40 injured and between 20-100 houses destroyed. In addition to this the collapse contaminated a local water supply that is used for local agriculture in the area. The initial damage was estimated to be 20 Million dollars in assets. However there is decades long damage to the environment and the economy of the region with close to 1000 people being displaced and farms having to reroute their water or move to another region. In 2025 a group of 5 people who worked for a local engineering company of the dam were charged with murder and damage to property. Recent evidence shows that the conventional methods used to measure the stability and security of the dam wall were spot checks with sensors at designated locations. However, this is a low sampling over a large area and can be irregular, a new method that was not used is satellite Inferometric Sythetic Aperture arrays that can measure across the entire wall motion down to millimetre precision every couple of days. 
+
+I believe this story links very closely to how data lakes are handled.
+
+1. The fact that often breaches which occur due to improper planning, design and testing in addition to governance, often end up being pointed towards a small hacking group or a security agency or companies feeding data rather than the large corporate organisation themselves that needs a structural review.
+2. Often the security testing and evaluation can be viewed with a complacent perspective with irregular spot checks held by agencies with a pen test occurring. Rather than regular active threat monitoring logging and detection methods to spot anomonalies very early in the process such as the satellites could have prevented the fallout of the dam collapse very early on.
+3.The damage that occurs to not only on a social level but on an economic level I find to be closely linked. Due to the fact that these data breaches often cause continmation of information of businesses loosely attached with a data lake. Think of a dealership using a CRM which feeds into a data lake, once the contacts have been leaked, not only are there all the social aspects and setting up a new CRM that may be required, but also the time to re establish a competitive advantage to run the business successfully similar to the water availability to the farmers down stream.
+
+
+
+Practice Q4:Problems with PKI (7Marks): (No Example -2) (3)
+
+One of the large problems of the PKI system is that the people who issue certificates that a source have been approved. They often assume that you will double check that they are a trusted person and only give the source a unique name and ID to go by around the internet. We assume that a name and ID give enough information about how trustworthy a site is, but two people could have the same name and different passports the same way two source/sites can so when you call or ask for that source how do you know which one you are talking two if they both sound the same and you only use their name and check that they own a certificate. This can lead to man cases and fraud and with nobody to properly check against with a false sense of trust in the higher ups which are assuming that you are going to do the work for them.
+
+xxx
+

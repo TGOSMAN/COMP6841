@@ -1,0 +1,38 @@
+25 Mins
+
+Q1 Scenario 1: Accidents (10 Marks, 10 mins)
+
+An employee accidentally deletes important production data while performing routine maintenance. The company has backups, but restoring them will cause several hours of downtime.
+
+What would you recommend the company do?
+
+Consider recovery, investigation, responsibility, and preventing similar accidents.
+
+
+The company should load the backups with the down time as a penalty and begin a root cause analysis. A group of people at various positions should be interviewed relating to the accident. A Key question should be to determine how the employee was able to have access to the data in the first place and to review what should be a suitable authority level to have deletion permissions enabled for the data. Hence, a wider priority should be to fix the system created rather than the employee, the changes an findings should then be written to all staff and notified to people who it will concern the most before implementation. However, type 1 and 2 errors should be balanced in this process rather than escalating the permission to the highest authority.
+
+A secondary audit should then be undertaken to understand how the accident of the employee was able to occur what led to them making an accident, are the working conditions to acceptable standards and if the staff are receiving adequate training.
+Finally, a separate audit of the back up system should be undertaken as there is a key consequence of the deletion is the long down time of several hours. The audit should investigate if this system could be made faster and why this takes hours and the extent of the downtime on company operations. This is to then reduce the impact if another accident were to occur in which a shorter downtime in a localised section may be a target outcome with a lower severity. 
+
+Q2 Scenario 2: Hashes (10 Marks, 10 mins)
+
+A company discovers that its password database has been leaked. Passwords are stored using unsalted SHA-256 hashes.
+
+Management believes the passwords are safe because they were hashed.
+
+What would you recommend the company do?
+
+
+1. The company should first notify legal government authorities immediately of the cyber security breach.
+
+2. The company should then check their logs to see last data extractions or anomalous behaviours to see if the breach was captured and the extent of passwords should be measured. 
+
+3. Salting using a RNG package should be immediately implemented and tested, to ensure any new entries are much more secure.
+
+4. Using the initial findings of an investigation, if specific customers can be determined they should notify them immediately disclosing that their password has been leaked and recommending they change their password enabling it to be salted with the hash. A lookup system should also be used to deny customers from making new passwords with similarities to the old ones to avoid rainbow table and dictionary attacks. This should suspend the ongoing risk
+
+5. Further audit should then be taken into how the adversary was able to gain access to the database to prevent this from happening again. In addition to this the SHA-256 scheme should then be reviewed to find if a cryptographic has should be used. Potentially one without collisions to avoid a birthday attack from being taken. This would be the primary threat afterwards as an adversary may create a password with a colliding hash although the salting may resolve this. 
+
+
+
+Consider the actual risk to users, immediate actions, and how password storage should be improved.
